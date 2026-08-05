@@ -1,0 +1,320 @@
+import { useEffect, useState, useCallback } from "react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { adminApi, api, ADMIN_TOKEN_KEY, rupiah, LOGOS } from "@/lib/apiClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
+  Eye, RefreshCw, Ticket, Clock, Wallet, Users,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const STATUS_META = {
+  pending_payment: { t: "Belum Bayar", c: "bg-[#D56115]/15 text-[#B34F0F]" },
+  waiting_verification: { t: "Perlu Verifikasi", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
+  verified: { t: "Terverifikasi", c: "bg-[#10B981]/15 text-[#0F7A57]" },
+  rejected: { t: "Ditolak", c: "bg-[#EF4444]/15 text-[#EF4444]" },
+  expired: { t: "Kadaluarsa", c: "bg-[#6B7280]/15 text-[#6B7280]" },
+};
+
+const FILTERS = [
+  { k: "all", t: "Semua" },
+  { k: "waiting_verification", t: "Perlu Verifikasi" },
+  { k: "verified", t: "Terverifikasi" },
+  { k: "pending_payment", t: "Belum Bayar" },
+  { k: "rejected", t: "Ditolak" },
+];
+
+function LoginView({ onLogin }) {
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await api.post("/admin/login", { password });
+      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+      onLogin();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Login gagal");
+    }
+    setLoading(false);
+  };
+  return (
+    <div className="max-w-md mx-auto px-4 py-24">
+      <motion.form initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        onSubmit={submit} className="rounded-2xl border border-border bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="h-12 w-12 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center mb-4">
+          <ShieldCheck className="h-6 w-6 text-[#1E3A5F]" />
+        </div>
+        <h1 className="font-serif-display text-3xl text-[#1E3A5F]">Panel Admin</h1>
+        <p className="text-sm text-[#6B7280] mb-6">Masukkan password untuk mengelola pesanan.</p>
+        <Label htmlFor="pw">Password</Label>
+        <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          className="mt-1.5" data-testid="admin-password" placeholder="••••••••" />
+        <Button type="submit" disabled={loading} data-testid="admin-login-btn"
+          className="w-full mt-5 bg-[#1E3A5F] hover:bg-[#16304f] rounded-full">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Masuk
+        </Button>
+      </motion.form>
+    </div>
+  );
+}
+
+const StatCard = ({ icon: Icon, label, value, color }) => (
+  <div className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
+    <span className={cn("h-10 w-10 rounded-lg flex items-center justify-center", color)}><Icon className="h-5 w-5" /></span>
+    <div>
+      <p className="text-xs text-[#6B7280]">{label}</p>
+      <p className="font-semibold text-lg text-[#1E3A5F]">{value}</p>
+    </div>
+  </div>
+);
+
+export default function AdminPage() {
+  const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+  const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+  const [proofView, setProofView] = useState(null);
+  const [printOrder, setPrintOrder] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [o, s, e] = await Promise.all([
+        adminApi.get("/admin/orders"),
+        adminApi.get("/admin/stats"),
+        api.get("/event"),
+      ]);
+      setOrders(o.data); setStats(s.data); setEvent(e.data);
+    } catch (err) {
+      if (err?.response?.status === 401) { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); }
+      else toast.error("Gagal memuat data");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { if (authed) load(); }, [authed, load]);
+
+  const act = async (id, action) => {
+    setBusyId(id);
+    try {
+      await adminApi.post(`/admin/orders/${id}/${action}`);
+      toast.success(action === "verify" ? "Pesanan diverifikasi" : action === "reject" ? "Pesanan ditolak" : "Check-in tersimpan");
+      await load();
+    } catch (err) { toast.error("Aksi gagal"); }
+    setBusyId(null);
+  };
+
+  const setActiveSession = async (sid) => {
+    try { await adminApi.post("/admin/active-session", { session_id: sid }); toast.success(`Sesi aktif: ${sid}`); await load(); }
+    catch { toast.error("Gagal ubah sesi"); }
+  };
+
+  const logout = () => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); };
+
+  const doPrint = (o) => {
+    setPrintOrder(o);
+    setTimeout(() => window.print(), 250);
+  };
+
+  if (!authed) return <LoginView onLogin={() => setAuthed(true)} />;
+
+  const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
+      <div className="flex items-center justify-between mb-6 no-print">
+        <div>
+          <h1 className="font-serif-display text-3xl text-[#1E3A5F]">Panel Admin</h1>
+          <p className="text-sm text-[#6B7280]">Kelola pesanan & verifikasi pembayaran.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={load} data-testid="btn-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
+          <Button variant="ghost" onClick={logout} data-testid="btn-logout" className="text-[#EF4444]"><LogOut className="h-4 w-4 mr-1.5" /> Keluar</Button>
+        </div>
+      </div>
+
+      {stats && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 no-print">
+          <StatCard icon={Clock} label="Perlu Verifikasi" value={stats.waiting_verification} color="bg-[#1E3A5F]/10 text-[#1E3A5F]" />
+          <StatCard icon={CheckCircle2} label="Terverifikasi" value={stats.verified} color="bg-[#10B981]/10 text-[#10B981]" />
+          <StatCard icon={Ticket} label="Tiket Terjual" value={stats.tickets_verified} color="bg-[#D56115]/10 text-[#D56115]" />
+          <StatCard icon={Wallet} label="Pendapatan" value={rupiah(stats.revenue_verified)} color="bg-[#10B981]/10 text-[#10B981]" />
+        </div>
+      )}
+
+      {/* Session control */}
+      {event && (
+        <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print">
+          <p className="text-sm font-medium text-[#1E3A5F] mb-2 flex items-center gap-2"><Users className="h-4 w-4" /> Kontrol Sesi (aktif: Sesi {event.active_session})</p>
+          <div className="flex flex-wrap gap-2">
+            {event.sessions.map((s) => (
+              <button key={s.id} data-testid={`admin-session-${s.id}`} onClick={() => setActiveSession(s.id)}
+                className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  event.active_session === s.id ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/50")}>
+                {s.name} · {s.booked}/{s.capacity}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4 no-print">
+        {FILTERS.map((f) => (
+          <button key={f.k} data-testid={`filter-${f.k}`} onClick={() => setFilter(f.k)}
+            className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+              filter === f.k ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/40")}>
+            {f.t}
+          </button>
+        ))}
+      </div>
+
+      {/* Orders table */}
+      <div className="rounded-2xl border border-border bg-white overflow-hidden no-print">
+        {loading ? (
+          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+        ) : filtered.length === 0 ? (
+          <div className="py-16 text-center text-sm text-[#6B7280]">Belum ada pesanan.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" data-testid="orders-table">
+              <thead className="bg-muted/50 text-left text-xs text-[#6B7280]">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Pemesan</th>
+                  <th className="px-4 py-3 font-medium">Sesi / Kursi</th>
+                  <th className="px-4 py-3 font-medium">Total</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Bukti</th>
+                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filtered.map((o) => {
+                  const meta = STATUS_META[o.status] || {};
+                  return (
+                    <tr key={o.id} data-testid={`order-row-${o.id.slice(0, 8)}`} className="hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-[#1A1A1A]">{o.name}</p>
+                        <p className="text-xs text-[#6B7280]">{o.phone}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p>{o.session?.name}</p>
+                        <p className="text-xs text-[#6B7280]">{o.seats.join(", ")}</p>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-[#1E3A5F]">{rupiah(o.total_amount)}</td>
+                      <td className="px-4 py-3">
+                        <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", meta.c)}>{meta.t}</span>
+                        {o.checked_in && <span className="block text-[10px] text-[#10B981] mt-1">✓ check-in</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {o.proof_image ? (
+                          <button onClick={() => setProofView(o)} data-testid={`view-proof-${o.id.slice(0, 8)}`}
+                            className="inline-flex items-center gap-1 text-[#D56115] hover:underline text-xs">
+                            <Eye className="h-3.5 w-3.5" /> Lihat
+                          </button>
+                        ) : <span className="text-xs text-[#6B7280]">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1.5 justify-end">
+                          {o.status === "waiting_verification" && (
+                            <>
+                              <Button size="sm" onClick={() => act(o.id, "verify")} disabled={busyId === o.id}
+                                data-testid={`verify-${o.id.slice(0, 8)}`} className="h-8 bg-[#10B981] hover:bg-[#0F7A57]">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => act(o.id, "reject")} disabled={busyId === o.id}
+                                data-testid={`reject-${o.id.slice(0, 8)}`} className="h-8 text-[#EF4444] border-[#EF4444]/40">
+                                <XCircle className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                          {o.status === "verified" && (
+                            <>
+                              {!o.checked_in && (
+                                <Button size="sm" variant="outline" onClick={() => act(o.id, "checkin")} disabled={busyId === o.id}
+                                  data-testid={`checkin-${o.id.slice(0, 8)}`} className="h-8 text-xs">Check-in</Button>
+                              )}
+                              <Button size="sm" onClick={() => doPrint(o)} data-testid={`print-${o.id.slice(0, 8)}`}
+                                className="h-8 bg-[#1E3A5F] hover:bg-[#16304f]">
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Proof viewer */}
+      <Dialog open={!!proofView} onOpenChange={() => setProofView(null)}>
+        <DialogContent data-testid="proof-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Bukti Pembayaran</DialogTitle>
+          </DialogHeader>
+          {proofView && (
+            <div>
+              <div className="text-sm mb-3 space-y-1">
+                <p><b>{proofView.name}</b> · {proofView.phone}</p>
+                <p>Bayar: <b className="text-[#D56115]">{rupiah(proofView.total_amount)}</b> (kode unik {proofView.unique_code})</p>
+              </div>
+              <img src={proofView.proof_image} alt="Bukti" className="w-full rounded-lg border border-border" />
+              {proofView.status === "waiting_verification" && (
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={() => { act(proofView.id, "verify"); setProofView(null); }} className="flex-1 bg-[#10B981] hover:bg-[#0F7A57]">
+                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> Verifikasi
+                  </Button>
+                  <Button variant="outline" onClick={() => { act(proofView.id, "reject"); setProofView(null); }} className="flex-1 text-[#EF4444] border-[#EF4444]/40">
+                    <XCircle className="h-4 w-4 mr-1.5" /> Tolak
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Printable ticket */}
+      {printOrder && (
+        <div id="print-area" className="hidden print:block p-8">
+          <div className="border-2 border-[#1E3A5F] rounded-xl p-6 max-w-md">
+            <div className="flex items-center gap-3 border-b border-dashed border-gray-300 pb-3 mb-3">
+              <img src={LOGOS.kbi} alt="KBI" className="h-10" />
+              <img src={LOGOS.mbi} alt="MBI" className="h-10" />
+            </div>
+            <p className="text-xs text-gray-500">TIKET NONTON BERSAMA · Minggu, 13 Sep 2026 · CGV Grand Batam</p>
+            <p className="font-serif-display text-xl text-[#1E3A5F] leading-tight mt-1">
+              Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara
+            </p>
+            <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
+              <div><p className="text-gray-500 text-xs">Nama</p><p className="font-semibold">{printOrder.name}</p></div>
+              <div><p className="text-gray-500 text-xs">No. HP</p><p className="font-semibold">{printOrder.phone}</p></div>
+              <div><p className="text-gray-500 text-xs">Sesi</p><p className="font-semibold">{printOrder.session?.name} · {printOrder.session?.time}</p></div>
+              <div><p className="text-gray-500 text-xs">Kursi</p><p className="font-semibold">{printOrder.seats.join(", ")}</p></div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-dashed border-gray-300 flex justify-between items-center">
+              <div><p className="text-gray-500 text-xs">Kode</p><p className="font-mono font-bold">{printOrder.id.slice(0, 8).toUpperCase()}-{printOrder.unique_code}</p></div>
+              <div className="text-right"><p className="text-gray-500 text-xs">Total</p><p className="font-bold">{rupiah(printOrder.total_amount)}</p></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

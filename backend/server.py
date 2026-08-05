@@ -1,72 +1,378 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+import random
 import uuid
-from datetime import datetime, timezone
-
+from pathlib import Path
+from pydantic import BaseModel, Field
+from typing import List, Optional, Literal
+from datetime import datetime, timezone, timedelta
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'mbi-nonton-2026-admin')
 
-# Create a router with the /api prefix
+app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+# ---------------- Event configuration ----------------
+TICKET_PRICE = 50000
+HOLD_MINUTES = 15  # unpaid orders auto-release seats after this
+EVENT_TITLE = 'Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"'
+EVENT_DATE = "Minggu, 13 Sep 2026"
+EVENT_LOCATION = "CGV Grand Batam"
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+SESSIONS = [
+    {"id": 1, "name": "Sesi 1", "time": "13:00 WIB"},
+    {"id": 2, "name": "Sesi 2", "time": "15:00 WIB"},
+    {"id": 3, "name": "Sesi 3", "time": "17:00 WIB"},
+    {"id": 4, "name": "Sesi 4", "time": "19:00 WIB"},
+]
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+SEAT_ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"]
+SEATS_PER_ROW = 10
+SEATS_PER_SESSION = len(SEAT_ROWS) * SEATS_PER_ROW  # 100
 
-# Add your routes to the router instead of directly to app
+TRANSFER_INFO = {
+    "bank": "BCA",
+    "account_number": "061 518 3381",
+    "account_name": "PD Majelis Buddhayana Indonesia Prov Kepri",
+}
+
+
+# ---------------- Models ----------------
+class OrderCreate(BaseModel):
+    name: str
+    phone: str
+    session_id: int
+    seats: List[str]
+    payment_method: Literal["qris", "transfer"]
+
+
+class ProofUpload(BaseModel):
+    proof_image: str  # base64 data URL
+
+
+class AdminLogin(BaseModel):
+    password: str
+
+
+class SetActiveSession(BaseModel):
+    session_id: int
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def get_config():
+    cfg = await db.config.find_one({"_id": "config"})
+    if not cfg:
+        cfg = {"_id": "config", "active_session": 1}
+        await db.config.insert_one(cfg)
+    return cfg
+
+
+async def taken_seats(session_id: int):
+    """Return set of seat labels currently occupied for a session.
+    Auto-releases (marks expired) unpaid orders older than HOLD_MINUTES."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=HOLD_MINUTES)
+    taken = set()
+    cursor = db.orders.find({"session_id": session_id, "status": {"$ne": "rejected"}})
+    async for o in cursor:
+        status = o.get("status")
+        if status == "expired":
+            continue
+        if status == "pending_payment":
+            created = datetime.fromisoformat(o["created_at"])
+            if created < cutoff:
+                await db.orders.update_one({"id": o["id"]}, {"$set": {"status": "expired"}})
+                continue
+        taken.update(o.get("seats", []))
+    return taken
+
+
+def build_seat_map(taken: set):
+    """Cara B: baris belakang terkunci sampai baris depan penuh."""
+    rows = []
+    prev_full = True
+    for r in SEAT_ROWS:
+        labels = [f"{r}{i}" for i in range(1, SEATS_PER_ROW + 1)]
+        row_taken = [l for l in labels if l in taken]
+        unlocked = prev_full
+        seats = []
+        for l in labels:
+            if l in taken:
+                st = "booked"
+            elif unlocked:
+                st = "available"
+            else:
+                st = "locked"
+            seats.append({"label": l, "status": st})
+        rows.append({"row": r, "unlocked": unlocked, "seats": seats})
+        prev_full = prev_full and (len(row_taken) == SEATS_PER_ROW)
+    return rows
+
+
+async def session_status(session_id: int, active_session: int):
+    taken = await taken_seats(session_id)
+    is_full = len(taken) >= SEATS_PER_SESSION
+    if session_id < active_session:
+        status = "closed"
+    elif session_id == active_session:
+        status = "full" if is_full else "open"
+    else:
+        status = "locked"
+    return status, len(taken)
+
+
+async def resolve_active_session():
+    """Advance active session pointer automatically when the current one is full."""
+    cfg = await get_config()
+    active = cfg["active_session"]
+    for s in SESSIONS:
+        if s["id"] < active:
+            continue
+        taken = await taken_seats(s["id"])
+        if len(taken) >= SEATS_PER_SESSION:
+            active = s["id"] + 1
+        else:
+            break
+    if active > len(SESSIONS):
+        active = len(SESSIONS)
+    if active != cfg["active_session"]:
+        await db.config.update_one({"_id": "config"}, {"$set": {"active_session": active}})
+    return active
+
+
+async def gen_unique_total(base: int):
+    existing = set()
+    async for o in db.orders.find({"status": {"$ne": "rejected"}}, {"total_amount": 1}):
+        if o.get("total_amount"):
+            existing.add(o["total_amount"])
+    for pool in (list(range(11, 100)), list(range(100, 1000))):
+        random.shuffle(pool)
+        for c in pool:
+            if base + c not in existing:
+                return c, base + c
+    raise HTTPException(status_code=409, detail="Tidak dapat membuat kode unik, coba lagi.")
+
+
+def clean(o):
+    o.pop("_id", None)
+    return o
+
+
+def require_admin(x_admin_token: Optional[str] = Header(None)):
+    if x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Tidak diizinkan")
+    return True
+
+
+# ---------------- Public endpoints ----------------
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Nonton Bareng MBI API"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+@api_router.get("/event")
+async def event_info():
+    active = await resolve_active_session()
+    sessions = []
+    for s in SESSIONS:
+        status, count = await session_status(s["id"], active)
+        sessions.append({**s, "status": status, "booked": count, "capacity": SEATS_PER_SESSION})
+    return {
+        "title": EVENT_TITLE,
+        "date": EVENT_DATE,
+        "location": EVENT_LOCATION,
+        "ticket_price": TICKET_PRICE,
+        "hold_minutes": HOLD_MINUTES,
+        "active_session": active,
+        "sessions": sessions,
+        "transfer": TRANSFER_INFO,
+    }
 
-# Include the router in the main app
+
+@api_router.get("/sessions/{session_id}/seats")
+async def get_seats(session_id: int):
+    if session_id not in [s["id"] for s in SESSIONS]:
+        raise HTTPException(status_code=404, detail="Sesi tidak ditemukan")
+    active = await resolve_active_session()
+    status, count = await session_status(session_id, active)
+    taken = await taken_seats(session_id)
+    return {
+        "session_id": session_id,
+        "status": status,
+        "rows": build_seat_map(taken),
+        "booked": count,
+        "capacity": SEATS_PER_SESSION,
+    }
+
+
+@api_router.post("/orders")
+async def create_order(payload: OrderCreate):
+    if not payload.name.strip() or not payload.phone.strip():
+        raise HTTPException(status_code=400, detail="Nama dan nomor HP wajib diisi")
+    if not payload.seats:
+        raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
+
+    active = await resolve_active_session()
+    if payload.session_id != active:
+        raise HTTPException(status_code=400, detail="Sesi ini belum/tidak dibuka untuk pemesanan")
+
+    seat_map = build_seat_map(await taken_seats(payload.session_id))
+    status_by_label = {s["label"]: s["status"] for row in seat_map for s in row["seats"]}
+    for seat in payload.seats:
+        st = status_by_label.get(seat)
+        if st is None:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
+        if st == "booked":
+            raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah dipesan orang lain")
+        if st == "locked":
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} masih terkunci, isi baris depan dulu")
+
+    qty = len(payload.seats)
+    base = qty * TICKET_PRICE
+    code, total = await gen_unique_total(base)
+
+    order = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name.strip(),
+        "phone": payload.phone.strip(),
+        "session_id": payload.session_id,
+        "seats": payload.seats,
+        "qty": qty,
+        "unit_price": TICKET_PRICE,
+        "base_amount": base,
+        "unique_code": code,
+        "total_amount": total,
+        "payment_method": payload.payment_method,
+        "status": "pending_payment",
+        "proof_image": None,
+        "checked_in": False,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.orders.insert_one(order)
+    return clean(dict(order))
+
+
+@api_router.get("/orders/{order_id}")
+async def get_order(order_id: str):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    # lazily expire if unpaid and too old
+    if o.get("status") == "pending_payment":
+        created = datetime.fromisoformat(o["created_at"])
+        if created < datetime.now(timezone.utc) - timedelta(minutes=HOLD_MINUTES):
+            await db.orders.update_one({"id": order_id}, {"$set": {"status": "expired"}})
+            o["status"] = "expired"
+    session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+    o = clean(o)
+    o["session"] = session
+    o["transfer"] = TRANSFER_INFO
+    return o
+
+
+@api_router.post("/orders/{order_id}/proof")
+async def upload_proof(order_id: str, payload: ProofUpload):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    if o["status"] == "expired":
+        raise HTTPException(status_code=400, detail="Pesanan sudah kadaluarsa, kursi telah dilepas")
+    if not payload.proof_image.startswith("data:image"):
+        raise HTTPException(status_code=400, detail="File bukti harus berupa gambar")
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"proof_image": payload.proof_image, "status": "waiting_verification", "updated_at": now_iso()}},
+    )
+    o = await db.orders.find_one({"id": order_id})
+    return clean(o)
+
+
+# ---------------- Admin endpoints ----------------
+@api_router.post("/admin/login")
+async def admin_login(payload: AdminLogin):
+    if payload.password != ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="Password salah")
+    return {"token": ADMIN_TOKEN}
+
+
+@api_router.get("/admin/orders")
+async def admin_orders(_: bool = Depends(require_admin), status: Optional[str] = None):
+    query = {}
+    if status:
+        query["status"] = status
+    orders = await db.orders.find(query).sort("created_at", -1).to_list(2000)
+    result = []
+    for o in orders:
+        session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        o = clean(o)
+        o["session"] = session
+        result.append(o)
+    return result
+
+
+@api_router.get("/admin/stats")
+async def admin_stats(_: bool = Depends(require_admin)):
+    orders = await db.orders.find({}).to_list(5000)
+    stats = {"total_orders": 0, "waiting_verification": 0, "verified": 0, "pending_payment": 0,
+             "rejected": 0, "expired": 0, "revenue_verified": 0, "tickets_verified": 0}
+    for o in orders:
+        stats["total_orders"] += 1
+        st = o.get("status", "")
+        if st in stats:
+            stats[st] += 1
+        if st == "verified":
+            stats["revenue_verified"] += o.get("base_amount", 0)
+            stats["tickets_verified"] += o.get("qty", 0)
+    return stats
+
+
+@api_router.post("/admin/orders/{order_id}/verify")
+async def verify_order(order_id: str, _: bool = Depends(require_admin)):
+    r = await db.orders.update_one({"id": order_id}, {"$set": {"status": "verified", "updated_at": now_iso()}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.post("/admin/orders/{order_id}/reject")
+async def reject_order(order_id: str, _: bool = Depends(require_admin)):
+    r = await db.orders.update_one({"id": order_id}, {"$set": {"status": "rejected", "updated_at": now_iso()}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.post("/admin/orders/{order_id}/checkin")
+async def checkin_order(order_id: str, _: bool = Depends(require_admin)):
+    r = await db.orders.update_one({"id": order_id}, {"$set": {"checked_in": True, "updated_at": now_iso()}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.post("/admin/active-session")
+async def set_active_session(payload: SetActiveSession, _: bool = Depends(require_admin)):
+    if payload.session_id not in [s["id"] for s in SESSIONS]:
+        raise HTTPException(status_code=400, detail="Sesi tidak valid")
+    await db.config.update_one({"_id": "config"}, {"$set": {"active_session": payload.session_id}}, upsert=True)
+    return {"active_session": payload.session_id}
+
+
 app.include_router(api_router)
 
 app.add_middleware(
@@ -77,12 +383,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
