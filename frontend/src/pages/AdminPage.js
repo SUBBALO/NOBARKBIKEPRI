@@ -10,9 +10,18 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
-  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck,
+  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const fmtTime = (iso) => {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    }) + " WIB";
+  } catch { return ""; }
+};
 
 const STATUS_META = {
   pending_payment: { t: "Belum Bayar", c: "bg-[#D56115]/15 text-[#B34F0F]" },
@@ -110,7 +119,10 @@ function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
             </div>
             <div className="text-right">
               {o.checked_in ? (
-                <span className="inline-flex items-center gap-1.5 text-sm text-[#10B981] font-medium"><CheckCircle2 className="h-4 w-4" /> Sudah Hadir</span>
+                <div className="text-right">
+                  <span className="inline-flex items-center gap-1.5 text-sm text-[#10B981] font-medium"><CheckCircle2 className="h-4 w-4" /> Sudah Hadir</span>
+                  {o.checked_in_at && <p className="text-[11px] text-[#6B7280] mt-0.5">Check-in: {fmtTime(o.checked_in_at)}</p>}
+                </div>
               ) : (
                 <Button onClick={() => onCheckin(o)} disabled={busyId === o.id} data-testid={`checkin-btn-${o.id.slice(0, 8)}`}
                   className="bg-[#1E3A5F] hover:bg-[#16304f]">
@@ -139,6 +151,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState("payment");
   const [checkinQuery, setCheckinQuery] = useState("");
   const [checkinPopup, setCheckinPopup] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,6 +188,25 @@ export default function AdminPage() {
 
   const logout = () => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); };
 
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const res = await adminApi.get("/admin/export", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `peserta_nonton_mbi.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("File Excel berhasil diunduh");
+    } catch (err) {
+      toast.error("Gagal mengunduh Excel");
+    }
+    setExporting(false);
+  };
+
   const doPrint = (o) => {
     setPrintOrder(o);
     setTimeout(() => window.print(), 250);
@@ -192,6 +224,9 @@ export default function AdminPage() {
           <p className="text-sm text-[#6B7280]">Kelola pesanan & verifikasi pembayaran.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={exportExcel} disabled={exporting} data-testid="btn-export">
+            {exporting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />} Export Excel
+          </Button>
           <Button variant="outline" onClick={load} data-testid="btn-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
           <Button variant="ghost" onClick={logout} data-testid="btn-logout" className="text-[#EF4444]"><LogOut className="h-4 w-4 mr-1.5" /> Keluar</Button>
         </div>
@@ -283,7 +318,7 @@ export default function AdminPage() {
                       <td className="px-4 py-3 font-semibold text-[#1E3A5F]">{rupiah(o.total_amount)}</td>
                       <td className="px-4 py-3">
                         <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", meta.c)}>{meta.t}</span>
-                        {o.checked_in && <span className="block text-[10px] text-[#10B981] mt-1">✓ check-in</span>}
+                        {o.checked_in && <span className="block text-[10px] text-[#10B981] mt-1">✓ hadir {o.checked_in_at ? fmtTime(o.checked_in_at) : ""}</span>}
                       </td>
                       <td className="px-4 py-3">
                         {o.proof_image ? (
@@ -376,6 +411,7 @@ export default function AdminPage() {
           {checkinPopup && (
             <div className="text-sm space-y-3">
               <p><b>{checkinPopup.name}</b> ({checkinPopup.phone}) — {checkinPopup.session?.name} · {checkinPopup.session?.time}</p>
+              <p className="text-xs text-[#10B981] font-medium">✓ Check-in tercatat: {fmtTime(new Date().toISOString())}</p>
               <div className="rounded-lg bg-[#D56115]/10 p-4">
                 <p className="text-[#B34F0F] font-medium mb-2">Pastikan sudah serahkan tiket untuk kursi:</p>
                 <div className="flex flex-wrap gap-2">

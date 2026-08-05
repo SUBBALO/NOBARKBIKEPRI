@@ -1,8 +1,10 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import io
 import logging
 import random
 import uuid
@@ -10,6 +12,8 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -372,7 +376,10 @@ async def reject_order(order_id: str, _: bool = Depends(require_admin)):
 
 @api_router.post("/admin/orders/{order_id}/checkin")
 async def checkin_order(order_id: str, _: bool = Depends(require_admin)):
-    r = await db.orders.update_one({"id": order_id}, {"$set": {"checked_in": True, "updated_at": now_iso()}})
+    r = await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"checked_in": True, "checked_in_at": now_iso(), "updated_at": now_iso()}},
+    )
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
     return clean(await db.orders.find_one({"id": order_id}))
@@ -384,6 +391,73 @@ async def set_active_session(payload: SetActiveSession, _: bool = Depends(requir
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
     await db.config.update_one({"_id": "config"}, {"$set": {"active_session": payload.session_id}}, upsert=True)
     return {"active_session": payload.session_id}
+
+
+@api_router.get("/admin/export")
+async def export_orders(_: bool = Depends(require_admin)):
+    status_label = {
+        "pending_payment": "Belum Bayar",
+        "waiting_verification": "Perlu Verifikasi",
+        "verified": "Terverifikasi",
+        "rejected": "Ditolak",
+        "expired": "Kadaluarsa",
+    }
+    orders = await db.orders.find({}).sort([("session_id", 1), ("created_at", 1)]).to_list(5000)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Peserta"
+    headers = ["No", "Kode Pesanan", "Nama", "No HP", "Sesi", "Jam", "Kursi",
+               "Jml Tiket", "Nominal (Rp)", "Kode Unik", "Metode", "Status", "Sudah Hadir", "Waktu Check-in", "Waktu Pesan"]
+    ws.append(headers)
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    for i, o in enumerate(orders, 1):
+        session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        created = o.get("created_at", "")
+        try:
+            dt = datetime.fromisoformat(created)
+            created_str = dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            created_str = created
+        checkin_str = ""
+        if o.get("checked_in_at"):
+            try:
+                checkin_str = datetime.fromisoformat(o["checked_in_at"]).strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                checkin_str = o["checked_in_at"]
+        ws.append([
+            i,
+            o["id"][:8].upper(),
+            o["name"],
+            o["phone"],
+            session["name"] if session else o["session_id"],
+            session["time"] if session else "",
+            ", ".join(o.get("seats", [])),
+            o.get("qty", 0),
+            o.get("total_amount", 0),
+            o.get("unique_code", ""),
+            "QRIS" if o.get("payment_method") == "qris" else "Transfer",
+            status_label.get(o.get("status"), o.get("status")),
+            "Ya" if o.get("checked_in") else "Belum",
+            checkin_str,
+            created_str,
+        ])
+    widths = [5, 12, 24, 16, 10, 12, 18, 9, 14, 9, 10, 16, 11, 18, 18]
+    for idx, w in enumerate(widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
+    ws.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"peserta_nonton_mbi_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
 
 
 app.include_router(api_router)
