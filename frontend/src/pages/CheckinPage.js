@@ -1,0 +1,213 @@
+import { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { adminApi, api, ADMIN_TOKEN_KEY, LOGOS } from "@/lib/apiClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Loader2, Search, UserCheck, CheckCircle2, Ticket, ScanLine, X,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const fmtTime = (iso) => {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+    }) + " WIB";
+  } catch { return ""; }
+};
+
+function Login({ onLogin }) {
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await api.post("/admin/login", { password });
+      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+      onLogin();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Login gagal");
+    }
+    setLoading(false);
+  };
+  return (
+    <div className="min-h-screen bg-[#1E3A5F] flex flex-col items-center justify-center px-6">
+      <img src={LOGOS.kbi} alt="KBI" className="h-14 mb-6 bg-white/95 rounded-lg p-2" />
+      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white p-7 shadow-xl">
+        <div className="h-12 w-12 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center mb-3">
+          <ScanLine className="h-6 w-6 text-[#1E3A5F]" />
+        </div>
+        <h1 className="font-serif-display text-2xl text-[#1E3A5F]">Check-in Peserta</h1>
+        <p className="text-sm text-[#6B7280] mb-5">Masuk untuk mencatat kehadiran peserta.</p>
+        <Label htmlFor="pw">Password Admin</Label>
+        <Input id="pw" type="password" inputMode="text" value={password} onChange={(e) => setPassword(e.target.value)}
+          className="mt-1.5" data-testid="checkin-login-password" placeholder="••••••••" />
+        <Button type="submit" disabled={loading} data-testid="checkin-login-btn"
+          className="w-full mt-5 bg-[#D56115] hover:bg-[#B34F0F] rounded-full h-11">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Masuk
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+export default function CheckinPage() {
+  const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState(null);
+  const [popup, setPopup] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await adminApi.get("/admin/participants");
+      setParticipants(data);
+    } catch (err) {
+      if (err?.response?.status === 401) { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); }
+      else toast.error("Gagal memuat data");
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { if (authed) load(); }, [authed, load]);
+
+  const doCheckin = async (o) => {
+    setBusyId(o.id);
+    try {
+      const { data } = await adminApi.post(`/admin/orders/${o.id}/checkin`);
+      setPopup(data);
+      await load();
+    } catch (err) { toast.error("Gagal check-in"); }
+    setBusyId(null);
+  };
+
+  if (!authed) return <Login onLogin={() => setAuthed(true)} />;
+
+  const q = query.trim().toLowerCase();
+  const nq = q.replace(/[\s-]/g, "");
+  const results = q.length === 0 ? participants : participants.filter(
+    (o) => o.name.toLowerCase().includes(q) || o.phone.replace(/[\s-]/g, "").includes(nq)
+  );
+  const totalHadir = participants.filter((o) => o.checked_in).length;
+
+  return (
+    <div className="min-h-screen bg-[#FDFBF7]">
+      {/* Top bar */}
+      <div className="sticky top-0 z-40 bg-[#1E3A5F] text-white">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src={LOGOS.kbi} alt="KBI" className="h-8 bg-white/95 rounded p-1" />
+            <div>
+              <p className="text-sm font-semibold leading-tight">Check-in Peserta</p>
+              <p className="text-[11px] text-white/70 leading-tight">Nonton Bersama · MBI Kepri</p>
+            </div>
+          </div>
+          <button onClick={() => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); }}
+            data-testid="checkin-logout" className="text-xs text-white/80 underline">Keluar</button>
+        </div>
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+            <Input data-testid="checkin-search-mobile" value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="Cari nama atau nomor HP..." className="pl-9 pr-9 h-11 bg-white text-[#1A1A1A]" />
+            {query && (
+              <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-white/70 mt-2">
+            {totalHadir}/{participants.length} peserta sudah hadir
+          </p>
+        </div>
+      </div>
+
+      <div className="px-4 py-4 max-w-lg mx-auto space-y-3 pb-20">
+        {loading ? (
+          <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+        ) : results.length === 0 ? (
+          <p className="text-center text-sm text-[#6B7280] py-16">
+            {participants.length === 0 ? "Belum ada peserta terverifikasi." : "Tidak ada peserta yang cocok."}
+          </p>
+        ) : (
+          results.map((o) => (
+            <motion.div key={o.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              data-testid={`checkin-card-${o.id.slice(0, 8)}`}
+              className={cn("rounded-2xl border bg-white p-4 shadow-sm",
+                o.checked_in ? "border-[#10B981]/40 bg-[#10B981]/5" : "border-border")}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#1A1A1A] truncate">{o.name}</p>
+                  <p className="text-xs text-[#6B7280]">{o.phone}</p>
+                  <p className="text-xs text-[#6B7280] mt-0.5">{o.session?.name} · {o.session?.time} · {o.qty} tiket</p>
+                </div>
+                {o.checked_in ? (
+                  <span className="shrink-0 inline-flex items-center gap-1 text-xs text-[#0F7A57] font-medium bg-[#10B981]/15 px-2 py-1 rounded-full">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Hadir
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {o.seats.map((s) => (
+                  <span key={s} className="px-3 py-1.5 rounded-lg bg-[#D56115]/10 text-[#B34F0F] text-base font-bold">{s}</span>
+                ))}
+              </div>
+
+              {o.checked_in ? (
+                <p className="text-[11px] text-[#6B7280] mt-3">Check-in: {fmtTime(o.checked_in_at)}</p>
+              ) : (
+                <Button onClick={() => doCheckin(o)} disabled={busyId === o.id}
+                  data-testid={`checkin-mobile-btn-${o.id.slice(0, 8)}`}
+                  className="w-full mt-3 h-11 bg-[#1E3A5F] hover:bg-[#16304f] rounded-xl">
+                  {busyId === o.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserCheck className="h-4 w-4 mr-1.5" />}
+                  Tandai Sudah Datang
+                </Button>
+              )}
+            </motion.div>
+          ))
+        )}
+      </div>
+
+      {/* Reminder popup */}
+      <Dialog open={!!popup} onOpenChange={() => setPopup(null)}>
+        <DialogContent data-testid="checkin-mobile-popup" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center mb-2">
+              <Ticket className="h-5 w-5 text-[#10B981]" />
+            </div>
+            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Peserta Sudah Datang</DialogTitle>
+          </DialogHeader>
+          {popup && (
+            <div className="text-sm space-y-3">
+              <p><b>{popup.name}</b> — {popup.session?.name} · {popup.session?.time}</p>
+              <p className="text-xs text-[#10B981] font-medium">✓ Check-in: {fmtTime(popup.checked_in_at || new Date().toISOString())}</p>
+              <div className="rounded-lg bg-[#D56115]/10 p-4">
+                <p className="text-[#B34F0F] font-medium mb-2">Serahkan tiket untuk kursi:</p>
+                <div className="flex flex-wrap gap-2">
+                  {popup.seats.map((s) => (
+                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold border border-[#D56115]/30">{s}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setPopup(null)} className="bg-[#1E3A5F] hover:bg-[#16304f] w-full h-11" data-testid="checkin-mobile-ok">
+              Sudah Saya Berikan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
-  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download,
+  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -96,6 +96,10 @@ function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
     <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] no-print">
       <h2 className="font-serif-display text-2xl text-[#1E3A5F] mb-1">Check-in Peserta</h2>
       <p className="text-sm text-[#6B7280] mb-4">Cari peserta dengan nama atau nomor HP, tandai kehadiran, lalu serahkan tiket kursinya.</p>
+      <a href="/checkin" target="_blank" rel="noreferrer" data-testid="open-mobile-checkin"
+        className="inline-flex items-center gap-1.5 text-sm text-[#D56115] hover:underline font-medium mb-4">
+        <ScanLine className="h-4 w-4" /> Buka halaman Check-in khusus HP (mobile) → /checkin
+      </a>
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
         <Input data-testid="checkin-search" value={query} onChange={(e) => setQuery(e.target.value)}

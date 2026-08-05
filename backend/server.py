@@ -393,6 +393,20 @@ async def set_active_session(payload: SetActiveSession, _: bool = Depends(requir
     return {"active_session": payload.session_id}
 
 
+@api_router.get("/admin/participants")
+async def list_participants(_: bool = Depends(require_admin)):
+    docs = await db.orders.find({"status": "verified"}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
+    result = []
+    for o in docs:
+        session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        result.append({
+            "id": o["id"], "name": o["name"], "phone": o["phone"],
+            "session": session, "seats": o["seats"], "qty": o["qty"],
+            "checked_in": o.get("checked_in", False), "checked_in_at": o.get("checked_in_at"),
+        })
+    return result
+
+
 @api_router.get("/admin/export")
 async def export_orders(_: bool = Depends(require_admin)):
     status_label = {

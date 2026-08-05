@@ -7,10 +7,19 @@ import BookingPage from "@/pages/BookingPage";
 import OrderStatusPage from "@/pages/OrderStatusPage";
 import UploadProofPage from "@/pages/UploadProofPage";
 import AdminPage from "@/pages/AdminPage";
+import CheckinPage from "@/pages/CheckinPage";
 
 function Shell() {
   const loc = useLocation();
   const isAdmin = loc.pathname.startsWith("/admin");
+  const standalone = loc.pathname.startsWith("/checkin");
+  if (standalone) {
+    return (
+      <Routes>
+        <Route path="/checkin" element={<CheckinPage />} />
+      </Routes>
+    );
+  }
   return (
     <>
       <Header />
