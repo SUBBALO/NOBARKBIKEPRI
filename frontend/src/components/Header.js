@@ -30,14 +30,16 @@ export const Header = () => {
             <Upload className="h-4 w-4" />
             <span className="hidden xs:inline sm:inline">Upload Bukti</span>
           </Link>
-          <Link
-            to={onAdmin ? "/" : "/admin"}
-            data-testid="nav-admin"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#D56115] transition-colors"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            {onAdmin ? "Ke Pemesanan" : "Admin"}
-          </Link>
+          {onAdmin && (
+            <Link
+              to="/"
+              data-testid="nav-admin"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#D56115] transition-colors"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Ke Pemesanan
+            </Link>
+          )}
         </nav>
       </div>
     </header>
