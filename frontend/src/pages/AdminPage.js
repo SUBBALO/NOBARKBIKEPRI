@@ -150,6 +150,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [proofView, setProofView] = useState(null);
+  const [proofImage, setProofImage] = useState(null);
+  const [proofLoading, setProofLoading] = useState(false);
   const [printOrder, setPrintOrder] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [tab, setTab] = useState("payment");
@@ -191,6 +193,15 @@ export default function AdminPage() {
   };
 
   const logout = () => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); };
+
+  const openProof = async (o) => {
+    setProofView(o); setProofImage(null); setProofLoading(true);
+    try {
+      const { data } = await adminApi.get(`/admin/orders/${o.id}/proof-image`);
+      setProofImage(data.proof_image);
+    } catch { toast.error("Gagal memuat bukti"); }
+    setProofLoading(false);
+  };
 
   const exportExcel = async () => {
     setExporting(true);
@@ -325,8 +336,8 @@ export default function AdminPage() {
                         {o.checked_in && <span className="block text-[10px] text-[#10B981] mt-1">✓ hadir {o.checked_in_at ? fmtTime(o.checked_in_at) : ""}</span>}
                       </td>
                       <td className="px-4 py-3">
-                        {o.proof_image ? (
-                          <button onClick={() => setProofView(o)} data-testid={`view-proof-${o.id.slice(0, 8)}`}
+                        {o.has_proof ? (
+                          <button onClick={() => openProof(o)} data-testid={`view-proof-${o.id.slice(0, 8)}`}
                             className="inline-flex items-center gap-1 text-[#D56115] hover:underline text-xs">
                             <Eye className="h-3.5 w-3.5" /> Lihat
                           </button>
@@ -387,7 +398,13 @@ export default function AdminPage() {
                 <p><b>{proofView.name}</b> · {proofView.phone}</p>
                 <p>Bayar: <b className="text-[#D56115]">{rupiah(proofView.total_amount)}</b> (kode unik {proofView.unique_code})</p>
               </div>
-              <img src={proofView.proof_image} alt="Bukti" className="w-full rounded-lg border border-border" />
+              {proofLoading ? (
+                <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+              ) : proofImage ? (
+                <img src={proofImage} alt="Bukti" className="w-full rounded-lg border border-border" />
+              ) : (
+                <p className="text-sm text-[#6B7280] py-4 text-center">Bukti tidak tersedia.</p>
+              )}
               {proofView.status === "waiting_verification" && (
                 <div className="flex gap-2 mt-4">
                   <Button onClick={() => { act(proofView.id, "verify"); setProofView(null); }} className="flex-1 bg-[#10B981] hover:bg-[#0F7A57]">

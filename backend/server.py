@@ -92,7 +92,10 @@ async def taken_seats(session_id: int):
     Auto-releases (marks expired) unpaid orders older than HOLD_MINUTES."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=HOLD_MINUTES)
     taken = set()
-    cursor = db.orders.find({"session_id": session_id, "status": {"$ne": "rejected"}})
+    cursor = db.orders.find(
+        {"session_id": session_id, "status": {"$ne": "rejected"}},
+        {"id": 1, "status": 1, "created_at": 1, "seats": 1},
+    )
     async for o in cursor:
         status = o.get("status")
         if status == "expired":
@@ -150,14 +153,13 @@ async def resolve_active_session():
 
 
 async def gen_unique_total(base: int):
-    existing = set()
-    async for o in db.orders.find({"status": {"$ne": "rejected"}}, {"total_amount": 1}):
-        if o.get("total_amount"):
-            existing.add(o["total_amount"])
     for pool in (list(range(11, 100)), list(range(100, 1000))):
         random.shuffle(pool)
         for c in pool:
-            if base + c not in existing:
+            exists = await db.orders.count_documents(
+                {"total_amount": base + c, "status": {"$ne": "rejected"}}, limit=1
+            )
+            if not exists:
                 return c, base + c
     raise HTTPException(status_code=409, detail="Tidak dapat membuat kode unik, coba lagi.")
 
@@ -265,7 +267,9 @@ async def lookup_orders(phone: str):
     p = phone.strip().replace(" ", "").replace("-", "")
     if len(p) < 6:
         raise HTTPException(status_code=400, detail="Masukkan nomor HP yang valid")
-    docs = await db.orders.find({"status": {"$ne": "rejected"}}).sort("created_at", -1).to_list(3000)
+    docs = await db.orders.find(
+        {"status": {"$ne": "rejected"}}, {"proof_image": 0}
+    ).sort("created_at", -1).to_list(3000)
     result = []
     for o in docs:
         if o["phone"].replace(" ", "").replace("-", "") != p:
@@ -329,10 +333,21 @@ async def admin_login(payload: AdminLogin):
 
 @api_router.get("/admin/orders")
 async def admin_orders(_: bool = Depends(require_admin), status: Optional[str] = None):
-    query = {}
+    match = {}
     if status:
-        query["status"] = status
-    orders = await db.orders.find(query).sort("created_at", -1).to_list(2000)
+        match["status"] = status
+    pipeline = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline += [
+        {"$addFields": {"has_proof": {"$and": [
+            {"$ne": ["$proof_image", None]}, {"$ne": ["$proof_image", ""]},
+        ]}}},
+        {"$project": {"proof_image": 0}},
+        {"$sort": {"created_at": -1}},
+        {"$limit": 1000},
+    ]
+    orders = await db.orders.aggregate(pipeline).to_list(1000)
     result = []
     for o in orders:
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
@@ -342,19 +357,32 @@ async def admin_orders(_: bool = Depends(require_admin), status: Optional[str] =
     return result
 
 
+@api_router.get("/admin/orders/{order_id}/proof-image")
+async def get_proof_image(order_id: str, _: bool = Depends(require_admin)):
+    o = await db.orders.find_one({"id": order_id}, {"proof_image": 1})
+    if not o or not o.get("proof_image"):
+        raise HTTPException(status_code=404, detail="Bukti tidak ditemukan")
+    return {"proof_image": o["proof_image"]}
+
+
 @api_router.get("/admin/stats")
 async def admin_stats(_: bool = Depends(require_admin)):
-    orders = await db.orders.find({}).to_list(5000)
+    pipeline = [{"$group": {
+        "_id": "$status",
+        "count": {"$sum": 1},
+        "revenue": {"$sum": "$base_amount"},
+        "tickets": {"$sum": "$qty"},
+    }}]
     stats = {"total_orders": 0, "waiting_verification": 0, "verified": 0, "pending_payment": 0,
              "rejected": 0, "expired": 0, "revenue_verified": 0, "tickets_verified": 0}
-    for o in orders:
-        stats["total_orders"] += 1
-        st = o.get("status", "")
+    async for g in db.orders.aggregate(pipeline):
+        st = g["_id"]
+        stats["total_orders"] += g["count"]
         if st in stats:
-            stats[st] += 1
+            stats[st] += g["count"]
         if st == "verified":
-            stats["revenue_verified"] += o.get("base_amount", 0)
-            stats["tickets_verified"] += o.get("qty", 0)
+            stats["revenue_verified"] += g.get("revenue", 0) or 0
+            stats["tickets_verified"] += g.get("tickets", 0) or 0
     return stats
 
 
@@ -416,7 +444,7 @@ async def export_orders(_: bool = Depends(require_admin)):
         "rejected": "Ditolak",
         "expired": "Kadaluarsa",
     }
-    orders = await db.orders.find({}).sort([("session_id", 1), ("created_at", 1)]).to_list(5000)
+    orders = await db.orders.find({}, {"proof_image": 0}).sort([("session_id", 1), ("created_at", 1)]).to_list(5000)
     wb = Workbook()
     ws = wb.active
     ws.title = "Peserta"
