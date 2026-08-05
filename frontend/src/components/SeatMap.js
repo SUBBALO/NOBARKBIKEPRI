@@ -4,7 +4,6 @@ const LEGEND = [
   { key: "available", label: "Tersedia", cls: "bg-[#E5E7EB]" },
   { key: "selected", label: "Terpilih", cls: "bg-[#D56115]" },
   { key: "booked", label: "Terisi", cls: "bg-[#9CA3AF]" },
-  { key: "locked", label: "Terkunci", cls: "bg-[#F3E9DD] border border-dashed border-[#D56115]/40" },
 ];
 
 export const SeatMap = ({ rows, selected, onToggle }) => {

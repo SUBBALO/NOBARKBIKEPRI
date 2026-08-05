@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 2 full regression: backend pytest 20/20 PASS and frontend end-to-end (booking + admin check-in) PASS. Verified all iteration-2 changes: (a) row-locking removed - GET /api/sessions/1/seats returns only 'available'/'booked' and non-front-row seat B5/B7 bookable directly; (b) POST /api/orders/{id}/proof response now includes 'session' + 'transfer' (bug from iteration 1 is FIXED); (c) TRANSFER_INFO.short_name='PD MBI Kepri' surfaced in event + order responses; (d) date is 'Minggu, 13 September 2026'; (e) admin checkin endpoint sets checked_in=true and requires X-Admin-Token; (f) Admin UI has TWO tabs (admin-tab-payment, admin-tab-checkin), Check-in tab searches only VERIFIED orders, matching card shows seat numbers, clicking Tandai Sudah Datang triggers checkin-popup with Cetak Tiket + Sudah Saya Berikan buttons.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py: get_order/upload_proof/admin_orders each re-derive session via next(...) — extract a small helper e.g. get_session(id) for DRY (~4 duplicates).",
+    "server.py: taken_seats and gen_unique_total do full-collection scans. Fine for MVP scale (max 400 tickets) but if reused elsewhere add indexes on (session_id, status).",
+    "server.py: The seat_map still emits an 'unlocked' key on every row even though locking was removed. Now always True — either drop the field or document it as legacy so frontend can eventually stop reading it.",
+    "AdminPage.js: LoginView + CheckinPanel + main dashboard all in a single 428-line file. Splitting into components/AdminLogin.jsx and components/CheckinPanel.jsx would improve readability.",
+    "AdminPage.js/OrderStatusPage.js: countdown deadline is computed from client Date.now() vs server created_at — timezone drift possible if user's clock is off. Server could return `expires_at` iso instead.",
+    "BookingPage.js confirm dialog still says 'Kursi akan dikunci' but locking flow was removed — wording is still accurate for the individual seats, but revisit if row-lock behaviour is truly gone forever."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "100% (booking + admin check-in flows)"},
+  "test_credentials": "Admin password: admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Booking flow created order 120e6de3-... (TEST_UI2_Budi, session 1 seat B7, transfer, proof uploaded, verified via admin UI, then checked-in). Pytest created several TEST_-prefixed orders (TEST_User_*, TEST_B5_*, TEST_reject) in session 1 — occupy some row-A and B5. DB not cleaned.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iteration-2 features are working. Row A now has several booked seats from testing (A1, A2, and possibly A3 via reject-then-rebook cycles). B5 and B7 are booked. When next iteration retests booking, pick fresh seats or reset db.orders. Admin login token key: 'nb_admin_token' via localStorage. Frontend URL from frontend/.env.",
+  "rca of the issue": "No new issues found. Previous iteration bug (upload_proof missing session+transfer) is confirmed fixed: server.py upload_proof (lines 277-295) now re-fetches order, attaches session (from SESSIONS list) and transfer (TRANSFER_INFO) before returning."
+}

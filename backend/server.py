@@ -28,7 +28,7 @@ api_router = APIRouter(prefix="/api")
 TICKET_PRICE = 50000
 HOLD_MINUTES = 15  # unpaid orders auto-release seats after this
 EVENT_TITLE = 'Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"'
-EVENT_DATE = "Minggu, 13 Sep 2026"
+EVENT_DATE = "Minggu, 13 September 2026"
 EVENT_LOCATION = "CGV Grand Batam"
 
 SESSIONS = [
@@ -46,6 +46,7 @@ TRANSFER_INFO = {
     "bank": "BCA",
     "account_number": "061 518 3381",
     "account_name": "PD Majelis Buddhayana Indonesia Prov Kepri",
+    "short_name": "PD MBI Kepri",
 }
 
 
@@ -102,24 +103,14 @@ async def taken_seats(session_id: int):
 
 
 def build_seat_map(taken: set):
-    """Cara B: baris belakang terkunci sampai baris depan penuh."""
+    """Pilihan kursi bebas: semua kursi yang belum dipesan bisa dipilih."""
     rows = []
-    prev_full = True
     for r in SEAT_ROWS:
-        labels = [f"{r}{i}" for i in range(1, SEATS_PER_ROW + 1)]
-        row_taken = [l for l in labels if l in taken]
-        unlocked = prev_full
         seats = []
-        for l in labels:
-            if l in taken:
-                st = "booked"
-            elif unlocked:
-                st = "available"
-            else:
-                st = "locked"
-            seats.append({"label": l, "status": st})
-        rows.append({"row": r, "unlocked": unlocked, "seats": seats})
-        prev_full = prev_full and (len(row_taken) == SEATS_PER_ROW)
+        for i in range(1, SEATS_PER_ROW + 1):
+            l = f"{r}{i}"
+            seats.append({"label": l, "status": "booked" if l in taken else "available"})
+        rows.append({"row": r, "unlocked": True, "seats": seats})
     return rows
 
 
@@ -238,8 +229,6 @@ async def create_order(payload: OrderCreate):
             raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
         if st == "booked":
             raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah dipesan orang lain")
-        if st == "locked":
-            raise HTTPException(status_code=400, detail=f"Kursi {seat} masih terkunci, isi baris depan dulu")
 
     qty = len(payload.seats)
     base = qty * TICKET_PRICE
@@ -299,7 +288,11 @@ async def upload_proof(order_id: str, payload: ProofUpload):
         {"$set": {"proof_image": payload.proof_image, "status": "waiting_verification", "updated_at": now_iso()}},
     )
     o = await db.orders.find_one({"id": order_id})
-    return clean(o)
+    session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+    o = clean(o)
+    o["session"] = session
+    o["transfer"] = TRANSFER_INFO
+    return o
 
 
 # ---------------- Admin endpoints ----------------

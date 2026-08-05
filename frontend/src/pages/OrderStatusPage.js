@@ -218,6 +218,7 @@ export default function OrderStatusPage() {
                   <p className="text-xs text-[#6B7280] mt-2">Scan QRIS lalu bayar nominal PAS {rupiah(order.total_amount)}.</p>
                 </TabsContent>
                 <TabsContent value="transfer" className="pt-4">
+                  <p className="text-sm font-medium text-[#1E3A5F] mb-2">Transfer ke Rekening <b>PD MBI Kepri</b></p>
                   <div className="rounded-xl border border-border p-5 bg-[#FDFBF7] space-y-2">
                     <div className="flex justify-between text-sm"><span className="text-[#6B7280]">Bank</span><span className="font-semibold">{order.transfer?.bank}</span></div>
                     <div className="flex justify-between items-center text-sm">

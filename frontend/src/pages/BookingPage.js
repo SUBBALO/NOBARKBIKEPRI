@@ -140,13 +140,20 @@ export default function BookingPage() {
       >
         <div className="relative z-10 max-w-3xl">
           <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/10 px-3 py-1 rounded-full">
-            <CalendarDays className="h-3.5 w-3.5" /> {event?.date || "Minggu, 13 Sep 2026"} · {event?.location || "CGV Grand Batam"}
+            <CalendarDays className="h-3.5 w-3.5" /> {event?.date || "Minggu, 13 September 2026"} · {event?.location || "CGV Grand Batam"}
           </span>
           <h1 className="font-serif-display text-3xl sm:text-5xl leading-tight mt-4">
             Nonton Bersama Film Dokumenter
           </h1>
           <p className="font-serif-display text-xl sm:text-2xl text-[#F0C48A] mt-2 italic">
             “Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara”
+          </p>
+          <p className="text-sm sm:text-base text-white/90 mt-4 italic">
+            Sebuah perjalanan yang perlahan menghidupkan kembali cahaya.
+          </p>
+          <p className="text-sm text-white/70 mt-3 max-w-2xl leading-relaxed">
+            Temukan kisah perjuangan Y.A. MNS. Jinarakkhita (Sukong) dalam menghidupkan kembali
+            agama Buddha di Indonesia — diceritakan melalui kenangan, kesaksian, juga jejak yang ia tinggalkan.
           </p>
           <p className="text-sm text-white/70 mt-4">
             Harga tiket {rupiah(PRICE)} / kursi · Pembayaran QRIS atau Transfer BCA
@@ -228,7 +235,7 @@ export default function BookingPage() {
               <div>
                 <h2 className="font-serif-display text-3xl text-[#1E3A5F] mb-1">Pilih Kursi</h2>
                 <p className="text-sm text-[#6B7280]">
-                  {activeSession ? `${activeSession.name} · ${activeSession.time}` : ""} — baris belakang terbuka setelah baris depan penuh.
+                  {activeSession ? `${activeSession.name} · ${activeSession.time}` : ""} — pilih kursi mana saja yang tersedia.
                 </p>
               </div>
               <div className="text-right">
@@ -255,7 +262,7 @@ export default function BookingPage() {
               <div className="space-y-3">
                 {[
                   { k: "qris", label: "QRIS", desc: "Scan & bayar via e-wallet / m-banking", icon: QrCode },
-                  { k: "transfer", label: "Transfer Bank BCA", desc: "Transfer ke rekening panitia", icon: Landmark },
+                  { k: "transfer", label: "Transfer Bank BCA", desc: "Transfer ke Rek. PD MBI Kepri", icon: Landmark },
                 ].map((m) => {
                   const Icon = m.icon;
                   return (
@@ -291,7 +298,7 @@ export default function BookingPage() {
               </div>
               <p className="text-[11px] text-[#6B7280] mt-2 flex items-start gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#D56115]" />
-                Kode unik 2–3 digit akan ditambahkan pada total setelah konfirmasi, untuk memudahkan pengecekan mutasi.
+                Nominal PAS + kode unik akan langsung tampil di halaman pembayaran setelah Anda konfirmasi — bayar tepat sejumlah itu agar mudah kami cek di mutasi.
               </p>
             </div>
           </div>

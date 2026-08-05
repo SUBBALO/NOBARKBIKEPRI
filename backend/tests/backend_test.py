@@ -1,4 +1,11 @@
-"""Backend API tests for Nonton Bareng MBI ticketing app."""
+"""Backend API tests for Nonton Bareng MBI ticketing app (iteration 2).
+
+Iteration 2 changes:
+- Row locking removed: all seats appear as 'available' or 'booked' only.
+- POST /api/orders/{id}/proof must include 'session' and 'transfer' in response.
+- TRANSFER_INFO.short_name == 'PD MBI Kepri'.
+- Admin check-in endpoint POST /api/admin/orders/{id}/checkin sets checked_in=true.
+"""
 import os
 import base64
 import uuid as _uuid
@@ -7,7 +14,6 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
-    # fallback to frontend/.env
     from pathlib import Path
     envp = Path("/app/frontend/.env")
     for ln in envp.read_text().splitlines():
@@ -18,6 +24,7 @@ API = f"{BASE_URL}/api"
 ADMIN_PASSWORD = "admin123"
 
 
+# ---------------- Fixtures ----------------
 @pytest.fixture(scope="module")
 def s():
     sess = requests.Session()
@@ -26,18 +33,26 @@ def s():
 
 
 @pytest.fixture(scope="module")
-def admin_token(s):
+def admin_headers(s):
     r = s.post(f"{API}/admin/login", json={"password": ADMIN_PASSWORD})
     assert r.status_code == 200, r.text
-    return r.json()["token"]
+    return {"X-Admin-Token": r.json()["token"], "Content-Type": "application/json"}
 
 
-@pytest.fixture(scope="module")
-def admin_headers(admin_token):
-    return {"X-Admin-Token": admin_token, "Content-Type": "application/json"}
+def _pick_available(s, session_id=1, count=1, prefer_row=None):
+    r = s.get(f"{API}/sessions/{session_id}/seats").json()
+    if prefer_row:
+        row = next((row for row in r["rows"] if row["row"] == prefer_row), None)
+        if row:
+            avail = [x["label"] for x in row["seats"] if x["status"] == "available"]
+            if len(avail) >= count:
+                return avail[:count]
+    # fallback: any row
+    avail = [x["label"] for row in r["rows"] for x in row["seats"] if x["status"] == "available"]
+    return avail[:count]
 
 
-# ---------------- Reset via ensuring active session = 1 ----------------
+# ---------------- Admin login / auth ----------------
 def test_admin_login_wrong(s):
     r = s.post(f"{API}/admin/login", json={"password": "wrong"})
     assert r.status_code == 401
@@ -54,7 +69,7 @@ def test_admin_protected_requires_header(s):
     assert r.status_code == 401
 
 
-def test_set_active_session_1(s, admin_headers):
+def test_reset_active_to_1(s, admin_headers):
     r = requests.post(f"{API}/admin/active-session", json={"session_id": 1}, headers=admin_headers)
     assert r.status_code == 200
     assert r.json()["active_session"] == 1
@@ -68,21 +83,20 @@ def test_event(s):
     assert d["ticket_price"] == 50000
     assert len(d["sessions"]) == 4
     assert d["transfer"]["bank"] == "BCA"
+    assert d["transfer"]["short_name"] == "PD MBI Kepri"
+    assert d["date"] == "Minggu, 13 September 2026"
 
 
-# ---------------- Seats ----------------
-def test_seats_session1_rowA_available_rowB_locked(s):
+# ---------------- Seats (no locking) ----------------
+def test_seats_no_locked_status(s):
+    """Regression: seats should only be 'available' or 'booked' (no 'locked')."""
     r = s.get(f"{API}/sessions/1/seats")
     assert r.status_code == 200
     d = r.json()
-    rows = {row["row"]: row for row in d["rows"]}
-    # Row A should be unlocked (available unless booked)
-    assert rows["A"]["unlocked"] is True
-    # Row B should be locked until A is full
-    # only guaranteed if row A not full
-    if any(s["status"] == "available" for s in rows["A"]["seats"]):
-        assert rows["B"]["unlocked"] is False
-        assert all(s["status"] == "locked" for s in rows["B"]["seats"])
+    for row in d["rows"]:
+        assert row["unlocked"] is True, f"row {row['row']} not unlocked"
+        for st in row["seats"]:
+            assert st["status"] in ("available", "booked"), f"unexpected status {st['status']} for {st['label']}"
 
 
 def test_seats_invalid_session(s):
@@ -90,21 +104,37 @@ def test_seats_invalid_session(s):
     assert r.status_code == 404
 
 
-# ---------------- Create order ----------------
+# ---------------- Booking non-front-row seat directly (iteration 2 new) ----------------
 _uniq = _uuid.uuid4().hex[:4]
 
 
-def _pick_available_row_a(s):
+def test_can_book_non_front_row_seat_directly(s):
+    """B5 (a non-front-row seat) must be bookable without row A being full."""
+    # ensure B5 is available
     r = s.get(f"{API}/sessions/1/seats").json()
-    rowA = next(row for row in r["rows"] if row["row"] == "A")
-    return [x["label"] for x in rowA["seats"] if x["status"] == "available"]
+    rowB = next(row for row in r["rows"] if row["row"] == "B")
+    b5 = next((x for x in rowB["seats"] if x["label"] == "B5"), None)
+    assert b5 is not None
+    if b5["status"] == "booked":
+        pytest.skip("B5 already booked from previous run")
+    payload = {
+        "name": f"TEST_B5_{_uniq}",
+        "phone": "081234500005",
+        "session_id": 1,
+        "seats": ["B5"],
+        "payment_method": "qris",
+    }
+    r = s.post(f"{API}/orders", json=payload)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["seats"] == ["B5"]
+    assert d["status"] == "pending_payment"
 
 
 @pytest.fixture(scope="module")
 def created_order(s):
-    avail = _pick_available_row_a(s)
-    assert len(avail) >= 2, f"need 2 avail seats in row A, got {avail}"
-    seats = avail[:2]
+    seats = _pick_available(s, count=2, prefer_row="A")
+    assert len(seats) == 2, f"need 2 avail seats, got {seats}"
     payload = {
         "name": f"TEST_User_{_uniq}",
         "phone": "081234567890",
@@ -118,7 +148,6 @@ def created_order(s):
     assert d["base_amount"] == 100000
     assert 11 <= d["unique_code"] <= 999
     assert d["total_amount"] == 100000 + d["unique_code"]
-    assert d["status"] == "pending_payment"
     assert d["seats"] == seats
     return d
 
@@ -129,11 +158,11 @@ def test_order_created(created_order):
 
 def test_locked_session_cannot_book(s):
     # session 2 is locked when active=1
-    avail = _pick_available_row_a(s)
-    seat = avail[0] if avail else "A1"
+    seat = _pick_available(s, count=1)
+    assert seat, "no available seats to attempt"
     r = s.post(f"{API}/orders", json={
         "name": "TEST_lock", "phone": "0812", "session_id": 2,
-        "seats": [seat], "payment_method": "qris"
+        "seats": seat, "payment_method": "qris"
     })
     assert r.status_code == 400
 
@@ -147,15 +176,6 @@ def test_double_booking_returns_409(s, created_order):
     assert r.status_code == 409
 
 
-def test_locked_seat_returns_400(s):
-    # row B still locked because A is not full
-    r = s.post(f"{API}/orders", json={
-        "name": "TEST_lockseat", "phone": "0812", "session_id": 1,
-        "seats": ["B1"], "payment_method": "qris"
-    })
-    assert r.status_code == 400
-
-
 # ---------------- Get order + proof upload ----------------
 def test_get_order(s, created_order):
     r = s.get(f"{API}/orders/{created_order['id']}")
@@ -163,16 +183,24 @@ def test_get_order(s, created_order):
     d = r.json()
     assert d["session"]["id"] == 1
     assert d["transfer"]["bank"] == "BCA"
+    assert d["transfer"]["short_name"] == "PD MBI Kepri"
 
 
-def test_upload_proof_sets_waiting(s, created_order):
+def test_upload_proof_response_has_session_and_transfer(s, created_order):
+    """Iteration 2 fix: upload_proof must attach session + transfer."""
     tiny_png = base64.b64encode(bytes.fromhex(
         "89504E470D0A1A0A0000000D49484452000000010000000108060000001F15C4890000000A49444154789C63000100000500010D0A2DB40000000049454E44AE426082"
     )).decode()
     payload = {"proof_image": f"data:image/png;base64,{tiny_png}"}
     r = s.post(f"{API}/orders/{created_order['id']}/proof", json=payload)
     assert r.status_code == 200, r.text
-    assert r.json()["status"] == "waiting_verification"
+    d = r.json()
+    assert d["status"] == "waiting_verification"
+    assert "session" in d, "response missing 'session' key"
+    assert d["session"] is not None and d["session"]["id"] == 1
+    assert "transfer" in d, "response missing 'transfer' key"
+    assert d["transfer"]["bank"] == "BCA"
+    assert d["transfer"]["short_name"] == "PD MBI Kepri"
 
 
 def test_upload_proof_non_image_400(s, created_order):
@@ -202,14 +230,23 @@ def test_admin_verify(admin_headers, created_order):
     assert r.json()["status"] == "verified"
 
 
+def test_admin_checkin_sets_checked_in(admin_headers, created_order):
+    """Iteration 2: checkin endpoint sets checked_in=true, requires X-Admin-Token."""
+    # missing header -> 401
+    r_no = requests.post(f"{API}/admin/orders/{created_order['id']}/checkin")
+    assert r_no.status_code == 401
+    # with header
+    r = requests.post(f"{API}/admin/orders/{created_order['id']}/checkin", headers=admin_headers)
+    assert r.status_code == 200
+    assert r.json()["checked_in"] is True
+
+
 def test_admin_reject_frees_seat(s, admin_headers):
-    # Create a new order then reject and verify seat becomes available
-    avail = _pick_available_row_a(s)
-    assert len(avail) >= 1
-    seat = avail[0]
+    seat = _pick_available(s, count=1)
+    assert seat
     r = s.post(f"{API}/orders", json={
         "name": "TEST_reject", "phone": "0812", "session_id": 1,
-        "seats": [seat], "payment_method": "transfer"
+        "seats": seat, "payment_method": "transfer"
     })
     assert r.status_code == 200
     oid = r.json()["id"]
@@ -220,23 +257,8 @@ def test_admin_reject_frees_seat(s, admin_headers):
 
     # verify seat is available again
     r = s.get(f"{API}/sessions/1/seats").json()
-    rowA = next(row for row in r["rows"] if row["row"] == "A")
-    seat_status = {x["label"]: x["status"] for x in rowA["seats"]}
-    assert seat_status[seat] == "available", f"expected available, got {seat_status[seat]}"
-
-
-def test_admin_checkin(admin_headers, created_order):
-    r = requests.post(f"{API}/admin/orders/{created_order['id']}/checkin", headers=admin_headers)
-    assert r.status_code == 200
-    assert r.json()["checked_in"] is True
-
-
-def test_admin_set_active_session(admin_headers):
-    r = requests.post(f"{API}/admin/active-session", json={"session_id": 2}, headers=admin_headers)
-    assert r.status_code == 200
-    # restore
-    r = requests.post(f"{API}/admin/active-session", json={"session_id": 1}, headers=admin_headers)
-    assert r.status_code == 200
+    flat = {x["label"]: x["status"] for row in r["rows"] for x in row["seats"]}
+    assert flat[seat[0]] == "available"
 
 
 def test_admin_set_active_session_invalid(admin_headers):

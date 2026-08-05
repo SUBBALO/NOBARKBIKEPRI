@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
-  Eye, RefreshCw, Ticket, Clock, Wallet, Users,
+  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +76,56 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
   </div>
 );
 
+function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
+  const q = query.trim().toLowerCase();
+  const nq = q.replace(/\s/g, "");
+  const results = q.length === 0 ? [] : orders.filter(
+    (o) => o.status === "verified" &&
+      (o.name.toLowerCase().includes(q) || o.phone.replace(/\s/g, "").includes(nq))
+  );
+  return (
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] no-print">
+      <h2 className="font-serif-display text-2xl text-[#1E3A5F] mb-1">Check-in Peserta</h2>
+      <p className="text-sm text-[#6B7280] mb-4">Cari peserta dengan nama atau nomor HP, tandai kehadiran, lalu serahkan tiket kursinya.</p>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+        <Input data-testid="checkin-search" value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Ketik nama atau nomor HP peserta..." className="pl-9" />
+      </div>
+      <div className="mt-5 space-y-3">
+        {q.length > 0 && results.length === 0 && (
+          <p className="text-sm text-[#6B7280]" data-testid="checkin-empty">Tidak ada peserta terverifikasi yang cocok. (Hanya pesanan Terverifikasi yang tampil)</p>
+        )}
+        {results.map((o) => (
+          <div key={o.id} data-testid={`checkin-result-${o.id.slice(0, 8)}`}
+            className="rounded-xl border border-border p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-[#1A1A1A]">{o.name}</p>
+              <p className="text-xs text-[#6B7280]">{o.phone} · {o.session?.name} · {o.session?.time}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {o.seats.map((s) => (
+                  <span key={s} className="px-2.5 py-1 rounded-md bg-[#D56115]/10 text-[#B34F0F] text-sm font-semibold">{s}</span>
+                ))}
+              </div>
+            </div>
+            <div className="text-right">
+              {o.checked_in ? (
+                <span className="inline-flex items-center gap-1.5 text-sm text-[#10B981] font-medium"><CheckCircle2 className="h-4 w-4" /> Sudah Hadir</span>
+              ) : (
+                <Button onClick={() => onCheckin(o)} disabled={busyId === o.id} data-testid={`checkin-btn-${o.id.slice(0, 8)}`}
+                  className="bg-[#1E3A5F] hover:bg-[#16304f]">
+                  {busyId === o.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserCheck className="h-4 w-4 mr-1.5" />}
+                  Tandai Sudah Datang
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
   const [orders, setOrders] = useState([]);
@@ -86,6 +136,9 @@ export default function AdminPage() {
   const [proofView, setProofView] = useState(null);
   const [printOrder, setPrintOrder] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [tab, setTab] = useState("payment");
+  const [checkinQuery, setCheckinQuery] = useState("");
+  const [checkinPopup, setCheckinPopup] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,6 +206,21 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Tab switcher */}
+      <div className="flex flex-wrap gap-2 mb-6 no-print">
+        <button data-testid="admin-tab-payment" onClick={() => setTab("payment")}
+          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+            tab === "payment" ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/50")}>
+          <Wallet className="h-4 w-4" /> Verifikasi Pembayaran
+        </button>
+        <button data-testid="admin-tab-checkin" onClick={() => setTab("checkin")}
+          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+            tab === "checkin" ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/50")}>
+          <UserCheck className="h-4 w-4" /> Check-in Peserta
+        </button>
+      </div>
+
+      {tab === "payment" && (<>
       {/* Session control */}
       {event && (
         <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print">
@@ -261,6 +329,12 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+      </>)}
+
+      {tab === "checkin" && (
+        <CheckinPanel orders={orders} query={checkinQuery} setQuery={setCheckinQuery} busyId={busyId}
+          onCheckin={async (o) => { await act(o.id, "checkin"); setCheckinPopup(o); }} />
+      )}
 
       {/* Proof viewer */}
       <Dialog open={!!proofView} onOpenChange={() => setProofView(null)}>
@@ -290,6 +364,40 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Check-in reminder popup */}
+      <Dialog open={!!checkinPopup} onOpenChange={() => setCheckinPopup(null)}>
+        <DialogContent data-testid="checkin-popup">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center mb-2">
+              <Ticket className="h-5 w-5 text-[#10B981]" />
+            </div>
+            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Peserta Sudah Datang</DialogTitle>
+          </DialogHeader>
+          {checkinPopup && (
+            <div className="text-sm space-y-3">
+              <p><b>{checkinPopup.name}</b> ({checkinPopup.phone}) — {checkinPopup.session?.name} · {checkinPopup.session?.time}</p>
+              <div className="rounded-lg bg-[#D56115]/10 p-4">
+                <p className="text-[#B34F0F] font-medium mb-2">Pastikan sudah serahkan tiket untuk kursi:</p>
+                <div className="flex flex-wrap gap-2">
+                  {checkinPopup.seats.map((s) => (
+                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold text-base border border-[#D56115]/30">{s}</span>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[#6B7280] text-xs">Jangan lupa memberikan tiket kursi di atas kepada peserta ini agar tidak terjadi double.</p>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => { doPrint(checkinPopup); }} data-testid="checkin-print">
+              <Printer className="h-4 w-4 mr-1.5" /> Cetak Tiket
+            </Button>
+            <Button onClick={() => setCheckinPopup(null)} className="bg-[#1E3A5F] hover:bg-[#16304f]" data-testid="checkin-popup-ok">
+              Sudah Saya Berikan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Printable ticket */}
       {printOrder && (
         <div id="print-area" className="hidden print:block p-8">
@@ -298,7 +406,7 @@ export default function AdminPage() {
               <img src={LOGOS.kbi} alt="KBI" className="h-10" />
               <img src={LOGOS.mbi} alt="MBI" className="h-10" />
             </div>
-            <p className="text-xs text-gray-500">TIKET NONTON BERSAMA · Minggu, 13 Sep 2026 · CGV Grand Batam</p>
+            <p className="text-xs text-gray-500">TIKET NONTON BERSAMA · Minggu, 13 September 2026 · CGV Grand Batam</p>
             <p className="font-serif-display text-xl text-[#1E3A5F] leading-tight mt-1">
               Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara
             </p>
