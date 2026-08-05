@@ -22,3 +22,9 @@ export const LOGOS = {
 
 export const rupiah = (n) =>
   "Rp " + (n || 0).toLocaleString("id-ID");
+
+export const CONTACT = {
+  label: "Sekretariat MBI Kepri",
+  phone: "0882-7123-1796",
+  waLink: "https://wa.me/6288271231796",
+};

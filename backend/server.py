@@ -256,6 +256,28 @@ async def create_order(payload: OrderCreate):
     return clean(dict(order))
 
 
+@api_router.get("/orders/lookup")
+async def lookup_orders(phone: str):
+    p = phone.strip().replace(" ", "").replace("-", "")
+    if len(p) < 6:
+        raise HTTPException(status_code=400, detail="Masukkan nomor HP yang valid")
+    docs = await db.orders.find({"status": {"$ne": "rejected"}}).sort("created_at", -1).to_list(3000)
+    result = []
+    for o in docs:
+        if o["phone"].replace(" ", "").replace("-", "") != p:
+            continue
+        # lazily expire unpaid too-old orders for accurate status
+        session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        result.append({
+            "id": o["id"], "name": o["name"], "phone": o["phone"],
+            "session": session, "seats": o["seats"], "qty": o["qty"],
+            "total_amount": o["total_amount"], "unique_code": o["unique_code"],
+            "payment_method": o["payment_method"], "status": o["status"],
+            "has_proof": bool(o.get("proof_image")), "created_at": o["created_at"],
+        })
+    return {"orders": result, "transfer": TRANSFER_INFO}
+
+
 @api_router.get("/orders/{order_id}")
 async def get_order(order_id: str):
     o = await db.orders.find_one({"id": order_id})
@@ -279,8 +301,6 @@ async def upload_proof(order_id: str, payload: ProofUpload):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
-    if o["status"] == "expired":
-        raise HTTPException(status_code=400, detail="Pesanan sudah kadaluarsa, kursi telah dilepas")
     if not payload.proof_image.startswith("data:image"):
         raise HTTPException(status_code=400, detail="File bukti harus berupa gambar")
     await db.orders.update_one(

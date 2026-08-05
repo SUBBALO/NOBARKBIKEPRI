@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { LOGOS } from "@/lib/apiClient";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Upload } from "lucide-react";
 
 export const Header = () => {
   const loc = useLocation();
@@ -13,8 +13,6 @@ export const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3 flex items-center justify-between gap-4">
         <Link to="/" data-testid="header-logo-link" className="flex items-center gap-3 sm:gap-4">
           <img src={LOGOS.kbi} alt="KBI" className="h-9 sm:h-11 w-auto object-contain" />
-          <span className="h-8 w-px bg-black/10" />
-          <img src={LOGOS.mbi} alt="MBI" className="h-9 sm:h-11 w-auto object-contain" />
         </Link>
         <nav className="flex items-center gap-2 sm:gap-4">
           <Link
@@ -23,6 +21,14 @@ export const Header = () => {
             className="hidden sm:inline text-sm font-medium text-[#1E3A5F] hover:text-[#D56115] transition-colors"
           >
             Pesan Tiket
+          </Link>
+          <Link
+            to="/upload"
+            data-testid="nav-upload"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#D56115] transition-colors"
+          >
+            <Upload className="h-4 w-4" />
+            <span className="hidden xs:inline sm:inline">Upload Bukti</span>
           </Link>
           <Link
             to={onAdmin ? "/" : "/admin"}
