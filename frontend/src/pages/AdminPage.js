@@ -502,10 +502,6 @@ export default function AdminPage() {
                               className={cn("h-8 text-xs", o.wa_sent ? "bg-white text-[#0F7A57] border border-[#10B981]/50 hover:bg-[#10B981]/10" : "bg-[#10B981] hover:bg-[#0F7A57]")}>
                               <MessageCircle className="h-3.5 w-3.5 mr-1" /> {o.wa_sent ? "Kirim Ulang" : "Kirim Pesan"}
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => doPrint(o)} data-testid={`print-${o.id.slice(0, 8)}`}
-                              className="h-8 text-[#1E3A5F]" title="Cetak tiket">
-                              <Printer className="h-3.5 w-3.5" />
-                            </Button>
                           </div>
                         ) : (
                           <span className="text-xs text-[#6B7280]">—</span>
@@ -613,10 +609,7 @@ export default function AdminPage() {
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => { doPrint(checkinPopup); }} data-testid="checkin-print">
-              <Printer className="h-4 w-4 mr-1.5" /> Cetak Tiket
-            </Button>
-            <Button onClick={() => setCheckinPopup(null)} className="bg-[#1E3A5F] hover:bg-[#16304f]" data-testid="checkin-popup-ok">
+            <Button onClick={() => setCheckinPopup(null)} className="bg-[#1E3A5F] hover:bg-[#16304f] w-full" data-testid="checkin-popup-ok">
               Sudah Saya Berikan
             </Button>
           </DialogFooter>
