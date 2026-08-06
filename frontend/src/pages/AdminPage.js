@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
-  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine,
+  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,31 @@ const fmtTime = (iso) => {
       timeZone: "Asia/Jakarta", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
     }) + " WIB";
   } catch { return ""; }
+};
+
+const waPhone = (phone) => {
+  let p = (phone || "").replace(/[^0-9]/g, "");
+  if (p.startsWith("0")) p = "62" + p.slice(1);
+  else if (p.startsWith("8")) p = "62" + p;
+  return p;
+};
+
+const sendWA = (o) => {
+  const msg =
+`Halo ${o.name} 🙏
+Terima kasih, pembayaran Anda sudah kami *VERIFIKASI* ✅
+
+Berikut e-tiket Anda:
+🎬 Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"
+🗓️ Minggu, 13 September 2026
+📍 CGV Grand Batam
+🎟️ ${o.session?.name || "Sesi"} (${o.session?.time || "-"})
+💺 Kursi: ${o.seats.join(", ")}
+🔖 Kode: ${o.id.slice(0, 8).toUpperCase()}-${o.unique_code}
+
+Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa! 🙏
+— Sekretariat MBI Kepri`;
+  window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
 };
 
 const STATUS_META = {
@@ -440,6 +465,10 @@ export default function AdminPage() {
                                 <Button size="sm" variant="outline" onClick={() => act(o.id, "checkin")} disabled={busyId === o.id}
                                   data-testid={`checkin-${o.id.slice(0, 8)}`} className="h-8 text-xs">Check-in</Button>
                               )}
+                              <Button size="sm" onClick={() => sendWA(o)} data-testid={`wa-${o.id.slice(0, 8)}`}
+                                className="h-8 bg-[#10B981] hover:bg-[#0F7A57]" title="Kirim tiket via WhatsApp">
+                                <MessageCircle className="h-3.5 w-3.5" />
+                              </Button>
                               <Button size="sm" onClick={() => doPrint(o)} data-testid={`print-${o.id.slice(0, 8)}`}
                                 className="h-8 bg-[#1E3A5F] hover:bg-[#16304f]">
                                 <Printer className="h-3.5 w-3.5" />
