@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import DuplicateKeyError
 import os
 import io
 import logging
@@ -31,6 +32,7 @@ api_router = APIRouter(prefix="/api")
 # ---------------- Event configuration ----------------
 TICKET_PRICE = 50000
 HOLD_MINUTES = 15  # unpaid orders auto-release seats after this
+MAX_SEATS_PER_ORDER = 6  # batas kursi per pesanan
 EVENT_TITLE = 'Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"'
 EVENT_DATE = "Minggu, 13 September 2026"
 EVENT_LOCATION = "CGV Grand Batam"
@@ -45,6 +47,7 @@ SESSIONS = [
 SEAT_ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"]
 SEATS_PER_ROW = 10
 SEATS_PER_SESSION = len(SEAT_ROWS) * SEATS_PER_ROW  # 100
+ALL_SEAT_LABELS = {f"{r}{i}" for r in SEAT_ROWS for i in range(1, SEATS_PER_ROW + 1)}
 
 TRANSFER_INFO = {
     "bank": "BCA",
@@ -88,25 +91,23 @@ async def get_config():
 
 
 async def taken_seats(session_id: int):
-    """Return set of seat labels currently occupied for a session.
-    Auto-releases (marks expired) unpaid orders older than HOLD_MINUTES."""
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=HOLD_MINUTES)
-    taken = set()
-    cursor = db.orders.find(
-        {"session_id": session_id, "status": {"$ne": "rejected"}},
-        {"id": 1, "status": 1, "created_at": 1, "seats": 1},
-    )
-    async for o in cursor:
-        status = o.get("status")
-        if status == "expired":
-            continue
-        if status == "pending_payment":
-            created = datetime.fromisoformat(o["created_at"])
-            if created < cutoff:
-                await db.orders.update_one({"id": o["id"]}, {"$set": {"status": "expired"}})
-                continue
-        taken.update(o.get("seats", []))
-    return taken
+    """Occupied seats for a session, sourced from atomic seat_locks.
+    Expired locks (unpaid > HOLD_MINUTES) are auto-released and their orders marked expired."""
+    now = datetime.now(timezone.utc)
+    expired = await db.seat_locks.find(
+        {"session_id": session_id, "expires_at": {"$ne": None, "$lt": now}}, {"order_id": 1}
+    ).to_list(2000)
+    if expired:
+        order_ids = list({e["order_id"] for e in expired})
+        await db.seat_locks.delete_many(
+            {"session_id": session_id, "expires_at": {"$ne": None, "$lt": now}}
+        )
+        await db.orders.update_many(
+            {"id": {"$in": order_ids}, "status": "pending_payment"},
+            {"$set": {"status": "expired"}},
+        )
+    locks = await db.seat_locks.find({"session_id": session_id}, {"seat": 1}).to_list(2000)
+    return set(l["seat"] for l in locks)
 
 
 def build_seat_map(taken: set):
@@ -227,25 +228,47 @@ async def create_order(payload: OrderCreate):
     if payload.session_id != active:
         raise HTTPException(status_code=400, detail="Sesi ini belum/tidak dibuka untuk pemesanan")
 
-    seat_map = build_seat_map(await taken_seats(payload.session_id))
-    status_by_label = {s["label"]: s["status"] for row in seat_map for s in row["seats"]}
-    for seat in payload.seats:
-        st = status_by_label.get(seat)
-        if st is None:
+    seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
+    if len(seats) > MAX_SEATS_PER_ORDER:
+        raise HTTPException(status_code=400, detail=f"Maksimal {MAX_SEATS_PER_ORDER} kursi per pesanan")
+    for seat in seats:
+        if seat not in ALL_SEAT_LABELS:
             raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
-        if st == "booked":
-            raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah dipesan orang lain")
 
-    qty = len(payload.seats)
+    # Release any expired locks first so freed seats are claimable
+    await taken_seats(payload.session_id)
+
+    qty = len(seats)
     base = qty * TICKET_PRICE
     code, total = await gen_unique_total(base)
+    order_id = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=HOLD_MINUTES)
+
+    # Atomic seat claim: unique _id per (session, seat) prevents double booking
+    claimed = []
+    for seat in seats:
+        try:
+            await db.seat_locks.insert_one({
+                "_id": f"{payload.session_id}:{seat}",
+                "session_id": payload.session_id,
+                "seat": seat,
+                "order_id": order_id,
+                "expires_at": expires_at,
+            })
+            claimed.append(seat)
+        except DuplicateKeyError:
+            if claimed:
+                await db.seat_locks.delete_many(
+                    {"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}}
+                )
+            raise HTTPException(status_code=409, detail=f"Kursi {seat} baru saja dipesan orang lain. Silakan pilih kursi lain.")
 
     order = {
-        "id": str(uuid.uuid4()),
+        "id": order_id,
         "name": payload.name.strip(),
         "phone": payload.phone.strip(),
         "session_id": payload.session_id,
-        "seats": payload.seats,
+        "seats": seats,
         "qty": qty,
         "unit_price": TICKET_PRICE,
         "base_amount": base,
@@ -291,11 +314,12 @@ async def get_order(order_id: str):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
-    # lazily expire if unpaid and too old
+    # lazily expire if unpaid and too old (also releases its seat locks)
     if o.get("status") == "pending_payment":
         created = datetime.fromisoformat(o["created_at"])
         if created < datetime.now(timezone.utc) - timedelta(minutes=HOLD_MINUTES):
             await db.orders.update_one({"id": order_id}, {"$set": {"status": "expired"}})
+            await db.seat_locks.delete_many({"order_id": order_id})
             o["status"] = "expired"
     session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
     o = clean(o)
@@ -311,6 +335,20 @@ async def upload_proof(order_id: str, payload: ProofUpload):
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
     if not payload.proof_image.startswith("data:image"):
         raise HTTPException(status_code=400, detail="File bukti harus berupa gambar")
+    # Re-assert/keep seat reservation (handles late upload after auto-expire)
+    for seat in o.get("seats", []):
+        lid = f"{o['session_id']}:{seat}"
+        existing = await db.seat_locks.find_one({"_id": lid})
+        if existing:
+            if existing["order_id"] == order_id:
+                await db.seat_locks.update_one({"_id": lid}, {"$set": {"expires_at": None}})
+            else:
+                raise HTTPException(status_code=409, detail=f"Maaf, kursi {seat} sudah diambil peserta lain karena pembayaran melewati batas waktu. Silakan hubungi panitia.")
+        else:
+            await db.seat_locks.insert_one({
+                "_id": lid, "session_id": o["session_id"], "seat": seat,
+                "order_id": order_id, "expires_at": None,
+            })
     await db.orders.update_one(
         {"id": order_id},
         {"$set": {"proof_image": payload.proof_image, "status": "waiting_verification", "updated_at": now_iso()}},
@@ -399,6 +437,7 @@ async def reject_order(order_id: str, _: bool = Depends(require_admin)):
     r = await db.orders.update_one({"id": order_id}, {"$set": {"status": "rejected", "updated_at": now_iso()}})
     if r.matched_count == 0:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    await db.seat_locks.delete_many({"order_id": order_id})  # free the seats
     return clean(await db.orders.find_one({"id": order_id}))
 
 
@@ -514,6 +553,35 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def backfill_seat_locks():
+    """Ensure seat_locks exist for active (non-rejected/expired) orders.
+    Runs on every startup and is idempotent (unique _id per session:seat)."""
+    try:
+        active_statuses = ["pending_payment", "waiting_verification", "verified"]
+        async for o in db.orders.find({"status": {"$in": active_statuses}}):
+            exp = None
+            if o["status"] == "pending_payment":
+                try:
+                    exp = datetime.fromisoformat(o["created_at"]) + timedelta(minutes=HOLD_MINUTES)
+                except Exception:
+                    exp = None
+            for seat in o.get("seats", []):
+                try:
+                    await db.seat_locks.insert_one({
+                        "_id": f"{o['session_id']}:{seat}",
+                        "session_id": o["session_id"],
+                        "seat": seat,
+                        "order_id": o["id"],
+                        "expires_at": exp,
+                    })
+                except DuplicateKeyError:
+                    pass
+        logger.info("seat_locks backfill complete")
+    except Exception as e:
+        logger.error(f"seat_locks backfill error: {e}")
 
 
 @app.on_event("shutdown")

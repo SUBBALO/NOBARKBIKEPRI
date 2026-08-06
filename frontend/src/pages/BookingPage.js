@@ -83,22 +83,45 @@ export default function BookingPage() {
     } catch (e) { toast.error("Gagal memuat data acara"); }
   };
 
-  const loadSeats = async (id) => {
-    setSeatsLoading(true);
+  const loadSeats = async (id, silent = false) => {
+    if (!silent) setSeatsLoading(true);
     try {
       const { data } = await api.get(`/sessions/${id}/seats`);
       setRows(data.rows);
-    } catch (e) { toast.error("Gagal memuat denah kursi"); }
-    setSeatsLoading(false);
+      const bookedSet = new Set(
+        data.rows.flatMap((r) => r.seats.filter((s) => s.status === "booked").map((s) => s.label))
+      );
+      setSelected((prev) => {
+        const kept = prev.filter((l) => !bookedSet.has(l));
+        if (silent && kept.length !== prev.length) {
+          toast.info("Beberapa kursi pilihan Anda baru saja dipesan orang lain. Silakan pilih ulang.");
+        }
+        return kept;
+      });
+    } catch (e) {
+      if (!silent) toast.error("Gagal memuat denah kursi");
+    }
+    if (!silent) setSeatsLoading(false);
   };
 
   useEffect(() => { loadEvent(); }, []);
   useEffect(() => { if (step === 3 && sessionId) loadSeats(sessionId); }, [step, sessionId]);
+  useEffect(() => {
+    if (step !== 3 || !sessionId) return;
+    const t = setInterval(() => loadSeats(sessionId, true), 8000);
+    return () => clearInterval(t);
+  }, [step, sessionId]);
 
+  const MAX_SEATS = 6;
   const toggleSeat = (label) => {
-    setSelected((prev) =>
-      prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label]
-    );
+    setSelected((prev) => {
+      if (prev.includes(label)) return prev.filter((s) => s !== label);
+      if (prev.length >= MAX_SEATS) {
+        toast.error(`Maksimal ${MAX_SEATS} kursi per pesanan`);
+        return prev;
+      }
+      return [...prev, label];
+    });
   };
 
   const next = () => {
@@ -263,7 +286,7 @@ export default function BookingPage() {
               <div>
                 <h2 className="font-serif-display text-3xl text-[#1E3A5F] mb-1">Pilih Kursi</h2>
                 <p className="text-sm text-[#6B7280]">
-                  {activeSession ? `${activeSession.name} · ${activeSession.time}` : ""} — pilih kursi mana saja yang tersedia.
+                  {activeSession ? `${activeSession.name} · ${activeSession.time}` : ""} — pilih kursi (maks. {MAX_SEATS}). Denah diperbarui otomatis.
                 </p>
               </div>
               <div className="text-right">
