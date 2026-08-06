@@ -158,6 +158,7 @@ export default function AdminPage() {
   const [checkinQuery, setCheckinQuery] = useState("");
   const [checkinPopup, setCheckinPopup] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [sessionFilter, setSessionFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -229,7 +230,10 @@ export default function AdminPage() {
 
   if (!authed) return <LoginView onLogin={() => setAuthed(true)} />;
 
-  const filtered = filter === "all" ? orders : orders.filter((o) => o.status === filter);
+  const filtered = orders.filter((o) =>
+    (filter === "all" || o.status === filter) &&
+    (sessionFilter === "all" || o.session_id === sessionFilter)
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
@@ -287,7 +291,24 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filter per sesi */}
+      <div className="flex flex-wrap items-center gap-2 mb-3 no-print">
+        <span className="text-xs text-[#6B7280] mr-1">Filter sesi:</span>
+        <button data-testid="session-filter-all" onClick={() => setSessionFilter("all")}
+          className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+            sessionFilter === "all" ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/40")}>
+          Semua Sesi
+        </button>
+        {[1, 2, 3, 4].map((sid) => (
+          <button key={sid} data-testid={`session-filter-${sid}`} onClick={() => setSessionFilter(sid)}
+            className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+              sessionFilter === sid ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/40")}>
+            Sesi {sid} ({orders.filter((o) => o.session_id === sid).length})
+          </button>
+        ))}
+      </div>
+
+      {/* Filters status */}
       <div className="flex flex-wrap gap-2 mb-4 no-print">
         {FILTERS.map((f) => (
           <button key={f.k} data-testid={`filter-${f.k}`} onClick={() => setFilter(f.k)}
