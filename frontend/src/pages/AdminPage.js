@@ -32,7 +32,7 @@ const waPhone = (phone) => {
 
 const sendWA = (o) => {
   const msg =
-`Halo ${o.name} 🙏
+`Namo Buddhaya ${o.name} 🙏
 Terima kasih, pembayaran Anda sudah kami *VERIFIKASI* ✅
 
 🧾 No. Order: #${o.order_no}
@@ -49,6 +49,17 @@ Berikut e-tiket Anda:
 Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa! 🙏
 — Sekretariat MBI Kepri`;
   window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+const orderProgress = (o) => {
+  if (o.status === "pending_payment") return { t: "Belum Bayar", c: "bg-[#D56115]/15 text-[#B34F0F]" };
+  if (o.status === "waiting_verification") return { t: "⚠ Belum cek payment", c: "bg-[#D56115]/20 text-[#B34F0F]" };
+  if (o.status === "verified") return o.wa_sent
+    ? { t: "✅ Complete", c: "bg-[#10B981]/15 text-[#0F7A57]" }
+    : { t: "Belum kirim WhatsApp", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" };
+  if (o.status === "rejected") return { t: "Ditolak", c: "bg-[#EF4444]/15 text-[#EF4444]" };
+  if (o.status === "expired") return { t: "Kadaluarsa", c: "bg-[#6B7280]/15 text-[#6B7280]" };
+  return { t: o.status, c: "bg-muted" };
 };
 
 const STATUS_META = {
@@ -226,6 +237,12 @@ export default function AdminPage() {
   };
 
   const logout = () => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); };
+
+  const sendAndMarkWA = async (o) => {
+    sendWA(o);
+    try { await adminApi.post(`/admin/orders/${o.id}/wa-sent`); await load(); }
+    catch { /* ignore */ }
+  };
 
   const openProof = async (o) => {
     setProofView(o); setProofImage(null); setProofLoading(true); setDialogVerified(false);
@@ -431,13 +448,13 @@ export default function AdminPage() {
                   <th className="px-4 py-3 font-medium">Sesi / Kursi</th>
                   <th className="px-4 py-3 font-medium">Total</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Bukti</th>
-                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                  <th className="px-4 py-3 font-medium text-center">Verifikasi</th>
+                  <th className="px-4 py-3 font-medium text-center">Kirim Pesan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map((o) => {
-                  const meta = STATUS_META[o.status] || {};
+                  const dstat = orderProgress(o);
                   return (
                     <tr key={o.id} data-testid={`order-row-${o.id.slice(0, 8)}`} className="hover:bg-muted/30">
                       <td className="px-3 py-3">
@@ -448,7 +465,7 @@ export default function AdminPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-[#1A1A1A]">{o.name}</p>
+                        <p className="font-medium text-[#1A1A1A]">{o.name} <span className="font-mono text-[10px] text-[#6B7280]">#{o.order_no}</span></p>
                         <p className="text-xs text-[#6B7280]">{o.phone}</p>
                       </td>
                       <td className="px-4 py-3">
@@ -457,43 +474,42 @@ export default function AdminPage() {
                       </td>
                       <td className="px-4 py-3 font-semibold text-[#1E3A5F]">{rupiah(o.total_amount)}</td>
                       <td className="px-4 py-3">
-                        <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", meta.c)}>{meta.t}</span>
+                        <span data-testid={`status-${o.id.slice(0, 8)}`} className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium inline-block", dstat.c)}>{dstat.t}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        {o.has_proof ? (
-                          <button onClick={() => openProof(o)} data-testid={`view-proof-${o.id.slice(0, 8)}`}
-                            className="inline-flex items-center gap-1 text-[#D56115] hover:underline text-xs">
-                            <Eye className="h-3.5 w-3.5" /> Lihat
+                      {/* Verifikasi */}
+                      <td className="px-4 py-3 text-center">
+                        {o.status === "waiting_verification" ? (
+                          <Button size="sm" onClick={() => openProof(o)} data-testid={`verify-open-${o.id.slice(0, 8)}`}
+                            className="h-8 bg-[#D56115] hover:bg-[#B34F0F] text-xs">
+                            <Eye className="h-3.5 w-3.5 mr-1" /> Cek Bukti
+                          </Button>
+                        ) : o.status === "verified" ? (
+                          <button onClick={() => o.has_proof && openProof(o)} data-testid={`verify-done-${o.id.slice(0, 8)}`}
+                            className="inline-flex items-center gap-1 text-[#0F7A57] text-xs font-medium">
+                            <CheckCircle2 className="h-4 w-4" /> Payment OK
                           </button>
-                        ) : <span className="text-xs text-[#6B7280]">—</span>}
+                        ) : o.status === "pending_payment" ? (
+                          <span className="text-xs text-[#6B7280]">Belum upload</span>
+                        ) : (
+                          <span className="text-xs text-[#6B7280]">—</span>
+                        )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1.5 justify-end">
-                          {o.status === "waiting_verification" && (
-                            <>
-                              <Button size="sm" onClick={() => act(o.id, "verify")} disabled={busyId === o.id}
-                                data-testid={`verify-${o.id.slice(0, 8)}`} className="h-8 bg-[#10B981] hover:bg-[#0F7A57]">
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => act(o.id, "reject")} disabled={busyId === o.id}
-                                data-testid={`reject-${o.id.slice(0, 8)}`} className="h-8 text-[#EF4444] border-[#EF4444]/40">
-                                <XCircle className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
-                          {o.status === "verified" && (
-                            <>
-                              <Button size="sm" onClick={() => sendWA(o)} data-testid={`wa-${o.id.slice(0, 8)}`}
-                                className="h-8 bg-[#10B981] hover:bg-[#0F7A57]" title="Kirim tiket via WhatsApp">
-                                <MessageCircle className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button size="sm" onClick={() => doPrint(o)} data-testid={`print-${o.id.slice(0, 8)}`}
-                                className="h-8 bg-[#1E3A5F] hover:bg-[#16304f]">
-                                <Printer className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                      {/* Kirim Pesan */}
+                      <td className="px-4 py-3 text-center">
+                        {o.status === "verified" ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Button size="sm" onClick={() => sendAndMarkWA(o)} data-testid={`wa-${o.id.slice(0, 8)}`}
+                              className={cn("h-8 text-xs", o.wa_sent ? "bg-white text-[#0F7A57] border border-[#10B981]/50 hover:bg-[#10B981]/10" : "bg-[#10B981] hover:bg-[#0F7A57]")}>
+                              <MessageCircle className="h-3.5 w-3.5 mr-1" /> {o.wa_sent ? "Kirim Ulang" : "Kirim Pesan"}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => doPrint(o)} data-testid={`print-${o.id.slice(0, 8)}`}
+                              className="h-8 text-[#1E3A5F]" title="Cetak tiket">
+                              <Printer className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-[#6B7280]">—</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -542,7 +558,7 @@ export default function AdminPage() {
                     <CheckCircle2 className="h-8 w-8 text-[#10B981] mx-auto mb-1" />
                     <p className="text-sm text-[#0F7A57] font-medium">Pembayaran diverifikasi. Kirim tiket ke pembeli via WhatsApp.</p>
                   </div>
-                  <Button onClick={() => { sendWA(proofView); }} data-testid="dialog-send-wa"
+                  <Button onClick={() => { sendAndMarkWA(proofView); }} data-testid="dialog-send-wa"
                     className="w-full bg-[#10B981] hover:bg-[#0F7A57]">
                     <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
                   </Button>
@@ -554,7 +570,7 @@ export default function AdminPage() {
                 <div className="flex gap-2 mt-4">
                   <Button onClick={verifyInDialog} disabled={busyId === proofView.id} data-testid="dialog-verify"
                     className="flex-1 bg-[#10B981] hover:bg-[#0F7A57]">
-                    {busyId === proofView.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Verifikasi
+                    {busyId === proofView.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Payment Masuk
                   </Button>
                   <Button variant="outline" onClick={() => { act(proofView.id, "reject"); setProofView(null); }}
                     data-testid="dialog-reject" className="flex-1 text-[#EF4444] border-[#EF4444]/40">
@@ -562,7 +578,7 @@ export default function AdminPage() {
                   </Button>
                 </div>
               ) : proofView.status === "verified" ? (
-                <Button onClick={() => sendWA(proofView)} data-testid="dialog-send-wa-2"
+                <Button onClick={() => sendAndMarkWA(proofView)} data-testid="dialog-send-wa-2"
                   className="w-full mt-4 bg-[#10B981] hover:bg-[#0F7A57]">
                   <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
                 </Button>

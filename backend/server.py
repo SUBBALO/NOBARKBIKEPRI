@@ -475,6 +475,17 @@ async def bulk_action(payload: BulkAction, _: bool = Depends(require_admin)):
     return {"updated": len(payload.ids), "action": payload.action}
 
 
+@api_router.post("/admin/orders/{order_id}/wa-sent")
+async def mark_wa_sent(order_id: str, _: bool = Depends(require_admin)):
+    r = await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"wa_sent": True, "wa_sent_at": now_iso(), "updated_at": now_iso()}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
 @api_router.post("/admin/orders/{order_id}/checkin")
 async def checkin_order(order_id: str, _: bool = Depends(require_admin)):
     r = await db.orders.update_one(
