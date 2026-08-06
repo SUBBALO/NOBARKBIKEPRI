@@ -245,8 +245,6 @@ async def create_order(payload: OrderCreate):
         raise HTTPException(status_code=400, detail="Sesi ini belum/tidak dibuka untuk pemesanan")
 
     seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
-    if len(seats) > MAX_SEATS_PER_ORDER:
-        raise HTTPException(status_code=400, detail=f"Maksimal {MAX_SEATS_PER_ORDER} kursi per pesanan")
     for seat in seats:
         if seat not in ALL_SEAT_LABELS:
             raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")

@@ -112,16 +112,10 @@ export default function BookingPage() {
     return () => clearInterval(t);
   }, [step, sessionId]);
 
-  const MAX_SEATS = 6;
   const toggleSeat = (label) => {
-    setSelected((prev) => {
-      if (prev.includes(label)) return prev.filter((s) => s !== label);
-      if (prev.length >= MAX_SEATS) {
-        toast.error(`Maksimal ${MAX_SEATS} kursi per pesanan`);
-        return prev;
-      }
-      return [...prev, label];
-    });
+    setSelected((prev) =>
+      prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label]
+    );
   };
 
   const next = () => {
@@ -286,7 +280,7 @@ export default function BookingPage() {
               <div>
                 <h2 className="font-serif-display text-3xl text-[#1E3A5F] mb-1">Pilih Kursi</h2>
                 <p className="text-sm text-[#6B7280]">
-                  {activeSession ? `${activeSession.name} · ${activeSession.time}` : ""} — pilih kursi (maks. {MAX_SEATS}). Denah diperbarui otomatis.
+                  {activeSession ? `${activeSession.name} · ${activeSession.time}` : ""} — pilih kursi sebanyak yang dibutuhkan. Denah diperbarui otomatis.
                 </p>
               </div>
               <div className="text-right">
