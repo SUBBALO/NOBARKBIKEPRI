@@ -231,6 +231,11 @@ export default function OrderStatusPage() {
                     </div>
                     <div className="flex justify-between text-sm"><span className="text-[#6B7280]">Atas Nama</span><span className="font-semibold text-right max-w-[60%]">{order.transfer?.account_name}</span></div>
                   </div>
+                  <div className="mt-3 rounded-lg bg-[#D56115]/10 border border-[#D56115]/20 p-3">
+                    <p className="text-xs text-[#B34F0F]">
+                      📝 <b>Penting:</b> mohon cantumkan <b>No. Order #{order.order_no}</b> pada kolom <b>keterangan / berita transfer</b> agar pembayaran Anda mudah kami cocokkan.
+                    </p>
+                  </div>
                   <p className="text-xs text-[#6B7280] mt-2">Transfer nominal PAS {rupiah(order.total_amount)} (termasuk kode unik).</p>
                 </TabsContent>
               </Tabs>
