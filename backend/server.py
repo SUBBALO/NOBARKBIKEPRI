@@ -469,6 +469,15 @@ async def reject_order(order_id: str, _: bool = Depends(require_admin)):
     return clean(await db.orders.find_one({"id": order_id}))
 
 
+@api_router.delete("/admin/orders/{order_id}")
+async def delete_order(order_id: str, _: bool = Depends(require_admin)):
+    r = await db.orders.delete_one({"id": order_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    await db.seat_locks.delete_many({"order_id": order_id})  # free the seats
+    return {"deleted": True, "id": order_id}
+
+
 @api_router.post("/admin/orders/bulk")
 async def bulk_action(payload: BulkAction, _: bool = Depends(require_admin)):
     if not payload.ids:

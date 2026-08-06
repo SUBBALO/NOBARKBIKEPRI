@@ -11,6 +11,7 @@ import {
 import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
+  Trash2, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -246,6 +247,8 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -281,6 +284,19 @@ export default function AdminPage() {
   };
 
   const logout = () => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); };
+
+  const doDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await adminApi.delete(`/admin/orders/${deleteTarget.id}`);
+      toast.success(`Pesanan #${deleteTarget.order_no} dihapus permanen`);
+      setDeleteTarget(null);
+      setSelectedIds((p) => p.filter((x) => x !== deleteTarget.id));
+      await load();
+    } catch { toast.error("Gagal menghapus pesanan"); }
+    setDeleteBusy(false);
+  };
 
   const sendAndMarkWA = async (o) => {
     sendWA(o);
@@ -512,6 +528,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-center">Verifikasi</th>
                   <th className="px-4 py-3 font-medium text-center">Kirim Pesan</th>
+                  <th className="px-4 py-3 font-medium text-center">Hapus</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -581,6 +598,14 @@ export default function AdminPage() {
                         ) : (
                           <span className="text-xs text-[#6B7280]">—</span>
                         )}
+                      </td>
+                      {/* Hapus */}
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => setDeleteTarget(o)} data-testid={`delete-open-${o.id.slice(0, 8)}`}
+                          title="Hapus pesanan"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -686,6 +711,40 @@ export default function AdminPage() {
           <DialogFooter className="gap-2 sm:gap-2">
             <Button onClick={() => setCheckinPopup(null)} className="bg-[#1E3A5F] hover:bg-[#16304f] w-full" data-testid="checkin-popup-ok">
               Sudah Saya Berikan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={() => !deleteBusy && setDeleteTarget(null)}>
+        <DialogContent data-testid="delete-dialog" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#EF4444]/15 flex items-center justify-center mb-2">
+              <AlertTriangle className="h-5 w-5 text-[#EF4444]" />
+            </div>
+            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Anda yakin hapus?</DialogTitle>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="text-sm space-y-3">
+              <p className="text-[#6B7280]">
+                Pesanan berikut akan <b className="text-[#EF4444]">dihapus permanen</b> dan
+                <b> tidak bisa dikembalikan</b>.
+              </p>
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="font-semibold text-[#1A1A1A]">{deleteTarget.name} <span className="font-mono text-xs text-[#6B7280]">#{deleteTarget.order_no}</span></p>
+                <p className="text-xs text-[#6B7280]">{deleteTarget.phone} · {deleteTarget.session?.name} · {rupiah(deleteTarget.total_amount)}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}
+              data-testid="delete-cancel" className="flex-1">
+              Batal
+            </Button>
+            <Button onClick={doDelete} disabled={deleteBusy} data-testid="delete-confirm"
+              className="flex-1 bg-[#EF4444] hover:bg-[#DC2626]">
+              {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />} Ya, Hapus Permanen
             </Button>
           </DialogFooter>
         </DialogContent>
