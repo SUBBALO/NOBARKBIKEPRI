@@ -180,6 +180,7 @@ export default function AdminPage() {
   const [proofView, setProofView] = useState(null);
   const [proofImage, setProofImage] = useState(null);
   const [proofLoading, setProofLoading] = useState(false);
+  const [dialogVerified, setDialogVerified] = useState(false);
   const [printOrder, setPrintOrder] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [tab, setTab] = useState("payment");
@@ -227,12 +228,24 @@ export default function AdminPage() {
   const logout = () => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); };
 
   const openProof = async (o) => {
-    setProofView(o); setProofImage(null); setProofLoading(true);
+    setProofView(o); setProofImage(null); setProofLoading(true); setDialogVerified(false);
     try {
       const { data } = await adminApi.get(`/admin/orders/${o.id}/proof-image`);
       setProofImage(data.proof_image);
     } catch { toast.error("Gagal memuat bukti"); }
     setProofLoading(false);
+  };
+
+  const verifyInDialog = async () => {
+    if (!proofView) return;
+    setBusyId(proofView.id);
+    try {
+      await adminApi.post(`/admin/orders/${proofView.id}/verify`);
+      toast.success("Pesanan diverifikasi");
+      setDialogVerified(true);
+      await load();
+    } catch { toast.error("Gagal verifikasi"); }
+    setBusyId(null);
   };
 
   const exportExcel = async () => {
@@ -393,6 +406,13 @@ export default function AdminPage() {
       </div>
 
       {/* Orders table */}
+      <div className="flex items-center justify-between mb-2 no-print">
+        <h2 className="font-serif-display text-xl text-[#1E3A5F] flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-[#D56115]" /> Daftar Pesanan — Verifikasi Pembayaran
+        </h2>
+        <span className="text-xs text-[#6B7280]">{filtered.length} pesanan</span>
+      </div>
+      <p className="text-xs text-[#6B7280] mb-3 no-print">Klik <b>Lihat</b> pada kolom Bukti untuk melihat bukti transfer & memverifikasi.</p>
       <div className="rounded-2xl border border-border bg-white overflow-hidden no-print">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
@@ -438,7 +458,6 @@ export default function AdminPage() {
                       <td className="px-4 py-3 font-semibold text-[#1E3A5F]">{rupiah(o.total_amount)}</td>
                       <td className="px-4 py-3">
                         <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", meta.c)}>{meta.t}</span>
-                        {o.checked_in && <span className="block text-[10px] text-[#10B981] mt-1">✓ hadir {o.checked_in_at ? fmtTime(o.checked_in_at) : ""}</span>}
                       </td>
                       <td className="px-4 py-3">
                         {o.has_proof ? (
@@ -464,10 +483,6 @@ export default function AdminPage() {
                           )}
                           {o.status === "verified" && (
                             <>
-                              {!o.checked_in && (
-                                <Button size="sm" variant="outline" onClick={() => act(o.id, "checkin")} disabled={busyId === o.id}
-                                  data-testid={`checkin-${o.id.slice(0, 8)}`} className="h-8 text-xs">Check-in</Button>
-                              )}
                               <Button size="sm" onClick={() => sendWA(o)} data-testid={`wa-${o.id.slice(0, 8)}`}
                                 className="h-8 bg-[#10B981] hover:bg-[#0F7A57]" title="Kirim tiket via WhatsApp">
                                 <MessageCircle className="h-3.5 w-3.5" />
@@ -499,31 +514,59 @@ export default function AdminPage() {
       <Dialog open={!!proofView} onOpenChange={() => setProofView(null)}>
         <DialogContent data-testid="proof-dialog">
           <DialogHeader>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Bukti Pembayaran</DialogTitle>
+            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">
+              {dialogVerified ? "Terverifikasi ✅" : "Verifikasi Pembayaran"}
+            </DialogTitle>
           </DialogHeader>
           {proofView && (
             <div>
-              <div className="text-sm mb-3 space-y-1">
-                <p><b>{proofView.name}</b> · {proofView.phone}</p>
-                <p>Bayar: <b className="text-[#D56115]">{rupiah(proofView.total_amount)}</b> (kode unik {proofView.unique_code})</p>
+              <div className="text-sm mb-3 space-y-0.5">
+                <p><b>{proofView.name}</b> <span className="font-mono text-xs text-[#6B7280]">#{proofView.order_no}</span></p>
+                <p className="text-[#6B7280]">{proofView.phone} · {proofView.session?.name} · Kursi {proofView.seats.join(", ")}</p>
+                <p>Nominal: <b className="text-[#D56115]">{rupiah(proofView.total_amount)}</b> (kode unik {proofView.unique_code})</p>
               </div>
-              {proofLoading ? (
-                <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
-              ) : proofImage ? (
-                <img src={proofImage} alt="Bukti" className="w-full rounded-lg border border-border" />
-              ) : (
-                <p className="text-sm text-[#6B7280] py-4 text-center">Bukti tidak tersedia.</p>
+
+              {!dialogVerified && (
+                proofLoading ? (
+                  <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+                ) : proofImage ? (
+                  <img src={proofImage} alt="Bukti" className="w-full rounded-lg border border-border max-h-[45vh] object-contain bg-muted/30" />
+                ) : (
+                  <p className="text-sm text-[#6B7280] py-4 text-center">Bukti tidak tersedia.</p>
+                )
               )}
-              {proofView.status === "waiting_verification" && (
-                <div className="flex gap-2 mt-4">
-                  <Button onClick={() => { act(proofView.id, "verify"); setProofView(null); }} className="flex-1 bg-[#10B981] hover:bg-[#0F7A57]">
-                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> Verifikasi
+
+              {dialogVerified ? (
+                <div className="mt-4">
+                  <div className="rounded-lg bg-[#10B981]/10 p-4 text-center mb-3">
+                    <CheckCircle2 className="h-8 w-8 text-[#10B981] mx-auto mb-1" />
+                    <p className="text-sm text-[#0F7A57] font-medium">Pembayaran diverifikasi. Kirim tiket ke pembeli via WhatsApp.</p>
+                  </div>
+                  <Button onClick={() => { sendWA(proofView); }} data-testid="dialog-send-wa"
+                    className="w-full bg-[#10B981] hover:bg-[#0F7A57]">
+                    <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
                   </Button>
-                  <Button variant="outline" onClick={() => { act(proofView.id, "reject"); setProofView(null); }} className="flex-1 text-[#EF4444] border-[#EF4444]/40">
+                  <Button variant="ghost" onClick={() => setProofView(null)} className="w-full mt-1 text-[#6B7280]" data-testid="dialog-close">
+                    Selesai
+                  </Button>
+                </div>
+              ) : proofView.status === "waiting_verification" ? (
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={verifyInDialog} disabled={busyId === proofView.id} data-testid="dialog-verify"
+                    className="flex-1 bg-[#10B981] hover:bg-[#0F7A57]">
+                    {busyId === proofView.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Verifikasi
+                  </Button>
+                  <Button variant="outline" onClick={() => { act(proofView.id, "reject"); setProofView(null); }}
+                    data-testid="dialog-reject" className="flex-1 text-[#EF4444] border-[#EF4444]/40">
                     <XCircle className="h-4 w-4 mr-1.5" /> Tolak
                   </Button>
                 </div>
-              )}
+              ) : proofView.status === "verified" ? (
+                <Button onClick={() => sendWA(proofView)} data-testid="dialog-send-wa-2"
+                  className="w-full mt-4 bg-[#10B981] hover:bg-[#0F7A57]">
+                  <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
+                </Button>
+              ) : null}
             </div>
           )}
         </DialogContent>
