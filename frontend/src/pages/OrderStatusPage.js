@@ -236,13 +236,13 @@ export default function OrderStatusPage() {
                   <div className="mt-3">
                     <label className="text-xs text-[#6B7280]">Keterangan / Berita Transfer <span className="text-[#B34F0F]">(wajib diisi)</span></label>
                     <div className="mt-1 flex items-center gap-2 rounded-lg border-2 border-dashed border-[#D56115]/40 bg-white px-3 py-2.5">
-                      <span data-testid="transfer-note" className="flex-1 font-mono font-bold text-[#1E3A5F] tracking-wide">No. Order #{order.order_no}</span>
-                      <button onClick={() => { navigator.clipboard.writeText(`No. Order #${order.order_no}`); toast.success("Keterangan disalin"); }}
+                      <span data-testid="transfer-note" className="flex-1 font-mono font-bold text-[#1E3A5F] tracking-wide">#{order.order_no}</span>
+                      <button onClick={() => { navigator.clipboard.writeText(String(order.order_no)); toast.success(`"${order.order_no}" disalin`); }}
                         data-testid="btn-copy-note" className="inline-flex items-center gap-1 text-xs text-[#D56115] font-medium hover:underline">
                         <Copy className="h-3.5 w-3.5" /> Salin
                       </button>
                     </div>
-                    <p className="text-[11px] text-[#6B7280] mt-1">Salin & tempel pada kolom berita transfer agar mudah kami cocokkan.</p>
+                    <p className="text-[11px] text-[#6B7280] mt-1">Cukup salin angka <b>{order.order_no}</b> lalu tempel pada kolom berita transfer.</p>
                   </div>
 
                   {/* Nominal transfer - ditonjolkan */}
