@@ -130,8 +130,8 @@ export default function OrderStatusPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <p className="text-xs text-[#6B7280]">Kode Pesanan</p>
-          <p className="font-mono text-sm text-[#1E3A5F]" data-testid="order-id">{order.id.slice(0, 8).toUpperCase()}</p>
+          <p className="text-xs text-[#6B7280]">No. Order</p>
+          <p className="font-mono text-sm text-[#1E3A5F]" data-testid="order-id">#{order.order_no}</p>
         </div>
         <StatusBadge status={order.status} />
       </div>

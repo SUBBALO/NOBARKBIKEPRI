@@ -158,6 +158,17 @@ async def resolve_active_session():
     return active
 
 
+async def gen_order_no():
+    for _ in range(80):
+        n = random.randint(1000, 9999)
+        exists = await db.orders.count_documents({"order_no": n}, limit=1)
+        if not exists:
+            return n
+    # fallback: sequential above current max
+    last = await db.orders.find({"order_no": {"$exists": True}}).sort("order_no", -1).limit(1).to_list(1)
+    return (last[0]["order_no"] + 1) if last else 1000
+
+
 async def gen_unique_total(base: int):
     for pool in (list(range(11, 100)), list(range(100, 1000))):
         random.shuffle(pool)
@@ -246,6 +257,7 @@ async def create_order(payload: OrderCreate):
     qty = len(seats)
     base = qty * TICKET_PRICE
     code, total = await gen_unique_total(base)
+    order_no = await gen_order_no()
     order_id = str(uuid.uuid4())
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=HOLD_MINUTES)
 
@@ -270,6 +282,7 @@ async def create_order(payload: OrderCreate):
 
     order = {
         "id": order_id,
+        "order_no": order_no,
         "name": payload.name.strip(),
         "phone": payload.phone.strip(),
         "session_id": payload.session_id,
@@ -305,7 +318,7 @@ async def lookup_orders(phone: str):
         # lazily expire unpaid too-old orders for accurate status
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
         result.append({
-            "id": o["id"], "name": o["name"], "phone": o["phone"],
+            "id": o["id"], "order_no": o.get("order_no"), "name": o["name"], "phone": o["phone"],
             "session": session, "seats": o["seats"], "qty": o["qty"],
             "total_amount": o["total_amount"], "unique_code": o["unique_code"],
             "payment_method": o["payment_method"], "status": o["status"],
@@ -490,7 +503,7 @@ async def list_participants(_: bool = Depends(require_admin)):
     for o in docs:
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
         result.append({
-            "id": o["id"], "name": o["name"], "phone": o["phone"],
+            "id": o["id"], "order_no": o.get("order_no"), "name": o["name"], "phone": o["phone"],
             "session": session, "seats": o["seats"], "qty": o["qty"],
             "checked_in": o.get("checked_in", False), "checked_in_at": o.get("checked_in_at"),
         })
@@ -510,7 +523,7 @@ async def export_orders(_: bool = Depends(require_admin)):
     wb = Workbook()
     ws = wb.active
     ws.title = "Peserta"
-    headers = ["No", "Kode Pesanan", "Nama", "No HP", "Sesi", "Jam", "Kursi",
+    headers = ["No", "No. Order", "Kode Pesanan", "Nama", "No HP", "Sesi", "Jam", "Kursi",
                "Jml Tiket", "Nominal (Rp)", "Kode Unik", "Metode", "Status", "Sudah Hadir", "Waktu Check-in", "Waktu Pesan"]
     ws.append(headers)
     header_fill = PatternFill("solid", fgColor="1E3A5F")
@@ -534,6 +547,7 @@ async def export_orders(_: bool = Depends(require_admin)):
                 checkin_str = o["checked_in_at"]
         ws.append([
             i,
+            o.get("order_no", ""),
             o["id"][:8].upper(),
             o["name"],
             o["phone"],
@@ -549,7 +563,7 @@ async def export_orders(_: bool = Depends(require_admin)):
             checkin_str,
             created_str,
         ])
-    widths = [5, 12, 24, 16, 10, 12, 18, 9, 14, 9, 10, 16, 11, 18, 18]
+    widths = [5, 9, 12, 24, 16, 10, 12, 18, 9, 14, 9, 10, 16, 11, 18, 18]
     for idx, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
     ws.freeze_panes = "A2"
@@ -605,6 +619,13 @@ async def backfill_seat_locks():
         logger.info("seat_locks backfill complete")
     except Exception as e:
         logger.error(f"seat_locks backfill error: {e}")
+    # assign 4-digit order_no to any order missing it
+    try:
+        async for o in db.orders.find({"order_no": {"$exists": False}}):
+            await db.orders.update_one({"id": o["id"]}, {"$set": {"order_no": await gen_order_no()}})
+        logger.info("order_no backfill complete")
+    except Exception as e:
+        logger.error(f"order_no backfill error: {e}")
 
 
 @app.on_event("shutdown")

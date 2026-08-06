@@ -122,7 +122,7 @@ export default function UploadProofPage() {
               className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
-                  <p className="font-semibold text-[#1A1A1A]">{o.name}</p>
+                  <p className="font-semibold text-[#1A1A1A]">{o.name} <span className="font-mono text-xs text-[#6B7280]">#{o.order_no}</span></p>
                   <p className="text-xs text-[#6B7280]">{o.session?.name} · {o.session?.time} · Kursi {o.seats.join(", ")}</p>
                 </div>
                 <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium", meta.c)}>

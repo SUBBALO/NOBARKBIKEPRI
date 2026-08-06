@@ -35,13 +35,16 @@ const sendWA = (o) => {
 `Halo ${o.name} 🙏
 Terima kasih, pembayaran Anda sudah kami *VERIFIKASI* ✅
 
+🧾 No. Order: #${o.order_no}
+👤 Nama: ${o.name}
+📱 No HP: ${o.phone}
+
 Berikut e-tiket Anda:
 🎬 Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"
 🗓️ Minggu, 13 September 2026
 📍 CGV Grand Batam
 🎟️ ${o.session?.name || "Sesi"} (${o.session?.time || "-"})
 💺 Kursi: ${o.seats.join(", ")}
-🔖 Kode: ${o.id.slice(0, 8).toUpperCase()}-${o.unique_code}
 
 Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa! 🙏
 — Sekretariat MBI Kepri`;
@@ -263,7 +266,7 @@ export default function AdminPage() {
   const filtered = orders.filter((o) =>
     (filter === "all" || o.status === filter) &&
     (sessionFilter === "all" || o.session_id === sessionFilter) &&
-    (sq === "" || o.name.toLowerCase().includes(sq) || o.phone.replace(/[\s-]/g, "").includes(nsq))
+    (sq === "" || o.name.toLowerCase().includes(sq) || o.phone.replace(/[\s-]/g, "").includes(nsq) || String(o.order_no || "").includes(searchQuery.trim()))
   );
 
   const selectableIds = filtered.filter((o) => o.status === "waiting_verification").map((o) => o.id);
@@ -371,7 +374,7 @@ export default function AdminPage() {
         <div className="relative flex-1 min-w-[220px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
           <Input data-testid="orders-search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari nama atau nomor HP..." className="pl-9" />
+            placeholder="Cari nama, no HP, atau no order..." className="pl-9" />
         </div>
         {selectedIds.length > 0 && (
           <div className="flex items-center gap-2 rounded-full bg-[#1E3A5F]/5 border border-[#1E3A5F]/20 px-3 py-1.5">
@@ -580,7 +583,7 @@ export default function AdminPage() {
               <div><p className="text-gray-500 text-xs">Kursi</p><p className="font-semibold">{printOrder.seats.join(", ")}</p></div>
             </div>
             <div className="mt-4 pt-3 border-t border-dashed border-gray-300 flex justify-between items-center">
-              <div><p className="text-gray-500 text-xs">Kode</p><p className="font-mono font-bold">{printOrder.id.slice(0, 8).toUpperCase()}-{printOrder.unique_code}</p></div>
+              <div><p className="text-gray-500 text-xs">No. Order</p><p className="font-mono font-bold">#{printOrder.order_no}</p></div>
               <div className="text-right"><p className="text-gray-500 text-xs">Total</p><p className="font-bold">{rupiah(printOrder.total_amount)}</p></div>
             </div>
           </div>
