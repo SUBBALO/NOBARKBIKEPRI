@@ -10,9 +10,33 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
-  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle,
+  Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const compressImage = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1400;
+        let { width, height } = img;
+        if (width > max || height > max) {
+          const r = Math.min(max / width, max / height);
+          width = Math.round(width * r); height = Math.round(height * r);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 const fmtTime = (iso) => {
   if (!iso) return "";
@@ -22,7 +46,6 @@ const fmtTime = (iso) => {
     }) + " WIB";
   } catch { return ""; }
 };
-
 const waPhone = (phone) => {
   let p = (phone || "").replace(/[^0-9]/g, "");
   if (p.startsWith("0")) p = "62" + p.slice(1);
@@ -64,6 +87,8 @@ Namun kami *BELUM menerima bukti pembayaran* Anda untuk:
 
 Mohon segera lakukan pembayaran & *upload bukti transfer* melalui link berikut:
 ${link}
+
+Atau Anda cukup *kirim foto bukti transfer ke chat WhatsApp ini*, nanti kami bantu upload-kan. 🙏
 
 Jika sudah membayar, mohon abaikan pesan ini. Terima kasih 🙏
 — Sekretariat MBI Kepri`;
@@ -261,6 +286,24 @@ export default function AdminPage() {
     sendWA(o);
     try { await adminApi.post(`/admin/orders/${o.id}/wa-sent`); await load(); }
     catch { /* ignore */ }
+  };
+
+  const adminUpload = (o) => {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/*";
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setBusyId(o.id);
+      try {
+        const dataUrl = await compressImage(file);
+        await api.post(`/orders/${o.id}/proof`, { proof_image: dataUrl });
+        toast.success(`Bukti untuk ${o.name} berhasil diupload`);
+        await load();
+      } catch (err) { toast.error(err?.response?.data?.detail || "Gagal upload bukti"); }
+      setBusyId(null);
+    };
+    input.click();
   };
 
   const openProof = async (o) => {
@@ -508,7 +551,15 @@ export default function AdminPage() {
                             <CheckCircle2 className="h-4 w-4" /> Payment OK
                           </button>
                         ) : o.status === "pending_payment" ? (
-                          <span className="text-xs text-[#6B7280]">Belum upload</span>
+                          <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
+                            data-testid={`admin-upload-${o.id.slice(0, 8)}`} className="h-8 text-xs border-[#1E3A5F]/40 text-[#1E3A5F]">
+                            {busyId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <UploadCloud className="h-3.5 w-3.5 mr-1" />} Upload Bukti
+                          </Button>
+                        ) : o.status === "expired" ? (
+                          <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
+                            data-testid={`admin-upload-${o.id.slice(0, 8)}`} className="h-8 text-xs border-[#1E3A5F]/40 text-[#1E3A5F]">
+                            {busyId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <UploadCloud className="h-3.5 w-3.5 mr-1" />} Upload Bukti
+                          </Button>
                         ) : (
                           <span className="text-xs text-[#6B7280]">—</span>
                         )}
