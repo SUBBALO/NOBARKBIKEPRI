@@ -231,12 +231,30 @@ export default function OrderStatusPage() {
                     </div>
                     <div className="flex justify-between text-sm"><span className="text-[#6B7280]">Atas Nama</span><span className="font-semibold text-right max-w-[60%]">{order.transfer?.account_name}</span></div>
                   </div>
-                  <div className="mt-3 rounded-lg bg-[#D56115]/10 border border-[#D56115]/20 p-3">
-                    <p className="text-xs text-[#B34F0F]">
-                      📝 <b>Penting:</b> mohon cantumkan <b>No. Order #{order.order_no}</b> pada kolom <b>keterangan / berita transfer</b> agar pembayaran Anda mudah kami cocokkan.
-                    </p>
+
+                  {/* Keterangan / berita transfer (auto isi No. Order) */}
+                  <div className="mt-3">
+                    <label className="text-xs text-[#6B7280]">Keterangan / Berita Transfer <span className="text-[#B34F0F]">(wajib diisi)</span></label>
+                    <div className="mt-1 flex items-center gap-2 rounded-lg border-2 border-dashed border-[#D56115]/40 bg-white px-3 py-2.5">
+                      <span data-testid="transfer-note" className="flex-1 font-mono font-bold text-[#1E3A5F] tracking-wide">No. Order #{order.order_no}</span>
+                      <button onClick={() => { navigator.clipboard.writeText(`No. Order #${order.order_no}`); toast.success("Keterangan disalin"); }}
+                        data-testid="btn-copy-note" className="inline-flex items-center gap-1 text-xs text-[#D56115] font-medium hover:underline">
+                        <Copy className="h-3.5 w-3.5" /> Salin
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-[#6B7280] mt-1">Salin & tempel pada kolom berita transfer agar mudah kami cocokkan.</p>
                   </div>
-                  <p className="text-xs text-[#6B7280] mt-2">Transfer nominal PAS {rupiah(order.total_amount)} (termasuk kode unik).</p>
+
+                  {/* Nominal transfer - ditonjolkan */}
+                  <div className="mt-3 rounded-xl bg-[#1E3A5F] text-white px-4 py-3">
+                    <p className="text-xs text-white/70">Nominal Transfer (harus PAS)</p>
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif-display text-3xl tracking-tight" data-testid="transfer-amount">{rupiah(order.total_amount)}</span>
+                      <button onClick={() => { navigator.clipboard.writeText(String(order.total_amount)); toast.success("Nominal disalin"); }}
+                        data-testid="btn-copy-transfer-total" className="text-white/80 hover:text-white"><Copy className="h-5 w-5" /></button>
+                    </div>
+                    <p className="text-[11px] text-[#F0C48A] mt-0.5">3 digit terakhir ({order.unique_code}) adalah kode unik — bayar TEPAT sejumlah ini.</p>
+                  </div>
                 </TabsContent>
               </Tabs>
 
