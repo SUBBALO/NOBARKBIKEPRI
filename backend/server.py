@@ -78,6 +78,11 @@ class SetActiveSession(BaseModel):
     session_id: int
 
 
+class BulkAction(BaseModel):
+    ids: List[str]
+    action: Literal["verify", "reject"]
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
@@ -439,6 +444,24 @@ async def reject_order(order_id: str, _: bool = Depends(require_admin)):
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
     await db.seat_locks.delete_many({"order_id": order_id})  # free the seats
     return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.post("/admin/orders/bulk")
+async def bulk_action(payload: BulkAction, _: bool = Depends(require_admin)):
+    if not payload.ids:
+        raise HTTPException(status_code=400, detail="Tidak ada pesanan dipilih")
+    if payload.action == "verify":
+        await db.orders.update_many(
+            {"id": {"$in": payload.ids}},
+            {"$set": {"status": "verified", "updated_at": now_iso()}},
+        )
+    else:
+        await db.orders.update_many(
+            {"id": {"$in": payload.ids}},
+            {"$set": {"status": "rejected", "updated_at": now_iso()}},
+        )
+        await db.seat_locks.delete_many({"order_id": {"$in": payload.ids}})
+    return {"updated": len(payload.ids), "action": payload.action}
 
 
 @api_router.post("/admin/orders/{order_id}/checkin")

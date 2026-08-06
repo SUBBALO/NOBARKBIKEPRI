@@ -159,6 +159,9 @@ export default function AdminPage() {
   const [checkinPopup, setCheckinPopup] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [sessionFilter, setSessionFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -230,10 +233,29 @@ export default function AdminPage() {
 
   if (!authed) return <LoginView onLogin={() => setAuthed(true)} />;
 
+  const sq = searchQuery.trim().toLowerCase();
+  const nsq = sq.replace(/[\s-]/g, "");
   const filtered = orders.filter((o) =>
     (filter === "all" || o.status === filter) &&
-    (sessionFilter === "all" || o.session_id === sessionFilter)
+    (sessionFilter === "all" || o.session_id === sessionFilter) &&
+    (sq === "" || o.name.toLowerCase().includes(sq) || o.phone.replace(/[\s-]/g, "").includes(nsq))
   );
+
+  const selectableIds = filtered.filter((o) => o.status === "waiting_verification").map((o) => o.id);
+  const toggleSelect = (id) => setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id));
+  const toggleSelectAll = () => setSelectedIds(allSelected ? [] : selectableIds);
+  const bulkAct = async (action) => {
+    if (selectedIds.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const { data } = await adminApi.post("/admin/orders/bulk", { ids: selectedIds, action });
+      toast.success(`${data.updated} pesanan ${action === "verify" ? "diverifikasi" : "ditolak"}`);
+      setSelectedIds([]);
+      await load();
+    } catch { toast.error("Aksi massal gagal"); }
+    setBulkBusy(false);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
@@ -319,17 +341,44 @@ export default function AdminPage() {
         ))}
       </div>
 
+      {/* Search + bulk actions */}
+      <div className="flex flex-wrap items-center gap-3 mb-4 no-print">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+          <Input data-testid="orders-search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari nama atau nomor HP..." className="pl-9" />
+        </div>
+        {selectedIds.length > 0 && (
+          <div className="flex items-center gap-2 rounded-full bg-[#1E3A5F]/5 border border-[#1E3A5F]/20 px-3 py-1.5">
+            <span className="text-sm text-[#1E3A5F] font-medium" data-testid="bulk-count">{selectedIds.length} dipilih</span>
+            <Button size="sm" onClick={() => bulkAct("verify")} disabled={bulkBusy} data-testid="bulk-verify"
+              className="h-8 bg-[#10B981] hover:bg-[#0F7A57]">
+              {bulkBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />} Verifikasi
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkAct("reject")} disabled={bulkBusy} data-testid="bulk-reject"
+              className="h-8 text-[#EF4444] border-[#EF4444]/40">
+              <XCircle className="h-3.5 w-3.5 mr-1" /> Tolak
+            </Button>
+            <button onClick={() => setSelectedIds([])} className="text-xs text-[#6B7280] underline">bersihkan</button>
+          </div>
+        )}
+      </div>
+
       {/* Orders table */}
       <div className="rounded-2xl border border-border bg-white overflow-hidden no-print">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-[#6B7280]">Belum ada pesanan.</div>
+          <div className="py-16 text-center text-sm text-[#6B7280]">Tidak ada pesanan yang cocok.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="orders-table">
               <thead className="bg-muted/50 text-left text-xs text-[#6B7280]">
                 <tr>
+                  <th className="px-3 py-3 font-medium">
+                    <input type="checkbox" data-testid="select-all" checked={allSelected} onChange={toggleSelectAll}
+                      disabled={selectableIds.length === 0} className="accent-[#1E3A5F] h-4 w-4 align-middle" />
+                  </th>
                   <th className="px-4 py-3 font-medium">Pemesan</th>
                   <th className="px-4 py-3 font-medium">Sesi / Kursi</th>
                   <th className="px-4 py-3 font-medium">Total</th>
@@ -343,6 +392,13 @@ export default function AdminPage() {
                   const meta = STATUS_META[o.status] || {};
                   return (
                     <tr key={o.id} data-testid={`order-row-${o.id.slice(0, 8)}`} className="hover:bg-muted/30">
+                      <td className="px-3 py-3">
+                        {o.status === "waiting_verification" && (
+                          <input type="checkbox" data-testid={`select-${o.id.slice(0, 8)}`}
+                            checked={selectedIds.includes(o.id)} onChange={() => toggleSelect(o.id)}
+                            className="accent-[#1E3A5F] h-4 w-4 align-middle" />
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-[#1A1A1A]">{o.name}</p>
                         <p className="text-xs text-[#6B7280]">{o.phone}</p>
