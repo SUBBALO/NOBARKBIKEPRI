@@ -36,6 +36,14 @@ const compressImage = (file) =>
     reader.readAsDataURL(file);
   });
 
+const maskName = (name) => {
+  const parts = (name || "").trim().split(/\s+/);
+  return parts.map((w) => {
+    if (w.length <= 2) return w[0] + "*";
+    return w[0] + "*".repeat(Math.max(1, w.length - 2)) + w[w.length - 1];
+  }).join(" ");
+};
+
 const STATUS = {
   pending_payment: { t: "Belum Upload Bukti", c: "bg-[#D56115]/15 text-[#B34F0F]", i: Clock },
   expired: { t: "Kadaluarsa (segera upload)", c: "bg-[#6B7280]/15 text-[#6B7280]", i: AlertTriangle },

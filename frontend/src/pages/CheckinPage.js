@@ -95,7 +95,10 @@ export default function CheckinPage() {
   const q = query.trim().toLowerCase();
   const nq = q.replace(/[\s-]/g, "");
   const results = q.length === 0 ? participants : participants.filter(
-    (o) => o.name.toLowerCase().includes(q) || o.phone.replace(/[\s-]/g, "").includes(nq)
+    (o) =>
+      o.name.toLowerCase().includes(q) ||
+      o.phone.replace(/[\s-]/g, "").includes(nq) ||
+      String(o.order_no || "").includes(nq)
   );
   const totalHadir = participants.filter((o) => o.checked_in).length;
 
@@ -118,7 +121,7 @@ export default function CheckinPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
             <Input data-testid="checkin-search-mobile" value={query} onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari nama atau nomor HP..." className="pl-9 pr-9 h-11 bg-white text-[#1A1A1A]" />
+              placeholder="Cari nama, nomor HP, atau no. order..." className="pl-9 pr-9 h-11 bg-white text-[#1A1A1A]" />
             {query && (
               <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]">
                 <X className="h-4 w-4" />
@@ -146,7 +149,14 @@ export default function CheckinPage() {
                 o.checked_in ? "border-[#10B981]/40 bg-[#10B981]/5" : "border-border")}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-semibold text-[#1A1A1A] truncate">{o.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-[#1A1A1A] truncate">{o.name}</p>
+                    {o.order_no ? (
+                      <span className="shrink-0 text-[11px] font-bold text-[#1E3A5F] bg-[#1E3A5F]/10 px-2 py-0.5 rounded-md">
+                        #{o.order_no}
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="text-xs text-[#6B7280]">{o.phone}</p>
                   <p className="text-xs text-[#6B7280] mt-0.5">{o.session?.name} · {o.session?.time} · {o.qty} tiket</p>
                 </div>
