@@ -51,6 +51,25 @@ Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa! 🙏
   window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
 };
 
+const sendReminderWA = (o) => {
+  const link = `${window.location.origin}/order/${o.id}`;
+  const msg =
+`Namo Buddhaya ${o.name} 🙏
+Terima kasih sudah memesan tiket Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara".
+
+Namun kami *BELUM menerima bukti pembayaran* Anda untuk:
+🧾 No. Order: #${o.order_no}
+🎟️ ${o.session?.name || "Sesi"} · Kursi ${o.seats.join(", ")}
+💰 Total: ${rupiah(o.total_amount)} (mohon bayar PAS termasuk kode unik)
+
+Mohon segera lakukan pembayaran & *upload bukti transfer* melalui link berikut:
+${link}
+
+Jika sudah membayar, mohon abaikan pesan ini. Terima kasih 🙏
+— Sekretariat MBI Kepri`;
+  window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
 const orderProgress = (o) => {
   if (o.status === "pending_payment") return { t: "Belum Bayar", c: "bg-[#D56115]/15 text-[#B34F0F]" };
   if (o.status === "waiting_verification") return { t: "⚠ Belum cek payment", c: "bg-[#D56115]/20 text-[#B34F0F]" };
@@ -503,6 +522,11 @@ export default function AdminPage() {
                               <MessageCircle className="h-3.5 w-3.5 mr-1" /> {o.wa_sent ? "Kirim Ulang" : "Kirim Pesan"}
                             </Button>
                           </div>
+                        ) : (o.status === "pending_payment" || o.status === "expired") ? (
+                          <Button size="sm" onClick={() => sendReminderWA(o)} data-testid={`remind-${o.id.slice(0, 8)}`}
+                            className="h-8 text-xs bg-[#D56115] hover:bg-[#B34F0F]">
+                            <MessageCircle className="h-3.5 w-3.5 mr-1" /> Ingatkan Upload
+                          </Button>
                         ) : (
                           <span className="text-xs text-[#6B7280]">—</span>
                         )}
