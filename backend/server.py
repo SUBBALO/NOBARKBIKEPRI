@@ -158,6 +158,18 @@ async def resolve_active_session():
     return active
 
 
+def mask_name(name: str) -> str:
+    parts = (name or "").strip().split()
+    out = []
+    for w in parts:
+        if len(w) <= 2:
+            out.append(w[0] + "*")
+        else:
+            out.append(w[0] + "*" * max(1, len(w) - 2) + w[-1])
+    return " ".join(out)
+
+
+
 async def gen_order_no():
     for _ in range(80):
         n = random.randint(1000, 9999)
@@ -316,8 +328,8 @@ async def lookup_orders(phone: str):
         # lazily expire unpaid too-old orders for accurate status
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
         result.append({
-            "id": o["id"], "order_no": o.get("order_no"), "name": o["name"], "phone": o["phone"],
-            "session": session, "seats": o["seats"], "qty": o["qty"],
+            "id": o["id"], "order_no": o.get("order_no"), "name": mask_name(o["name"]), "phone": o["phone"],
+            "session": session, "qty": o["qty"],
             "total_amount": o["total_amount"], "unique_code": o["unique_code"],
             "payment_method": o["payment_method"], "status": o["status"],
             "has_proof": bool(o.get("proof_image")), "created_at": o["created_at"],

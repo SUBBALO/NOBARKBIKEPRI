@@ -36,14 +36,6 @@ const compressImage = (file) =>
     reader.readAsDataURL(file);
   });
 
-const maskName = (name) => {
-  const parts = (name || "").trim().split(/\s+/);
-  return parts.map((w) => {
-    if (w.length <= 2) return w[0] + "*";
-    return w[0] + "*".repeat(Math.max(1, w.length - 2)) + w[w.length - 1];
-  }).join(" ");
-};
-
 const STATUS = {
   pending_payment: { t: "Belum Upload Bukti", c: "bg-[#D56115]/15 text-[#B34F0F]", i: Clock },
   expired: { t: "Kadaluarsa (segera upload)", c: "bg-[#6B7280]/15 text-[#6B7280]", i: AlertTriangle },
@@ -131,7 +123,7 @@ export default function UploadProofPage() {
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
                   <p className="font-semibold text-[#1A1A1A]">{o.name} <span className="font-mono text-xs text-[#6B7280]">#{o.order_no}</span></p>
-                  <p className="text-xs text-[#6B7280]">{o.session?.name} · {o.session?.time} · Kursi {o.seats.join(", ")}</p>
+                  <p className="text-xs text-[#6B7280]">{o.session?.name} · {o.session?.time} · {o.qty} tiket</p>
                 </div>
                 <span className={cn("inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium", meta.c)}>
                   <Icon className="h-3.5 w-3.5" /> {meta.t}
