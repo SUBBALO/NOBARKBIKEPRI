@@ -154,21 +154,19 @@ async def session_status(session_id: int, active_session: int):
 
 
 async def resolve_active_session():
-    """Advance active session pointer automatically when the current one is full."""
-    cfg = await get_config()
-    active = cfg["active_session"]
+    """Active session = the first (lowest id) session that still has free seats.
+    Fills Sesi 1 first, then 2, etc. — no reliance on a stale/manual pointer."""
+    active = None
     for s in SESSIONS:
-        if s["id"] < active:
-            continue
         taken = await taken_seats(s["id"])
-        if len(taken) >= SEATS_PER_SESSION:
-            active = s["id"] + 1
-        else:
+        if len(taken) < SEATS_PER_SESSION:
+            active = s["id"]
             break
-    if active > len(SESSIONS):
+    if active is None:
         active = len(SESSIONS)
-    if active != cfg["active_session"]:
-        await db.config.update_one({"_id": "config"}, {"$set": {"active_session": active}})
+    cfg = await get_config()
+    if active != cfg.get("active_session"):
+        await db.config.update_one({"_id": "config"}, {"$set": {"active_session": active}}, upsert=True)
     return active
 
 

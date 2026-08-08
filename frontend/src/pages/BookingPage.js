@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { api, rupiah, CONTACT } from "@/lib/apiClient";
+import { api, rupiah } from "@/lib/apiClient";
 import { SeatMap } from "@/components/SeatMap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
 import {
   ArrowLeft, ArrowRight, User, Clock, Armchair, QrCode, Landmark,
   Lock, CheckCircle2, AlertTriangle, Loader2, CalendarDays,
-  Phone, MessageCircle, UploadCloud,
+  UploadCloud,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -150,51 +150,31 @@ export default function BookingPage() {
   const activeSession = event?.sessions?.find((s) => s.id === sessionId);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-2xl border border-border bg-[#1E3A5F] text-white p-8 sm:p-12 mb-10 grain"
+        className="relative overflow-hidden rounded-2xl border border-border bg-[#1E3A5F] text-white p-6 sm:p-8 mb-6 grain"
       >
         <div className="relative z-10 max-w-3xl">
           <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/10 px-3 py-1 rounded-full">
             <CalendarDays className="h-3.5 w-3.5" /> {event?.date || "Minggu, 13 September 2026"} · {event?.location || "CGV Grand Batam"}
           </span>
-          <h1 className="font-serif-display text-3xl sm:text-5xl leading-tight mt-4">
+          <h1 className="font-serif-display text-2xl sm:text-4xl leading-tight mt-3">
             Nonton Bersama Film Dokumenter
           </h1>
-          <p className="font-serif-display text-xl sm:text-2xl text-[#F0C48A] mt-2 italic">
+          <p className="font-serif-display text-lg sm:text-xl text-[#F0C48A] mt-1 italic">
             “Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara”
           </p>
-          <p className="text-sm sm:text-base text-white/90 mt-4 italic">
-            Sebuah perjalanan yang perlahan menghidupkan kembali cahaya.
-          </p>
-          <p className="text-sm text-white/70 mt-3 max-w-2xl leading-relaxed">
-            Temukan kisah perjuangan Y.A. MNS. Jinarakkhita (Sukong) dalam menghidupkan kembali
-            agama Buddha di Indonesia — diceritakan melalui kenangan, kesaksian, juga jejak yang ia tinggalkan.
-          </p>
-          <p className="text-sm text-white/70 mt-4">
+          <p className="text-sm text-white/80 mt-3">
             Harga tiket {rupiah(PRICE)} / kursi · Pembayaran QRIS atau Transfer BCA
           </p>
         </div>
         <div className="absolute -right-16 -bottom-16 h-64 w-64 rounded-full bg-[#D56115]/30 blur-3xl z-0" />
       </motion.div>
 
-      {/* Contact + lupa upload strip */}
-      <div className="grid sm:grid-cols-2 gap-4 mb-10">
-        <div data-testid="contact-card" className="rounded-xl border border-border bg-white p-5 flex items-center gap-4">
-          <span className="h-11 w-11 rounded-lg bg-[#D56115]/10 flex items-center justify-center shrink-0">
-            <Phone className="h-5 w-5 text-[#D56115]" />
-          </span>
-          <div>
-            <p className="text-xs text-[#6B7280]">Kontak Person</p>
-            <p className="font-semibold text-[#1E3A5F]">{CONTACT.label}</p>
-            <div className="flex items-center gap-3 mt-0.5">
-              <a href={`tel:${CONTACT.phone.replace(/-/g, "")}`} data-testid="contact-phone" className="text-sm text-[#D56115] hover:underline font-medium">{CONTACT.phone}</a>
-              <a href={CONTACT.waLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-[#0F7A57]"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
-            </div>
-          </div>
-        </div>
+      {/* Lupa upload strip */}
+      <div className="mb-6">
         <Link to="/upload" data-testid="link-upload-strip"
           className="rounded-xl border border-border bg-white p-5 flex items-center gap-4 hover:border-[#D56115]/50 transition-colors">
           <span className="h-11 w-11 rounded-lg bg-[#1E3A5F]/10 flex items-center justify-center shrink-0">
@@ -208,7 +188,7 @@ export default function BookingPage() {
       </div>
 
       {/* Stepper */}
-      <div className="flex items-center justify-between mb-8 max-w-2xl">
+      <div className="flex items-center justify-between mb-6 max-w-2xl">
         {STEPS.map((s, i) => {
           const done = step > s.n;
           const cur = step === s.n;

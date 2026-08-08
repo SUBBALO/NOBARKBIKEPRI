@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 3 end-to-end test: 19/19 backend pytest PASS + full frontend flows PASS. Validated auth (JWT via X-Admin-Token), 3-role gating (superadmin/admin/checkin), user management CRUD, activity log recording, delete-order with confirmation dialog, /checkin username+password login with search by name/phone/order_no, checkin-role redirect on /admin, lookup masking (name masked, no seats field), Sesi 1 correctly active first (was previously jumping to Sesi 3), and contact-card removed from booking homepage while link-upload-strip remains and footer contact person retained.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter3_auth_roles.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminPage.js is now ~1000 lines (LoginView, UsersPanel, LogsPanel, CheckinPanel, main dashboard, delete/proof/checkin dialogs). Consider splitting into src/components/admin/{LoginView,UsersPanel,LogsPanel,CheckinPanel,ProofDialog,DeleteDialog}.jsx — will materially improve maintainability.",
+    "server.py: get_current_user reads token from a custom X-Admin-Token header instead of standard Authorization: Bearer. Works, but non-standard header is easy to miss for API consumers/tests — document in code or accept both.",
+    "server.py: delete_order deletes seat_locks but not the associated activity log entries or wa_sent flag reference — expected behaviour but worth documenting that history of a deleted order still remains via activity_logs.target_id (which is a soft link).",
+    "server.py: lookup_orders masks name but still returns full phone (used as the lookup key) — acceptable, since the caller already knows the phone. Just documenting the deliberate choice.",
+    "server.py: JWT_SECRET is committed to backend/.env; for production this should be rotated and not checked in. (Env file may already be gitignored; noting for release hygiene.)",
+    "server.py: no rate-limit / lockout on POST /api/admin/login — brute-force is unbounded. Consider adding a simple per-IP throttle or lockout after N failures (playbook recommendation).",
+    "server.py: seed_admin_users only seeds when collection is empty; if password is changed in .env after first seed it will NOT be reflected (per playbook, seed should be idempotent + update password_hash if env changed). Not blocking, but a known deviation from best practice."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter3_auth_roles.py"],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% (booking + admin all-roles + checkin)"},
+  "test_credentials": "admin1/admin123 (superadmin), admin2/admin123 (admin), admin3/admin123 (checkin) — from /app/memory/test_credentials.md",
+  "seed_data_creation": "Backend tests created and then deleted several TEST_/uitest orders + users. Frontend admin1 create/delete flow created and deleted user 'uitest*'. All test data cleaned up. Pre-existing 'Candy #9741' + 'Endianto #6641' verified participants left untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iteration-3 auth/role/log/delete features verified working. Backend uses JWT in X-Admin-Token header; login endpoint returns {token, user:{id,username,name,role,role_label}}. Default seed users admin1/admin2/admin3 all with password admin123. Sesi 1 is now correctly the first-open session (was Sesi 3 due to a stale config pointer). Reusable pytest file at /app/backend/tests/test_iter3_auth_roles.py — set REACT_APP_BACKEND_URL env before running.",
+  "rca of the issue": "N/A — no bugs found this iteration. Previous 'Sesi 3 active first' bug fixed via resolve_active_session() which now scans sessions in order and picks the first with free seats, updating the config pointer accordingly."
+}
