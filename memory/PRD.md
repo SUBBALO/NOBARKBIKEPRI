@@ -25,7 +25,10 @@ Default seed: admin1(superadmin)/admin2(admin)/admin3(checkin), semua password `
 - Check-in: /checkin login username+password; cari peserta by nama/HP/no order 4 digit; no order tampil di kartu.
 - Riwayat check-in: order menyimpan `checked_in_by` (nama petugas); tampil "oleh <nama>" di kartu peserta hadir (mobile & panel admin).
 - Homepage: hero diringkas (form Data Diri langsung terlihat), kartu "Kontak Person" atas dihapus (footer tetap ada).
-- Footer: teks kecil "Developed by Alam Tenang" di paling bawah.
+- Footer: teks kecil "Developed by Alam Tenang" (tautan Instagram @alam_tenang) di paling bawah.
+- Export Log Aktivitas ke Excel (tombol di tab Log, endpoint GET /api/admin/logs/export).
+- Indikator "sisa kursi" menonjol di halaman Pilih Sesi (angka besar + progress bar; label "Segera penuh" bila sisa ≤ 20).
+- Menu Walk-in "Jual di Tempat" (staff): form express (nama, no HP opsional, sesi, jumlah, metode Cash/QRIS/Transfer). Kursi auto-assign, order langsung status verified + checked_in (checked_in_by = petugas). Cash = nominal pas tanpa kode unik & tanpa bukti; QRIS/Transfer = pakai kode unik. Popup hasil menampilkan no order, total (+kode unik), dan kursi untuk diserahkan. Endpoint POST /api/admin/walkin. payment_method kini {cash, qris, transfer}.
 
 ## Key APIs
 - POST /api/admin/login {username,password} → {token, user}

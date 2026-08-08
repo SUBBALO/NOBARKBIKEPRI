@@ -76,6 +76,14 @@ class ProofUpload(BaseModel):
     proof_image: str  # base64 data URL
 
 
+class WalkinCreate(BaseModel):
+    name: str
+    phone: Optional[str] = ""
+    session_id: int
+    qty: int
+    payment_method: Literal["cash", "qris", "transfer"]
+
+
 class AdminLogin(BaseModel):
     username: str
     password: str
@@ -615,6 +623,63 @@ async def checkin_order(order_id: str, user: dict = Depends(require_any)):
     return clean(await db.orders.find_one({"id": order_id}))
 
 
+@api_router.post("/admin/walkin")
+async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff)):
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Nama wajib diisi")
+    if payload.session_id not in [s["id"] for s in SESSIONS]:
+        raise HTTPException(status_code=400, detail="Sesi tidak valid")
+    if payload.qty < 1 or payload.qty > MAX_SEATS_PER_ORDER:
+        raise HTTPException(status_code=400, detail=f"Jumlah tiket harus 1-{MAX_SEATS_PER_ORDER}")
+
+    taken = await taken_seats(payload.session_id)  # also releases expired locks
+    available = [f"{r}{i}" for r in SEAT_ROWS for i in range(1, SEATS_PER_ROW + 1) if f"{r}{i}" not in taken]
+    if len(available) < payload.qty:
+        raise HTTPException(status_code=409, detail=f"Kursi sesi ini tidak cukup (sisa {len(available)})")
+
+    order_id = str(uuid.uuid4())
+    claimed = []
+    for seat in available:
+        if len(claimed) >= payload.qty:
+            break
+        try:
+            await db.seat_locks.insert_one({
+                "_id": f"{payload.session_id}:{seat}", "session_id": payload.session_id,
+                "seat": seat, "order_id": order_id, "expires_at": None,
+            })
+            claimed.append(seat)
+        except DuplicateKeyError:
+            continue
+    if len(claimed) < payload.qty:
+        await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
+        raise HTTPException(status_code=409, detail="Kursi baru saja terisi, coba lagi.")
+
+    order_no = await gen_order_no()
+    base = payload.qty * TICKET_PRICE
+    if payload.payment_method == "cash":
+        code, total = 0, base
+    else:
+        code, total = await gen_unique_total(base)
+    actor = user.get("name") or user.get("username")
+    order = {
+        "id": order_id, "order_no": order_no,
+        "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
+        "session_id": payload.session_id, "seats": claimed, "qty": payload.qty,
+        "unit_price": TICKET_PRICE, "base_amount": base, "unique_code": code, "total_amount": total,
+        "payment_method": payload.payment_method, "status": "verified",
+        "proof_image": None, "checked_in": True, "checked_in_at": now_iso(),
+        "checked_in_by": actor, "checked_in_by_username": user.get("username"),
+        "walkin": True, "sold_by": actor,
+        "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.orders.insert_one(order)
+    await log_activity(user, "walkin",
+                       f"Walk-in {payload.qty} tiket #{order_no} — {payload.name.strip()} ({payload.payment_method.upper()}), kursi {', '.join(claimed)}",
+                       order_id)
+    return clean(dict(order))
+
+
+
 @api_router.post("/admin/active-session")
 async def set_active_session(payload: SetActiveSession, user: dict = Depends(require_staff)):
     if payload.session_id not in [s["id"] for s in SESSIONS]:
@@ -767,6 +832,7 @@ ACTION_LABEL_ID = {
     "checkin": "Check-in",
     "user_create": "Buat User",
     "user_delete": "Hapus User",
+    "walkin": "Walk-in (Jual di Tempat)",
 }
 
 
