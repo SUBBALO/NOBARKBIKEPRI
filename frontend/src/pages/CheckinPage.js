@@ -209,7 +209,9 @@ export default function CheckinPage() {
               <p><b>{popup.name}</b> — {popup.session?.name} · {popup.session?.time}</p>
               <p className="text-xs text-[#10B981] font-medium">✓ Check-in: {fmtTime(popup.checked_in_at || new Date().toISOString())}</p>
               <div className="rounded-lg bg-[#D56115]/10 p-4">
-                <p className="text-[#B34F0F] font-medium mb-2">Serahkan tiket untuk kursi:</p>
+                <p className="text-[#B34F0F] font-medium mb-2">Serahkan tiket:</p>
+                <p className="font-serif-display text-2xl text-[#1E3A5F] mb-2" data-testid="checkin-mobile-session">{popup.session?.name?.toUpperCase()} · {popup.session?.time}</p>
+                <p className="text-xs text-[#6B7280] mb-1">Nomor kursi:</p>
                 <div className="flex flex-wrap gap-2">
                   {popup.seats.map((s) => (
                     <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold border border-[#D56115]/30">{s}</span>
