@@ -220,6 +220,7 @@ function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
                 <div className="text-right">
                   <span className="inline-flex items-center gap-1.5 text-sm text-[#10B981] font-medium"><CheckCircle2 className="h-4 w-4" /> Sudah Hadir</span>
                   {o.checked_in_at && <p className="text-[11px] text-[#6B7280] mt-0.5">Check-in: {fmtTime(o.checked_in_at)}</p>}
+                  {o.checked_in_by && <p className="text-[11px] text-[#6B7280]">oleh <b className="text-[#0F7A57]">{o.checked_in_by}</b></p>}
                 </div>
               ) : (
                 <Button onClick={() => onCheckin(o)} disabled={busyId === o.id} data-testid={`checkin-btn-${o.id.slice(0, 8)}`}

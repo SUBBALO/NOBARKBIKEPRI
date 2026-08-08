@@ -22,5 +22,10 @@ export const Footer = () => (
         </div>
       </div>
     </div>
+    <div className="border-t border-black/5">
+      <p data-testid="footer-credit" className="text-center text-[11px] text-[#9CA3AF] py-3">
+        Developed by Alam Tenang
+      </p>
+    </div>
   </footer>
 );

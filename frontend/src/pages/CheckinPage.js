@@ -178,7 +178,10 @@ export default function CheckinPage() {
               </div>
 
               {o.checked_in ? (
-                <p className="text-[11px] text-[#6B7280] mt-3">Check-in: {fmtTime(o.checked_in_at)}</p>
+                <p className="text-[11px] text-[#6B7280] mt-3">
+                  Check-in: {fmtTime(o.checked_in_at)}
+                  {o.checked_in_by ? <> · oleh <b className="text-[#0F7A57]">{o.checked_in_by}</b></> : null}
+                </p>
               ) : (
                 <Button onClick={() => doCheckin(o)} disabled={busyId === o.id}
                   data-testid={`checkin-mobile-btn-${o.id.slice(0, 8)}`}

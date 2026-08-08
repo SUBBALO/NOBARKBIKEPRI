@@ -605,10 +605,11 @@ async def checkin_order(order_id: str, user: dict = Depends(require_any)):
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
     already = o.get("checked_in", False)
-    await db.orders.update_one(
-        {"id": order_id},
-        {"$set": {"checked_in": True, "checked_in_at": now_iso(), "updated_at": now_iso()}},
-    )
+    update = {"checked_in": True, "checked_in_at": now_iso(), "updated_at": now_iso()}
+    if not already:
+        update["checked_in_by"] = user.get("name") or user.get("username")
+        update["checked_in_by_username"] = user.get("username")
+    await db.orders.update_one({"id": order_id}, {"$set": update})
     if not already:
         await log_activity(user, "checkin", f"Check-in peserta #{o.get('order_no')} — {o.get('name')}", order_id)
     return clean(await db.orders.find_one({"id": order_id}))
@@ -632,6 +633,7 @@ async def list_participants(user: dict = Depends(require_any)):
             "id": o["id"], "order_no": o.get("order_no"), "name": o["name"], "phone": o["phone"],
             "session": session, "seats": o["seats"], "qty": o["qty"],
             "checked_in": o.get("checked_in", False), "checked_in_at": o.get("checked_in_at"),
+            "checked_in_by": o.get("checked_in_by"),
         })
     return result
 
