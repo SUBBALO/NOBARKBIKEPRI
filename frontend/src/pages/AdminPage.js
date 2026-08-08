@@ -12,7 +12,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, QrCode, Landmark,
+  Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -444,127 +444,22 @@ function UsersPanel({ currentUser }) {
 }
 
 
-const PAY_METHODS = [
-  { k: "cash", t: "Cash", icon: Banknote, desc: "Tunai, nominal pas" },
-  { k: "qris", t: "QRIS", icon: QrCode, desc: "Scan, pakai kode unik" },
-  { k: "transfer", t: "Transfer", icon: Landmark, desc: "Transfer, pakai kode unik" },
-];
-
-function WalkinPanel({ onDone }) {
-  const [form, setForm] = useState({ name: "", phone: "", session_id: 1, qty: 1, payment_method: "cash" });
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) { toast.error("Nama wajib diisi"); return; }
-    setBusy(true);
-    try {
-      const { data } = await adminApi.post("/admin/walkin", {
-        name: form.name, phone: form.phone,
-        session_id: Number(form.session_id), qty: Number(form.qty),
-        payment_method: form.payment_method,
-      });
-      setResult(data);
-      setForm({ name: "", phone: "", session_id: form.session_id, qty: 1, payment_method: form.payment_method });
-      onDone && onDone();
-    } catch (err) { toast.error(err?.response?.data?.detail || "Gagal membuat tiket walk-in"); }
-    setBusy(false);
-  };
-
-  const payLabel = { cash: "Cash", qris: "QRIS", transfer: "Transfer" };
-
+function WalkinPanel() {
   return (
     <div className="max-w-xl mx-auto no-print">
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2 mb-1"><Store className="h-5 w-5 text-[#D56115]" /> Jual Tiket di Tempat</h2>
-        <p className="text-sm text-[#6B7280] mb-5">Untuk pembeli walk-in saat acara. Kursi otomatis, langsung lunas & check-in.</p>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="wn">Nama Pembeli</Label>
-              <Input id="wn" data-testid="walkin-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nama" className="mt-1.5" />
-            </div>
-            <div>
-              <Label htmlFor="wp">No. HP <span className="text-[#9CA3AF]">(opsional)</span></Label>
-              <Input id="wp" data-testid="walkin-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="08xxxx" className="mt-1.5" />
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="ws">Sesi</Label>
-              <select id="ws" data-testid="walkin-session" value={form.session_id}
-                onChange={(e) => setForm({ ...form, session_id: e.target.value })}
-                className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                <option value={1}>Sesi 1 · 13:00 WIB</option>
-                <option value={2}>Sesi 2 · 15:00 WIB</option>
-                <option value={3}>Sesi 3 · 17:00 WIB</option>
-                <option value={4}>Sesi 4 · 19:00 WIB</option>
-              </select>
-            </div>
-            <div>
-              <Label htmlFor="wq">Jumlah Tiket</Label>
-              <select id="wq" data-testid="walkin-qty" value={form.qty}
-                onChange={(e) => setForm({ ...form, qty: e.target.value })}
-                className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} tiket</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <Label>Metode Pembayaran</Label>
-            <div className="grid grid-cols-3 gap-2 mt-1.5">
-              {PAY_METHODS.map((m) => {
-                const Icon = m.icon; const active = form.payment_method === m.k;
-                return (
-                  <button type="button" key={m.k} data-testid={`walkin-pay-${m.k}`}
-                    onClick={() => setForm({ ...form, payment_method: m.k })}
-                    className={cn("rounded-xl border p-3 text-center transition-colors",
-                      active ? "border-[#D56115] bg-[#D56115]/5 ring-2 ring-[#D56115]/30" : "border-border hover:border-[#D56115]/50")}>
-                    <Icon className={cn("h-5 w-5 mx-auto mb-1", active ? "text-[#D56115]" : "text-[#6B7280]")} />
-                    <span className="text-sm font-medium text-[#1A1A1A]">{m.t}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-xs text-[#6B7280] mt-1.5">{PAY_METHODS.find((m) => m.k === form.payment_method)?.desc}</p>
-          </div>
-          <div className="rounded-lg bg-muted/40 p-3 flex items-center justify-between">
-            <span className="text-sm text-[#6B7280]">Total {form.payment_method === "cash" ? "(pas)" : "(+ kode unik nanti)"}</span>
-            <span className="font-serif-display text-2xl text-[#D56115]" data-testid="walkin-total">{rupiah(Number(form.qty) * 50000)}</span>
-          </div>
-          <Button type="submit" disabled={busy} data-testid="walkin-submit" className="w-full h-11 bg-[#1E3A5F] hover:bg-[#16304f]">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Ticket className="h-4 w-4 mr-1.5" />} Buat Tiket & Check-in
-          </Button>
-        </form>
+      <div className="rounded-2xl border border-border bg-white p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="h-14 w-14 rounded-full bg-[#D56115]/10 flex items-center justify-center mb-4 mx-auto">
+          <Store className="h-7 w-7 text-[#D56115]" />
+        </div>
+        <h2 className="font-serif-display text-2xl text-[#1E3A5F]">Jual Tiket di Tempat</h2>
+        <p className="text-sm text-[#6B7280] mt-1 mb-5 max-w-md mx-auto">
+          Halaman khusus layar monitor: pembeli melihat peta kursi, petugas memilih kursi, langsung lunas & check-in. Ketersediaan kursi mengikuti sistem secara real-time.
+        </p>
+        <a href="/walkin" target="_blank" rel="noreferrer" data-testid="open-walkin"
+          className="inline-flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#16304f] text-white rounded-full px-6 py-3 text-sm font-medium">
+          <Store className="h-4 w-4" /> Buka Halaman Jual di Tempat &rarr; /walkin
+        </a>
       </div>
-
-      {/* Result popup */}
-      <Dialog open={!!result} onOpenChange={() => setResult(null)}>
-        <DialogContent data-testid="walkin-result-dialog" className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center mb-2"><CheckCircle2 className="h-5 w-5 text-[#10B981]" /></div>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Tiket Dibuat & Check-in ✅</DialogTitle>
-          </DialogHeader>
-          {result && (
-            <div className="text-sm space-y-3">
-              <p><b>{result.name}</b> <span className="font-mono text-xs text-[#6B7280]">#{result.order_no}</span></p>
-              <p className="text-[#6B7280]">{payLabel[result.payment_method]} · Total <b className="text-[#D56115]">{rupiah(result.total_amount)}</b>{result.unique_code ? <> <span className="text-xs">(kode unik {result.unique_code})</span></> : null}</p>
-              <div className="rounded-lg bg-[#D56115]/10 p-4">
-                <p className="text-[#B34F0F] font-medium mb-2">🎟️ Jangan lupa serahkan tiket untuk kursi:</p>
-                <div className="flex flex-wrap gap-2" data-testid="walkin-result-seats">
-                  {result.seats.map((s) => (
-                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold text-base border border-[#D56115]/30">{s}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button onClick={() => setResult(null)} className="w-full h-11 bg-[#1E3A5F] hover:bg-[#16304f]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -1017,7 +912,7 @@ export default function AdminPage() {
 
       {tab === "logs" && <LogsPanel />}
 
-      {tab === "walkin" && <WalkinPanel onDone={load} />}
+      {tab === "walkin" && <WalkinPanel />}
 
       {tab === "users" && isSuper && <UsersPanel currentUser={currentUser} />}
 

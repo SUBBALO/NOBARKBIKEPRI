@@ -80,7 +80,7 @@ class WalkinCreate(BaseModel):
     name: str
     phone: Optional[str] = ""
     session_id: int
-    qty: int
+    seats: List[str]
     payment_method: Literal["cash", "qris", "transfer"]
 
 
@@ -629,19 +629,20 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
         raise HTTPException(status_code=400, detail="Nama wajib diisi")
     if payload.session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
-    if payload.qty < 1 or payload.qty > MAX_SEATS_PER_ORDER:
-        raise HTTPException(status_code=400, detail=f"Jumlah tiket harus 1-{MAX_SEATS_PER_ORDER}")
+    seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
+    if not seats:
+        raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
+    if len(seats) > MAX_SEATS_PER_ORDER:
+        raise HTTPException(status_code=400, detail=f"Maksimal {MAX_SEATS_PER_ORDER} kursi per transaksi")
+    for seat in seats:
+        if seat not in ALL_SEAT_LABELS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
 
-    taken = await taken_seats(payload.session_id)  # also releases expired locks
-    available = [f"{r}{i}" for r in SEAT_ROWS for i in range(1, SEATS_PER_ROW + 1) if f"{r}{i}" not in taken]
-    if len(available) < payload.qty:
-        raise HTTPException(status_code=409, detail=f"Kursi sesi ini tidak cukup (sisa {len(available)})")
+    await taken_seats(payload.session_id)  # release expired locks first
 
     order_id = str(uuid.uuid4())
     claimed = []
-    for seat in available:
-        if len(claimed) >= payload.qty:
-            break
+    for seat in seats:
         try:
             await db.seat_locks.insert_one({
                 "_id": f"{payload.session_id}:{seat}", "session_id": payload.session_id,
@@ -649,13 +650,13 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
             })
             claimed.append(seat)
         except DuplicateKeyError:
-            continue
-    if len(claimed) < payload.qty:
-        await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
-        raise HTTPException(status_code=409, detail="Kursi baru saja terisi, coba lagi.")
+            if claimed:
+                await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
+            raise HTTPException(status_code=409, detail=f"Kursi {seat} baru saja terisi. Pilih kursi lain.")
 
+    qty = len(claimed)
     order_no = await gen_order_no()
-    base = payload.qty * TICKET_PRICE
+    base = qty * TICKET_PRICE
     if payload.payment_method == "cash":
         code, total = 0, base
     else:
@@ -664,7 +665,7 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
     order = {
         "id": order_id, "order_no": order_no,
         "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
-        "session_id": payload.session_id, "seats": claimed, "qty": payload.qty,
+        "session_id": payload.session_id, "seats": claimed, "qty": qty,
         "unit_price": TICKET_PRICE, "base_amount": base, "unique_code": code, "total_amount": total,
         "payment_method": payload.payment_method, "status": "verified",
         "proof_image": None, "checked_in": True, "checked_in_at": now_iso(),
@@ -674,7 +675,7 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
     }
     await db.orders.insert_one(order)
     await log_activity(user, "walkin",
-                       f"Walk-in {payload.qty} tiket #{order_no} — {payload.name.strip()} ({payload.payment_method.upper()}), kursi {', '.join(claimed)}",
+                       f"Walk-in {qty} tiket #{order_no} — {payload.name.strip()} ({payload.payment_method.upper()}), kursi {', '.join(claimed)}",
                        order_id)
     return clean(dict(order))
 

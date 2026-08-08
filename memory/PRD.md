@@ -28,7 +28,7 @@ Default seed: admin1(superadmin)/admin2(admin)/admin3(checkin), semua password `
 - Footer: teks kecil "Developed by Alam Tenang" (tautan Instagram @alam_tenang) di paling bawah.
 - Export Log Aktivitas ke Excel (tombol di tab Log, endpoint GET /api/admin/logs/export).
 - Indikator "sisa kursi" menonjol di halaman Pilih Sesi (angka besar + progress bar; label "Segera penuh" bila sisa ≤ 20).
-- Menu Walk-in "Jual di Tempat" (staff): form express (nama, no HP opsional, sesi, jumlah, metode Cash/QRIS/Transfer). Kursi auto-assign, order langsung status verified + checked_in (checked_in_by = petugas). Cash = nominal pas tanpa kode unik & tanpa bukti; QRIS/Transfer = pakai kode unik. Popup hasil menampilkan no order, total (+kode unik), dan kursi untuk diserahkan. Endpoint POST /api/admin/walkin. payment_method kini {cash, qris, transfer}.
+- Menu Walk-in "Jual di Tempat" (staff, halaman monitor `/walkin`): login username+password (hanya admin/superadmin). Pilih kursi MANUAL dari peta kursi live (auto-refresh 5 dtk, mengikuti ketersediaan sistem). Isi nama + no HP opsional + metode Cash/QRIS/Transfer → order langsung status verified + checked_in (checked_in_by = petugas). Cash = nominal pas tanpa kode unik & tanpa bukti; QRIS/Transfer = pakai kode unik. Popup hasil menampilkan no order, total (+kode unik), dan kursi untuk diserahkan. Endpoint POST /api/admin/walkin menerima {name,phone,session_id,seats[],payment_method}. Tab admin "Jual di Tempat" = launcher ke /walkin.
 
 ## Key APIs
 - POST /api/admin/login {username,password} → {token, user}

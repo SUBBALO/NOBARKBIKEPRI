@@ -8,15 +8,17 @@ import OrderStatusPage from "@/pages/OrderStatusPage";
 import UploadProofPage from "@/pages/UploadProofPage";
 import AdminPage from "@/pages/AdminPage";
 import CheckinPage from "@/pages/CheckinPage";
+import WalkinPage from "@/pages/WalkinPage";
 
 function Shell() {
   const loc = useLocation();
   const isAdmin = loc.pathname.startsWith("/admin");
-  const standalone = loc.pathname.startsWith("/checkin");
+  const standalone = loc.pathname.startsWith("/checkin") || loc.pathname.startsWith("/walkin");
   if (standalone) {
     return (
       <Routes>
         <Route path="/checkin" element={<CheckinPage />} />
+        <Route path="/walkin" element={<WalkinPage />} />
       </Routes>
     );
   }

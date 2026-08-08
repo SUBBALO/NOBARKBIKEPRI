@@ -1,0 +1,273 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
+import { adminApi, api, ADMIN_TOKEN_KEY, getAdminUser, setAdminSession, clearAdminSession, rupiah, LOGOS } from "@/lib/apiClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SeatMap } from "@/components/SeatMap";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const SESSIONS = [
+  { id: 1, name: "Sesi 1", time: "13:00 WIB" },
+  { id: 2, name: "Sesi 2", time: "15:00 WIB" },
+  { id: 3, name: "Sesi 3", time: "17:00 WIB" },
+  { id: 4, name: "Sesi 4", time: "19:00 WIB" },
+];
+const PAY = [
+  { k: "cash", t: "Cash", icon: Banknote },
+  { k: "qris", t: "QRIS", icon: QrCode },
+  { k: "transfer", t: "Transfer", icon: Landmark },
+];
+const PRICE = 50000;
+const MAX = 6;
+
+function Login({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await api.post("/admin/login", { username, password });
+      if (data.user.role !== "admin" && data.user.role !== "superadmin") {
+        toast.error("Akun ini tidak boleh menjual tiket di tempat");
+        setLoading(false);
+        return;
+      }
+      setAdminSession(data.token, data.user);
+      onLogin();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Login gagal");
+    }
+    setLoading(false);
+  };
+  return (
+    <div className="min-h-screen bg-[#1E3A5F] flex flex-col items-center justify-center px-6">
+      <img src={LOGOS.kbi} alt="KBI" className="h-14 mb-6 bg-white/95 rounded-lg p-2" />
+      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white p-7 shadow-xl">
+        <div className="h-12 w-12 rounded-full bg-[#D56115]/10 flex items-center justify-center mb-3">
+          <Store className="h-6 w-6 text-[#D56115]" />
+        </div>
+        <h1 className="font-serif-display text-2xl text-[#1E3A5F]">Jual Tiket di Tempat</h1>
+        <p className="text-sm text-[#6B7280] mb-5">Masuk dengan akun panitia (Admin).</p>
+        <Label htmlFor="u">Username</Label>
+        <Input id="u" value={username} autoCapitalize="none" onChange={(e) => setUsername(e.target.value)}
+          className="mt-1.5 mb-3" data-testid="walkin-login-username" placeholder="username" />
+        <Label htmlFor="p">Password</Label>
+        <Input id="p" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          className="mt-1.5" data-testid="walkin-login-password" placeholder="••••••••" />
+        <Button type="submit" disabled={loading} data-testid="walkin-login-btn"
+          className="w-full mt-5 bg-[#D56115] hover:bg-[#B34F0F] rounded-full h-11">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Masuk
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+export default function WalkinPage() {
+  const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+  const [user, setUser] = useState(getAdminUser());
+  const [sessionId, setSessionId] = useState(1);
+  const [mapData, setMapData] = useState(null);
+  const [loadingMap, setLoadingMap] = useState(true);
+  const [selected, setSelected] = useState([]);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState("cash");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const pollRef = useRef(null);
+
+  const loadMap = useCallback(async (sid, showSpinner = false) => {
+    if (showSpinner) setLoadingMap(true);
+    try {
+      const { data } = await api.get(`/sessions/${sid}/seats`);
+      setMapData(data);
+    } catch { /* ignore transient */ }
+    if (showSpinner) setLoadingMap(false);
+  }, []);
+
+  useEffect(() => {
+    if (!authed) return;
+    setSelected([]);
+    loadMap(sessionId, true);
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => loadMap(sessionId, false), 5000);
+    return () => pollRef.current && clearInterval(pollRef.current);
+  }, [authed, sessionId, loadMap]);
+
+  if (!authed) return <Login onLogin={() => { setUser(getAdminUser()); setAuthed(true); }} />;
+
+  const isStaff = user?.role === "admin" || user?.role === "superadmin";
+  if (!isStaff) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center px-6 text-center">
+        <p className="text-[#6B7280]">Akun Anda tidak diizinkan menjual tiket di tempat.</p>
+        <button onClick={() => { clearAdminSession(); setAuthed(false); }} className="mt-3 text-xs text-[#EF4444] underline">Keluar</button>
+      </div>
+    );
+  }
+
+  const toggle = (label) => {
+    setSelected((p) => {
+      if (p.includes(label)) return p.filter((x) => x !== label);
+      if (p.length >= MAX) { toast.error(`Maksimal ${MAX} kursi per transaksi`); return p; }
+      return [...p, label];
+    });
+  };
+
+  const total = selected.length * PRICE;
+
+  const submit = async () => {
+    if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
+    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    setBusy(true);
+    try {
+      const { data } = await adminApi.post("/admin/walkin", {
+        name, phone, session_id: sessionId, seats: selected, payment_method: method,
+      });
+      setResult(data);
+      setName(""); setPhone(""); setSelected([]);
+      loadMap(sessionId, false);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Gagal membuat tiket");
+      loadMap(sessionId, false);
+    }
+    setBusy(false);
+  };
+
+  const remaining = mapData ? (mapData.capacity - mapData.booked) : null;
+  const sold = mapData && remaining <= 0;
+
+  return (
+    <div className="min-h-screen bg-[#FDFBF7]">
+      {/* Top bar */}
+      <div className="sticky top-0 z-40 bg-[#1E3A5F] text-white">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src={LOGOS.kbi} alt="KBI" className="h-8 bg-white/95 rounded p-1" />
+            <div>
+              <p className="text-sm font-semibold leading-tight flex items-center gap-1.5"><Store className="h-4 w-4" /> Jual Tiket di Tempat</p>
+              <p className="text-[11px] text-white/70 leading-tight">Petugas: {user?.name}</p>
+            </div>
+          </div>
+          <button onClick={() => { clearAdminSession(); setAuthed(false); }} data-testid="walkin-logout" className="text-xs text-white/80 underline">Keluar</button>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-5 grid lg:grid-cols-3 gap-6">
+        {/* Seat map — the big monitor area */}
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex flex-wrap gap-2">
+              {SESSIONS.map((s) => (
+                <button key={s.id} data-testid={`walkin-session-${s.id}`} onClick={() => setSessionId(s.id)}
+                  className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+                    sessionId === s.id ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/50")}>
+                  {s.name} · {s.time}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => loadMap(sessionId, true)} className="inline-flex items-center gap-1 text-xs text-[#6B7280] hover:text-[#D56115]">
+              <RefreshCw className="h-3.5 w-3.5" /> Perbarui
+            </button>
+          </div>
+
+          {mapData && (
+            <p className="text-sm mb-3" data-testid="walkin-remaining">
+              {sold ? <span className="font-semibold text-[#EF4444]">Kursi sesi ini habis terjual</span>
+                : <>Sisa <b className="text-[#0F7A57] text-lg">{remaining}</b> kursi · {mapData.booked}/{mapData.capacity} terisi</>}
+            </p>
+          )}
+
+          {loadingMap ? (
+            <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#D56115]" /></div>
+          ) : mapData ? (
+            <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} />
+          ) : (
+            <p className="text-center text-sm text-[#6B7280] py-16">Gagal memuat peta kursi.</p>
+          )}
+        </div>
+
+        {/* Order form */}
+        <div className="rounded-2xl border border-border bg-white p-5 h-fit lg:sticky lg:top-20">
+          <h2 className="font-serif-display text-xl text-[#1E3A5F] mb-3">Data Pembeli</h2>
+          <Label htmlFor="wn">Nama</Label>
+          <Input id="wn" data-testid="walkin-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama pembeli" className="mt-1.5 mb-3" />
+          <Label htmlFor="wp">No. HP <span className="text-[#9CA3AF]">(opsional)</span></Label>
+          <Input id="wp" data-testid="walkin-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08xxxx" className="mt-1.5 mb-4" />
+
+          <Label>Metode Pembayaran</Label>
+          <div className="grid grid-cols-3 gap-2 mt-1.5 mb-2">
+            {PAY.map((m) => {
+              const Icon = m.icon; const active = method === m.k;
+              return (
+                <button type="button" key={m.k} data-testid={`walkin-pay-${m.k}`} onClick={() => setMethod(m.k)}
+                  className={cn("rounded-xl border p-2.5 text-center transition-colors",
+                    active ? "border-[#D56115] bg-[#D56115]/5 ring-2 ring-[#D56115]/30" : "border-border hover:border-[#D56115]/50")}>
+                  <Icon className={cn("h-5 w-5 mx-auto mb-0.5", active ? "text-[#D56115]" : "text-[#6B7280]")} />
+                  <span className="text-xs font-medium text-[#1A1A1A]">{m.t}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-[#6B7280] mb-4">{method === "cash" ? "Cash: nominal pas, tanpa kode unik." : "Nominal akan ditambah kode unik otomatis."}</p>
+
+          <div className="rounded-lg bg-muted/40 p-3 mb-2">
+            <p className="text-xs text-[#6B7280] mb-1">Kursi dipilih ({selected.length})</p>
+            <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="walkin-selected-seats">
+              {selected.length === 0 ? <span className="text-xs text-[#9CA3AF]">Belum ada kursi dipilih</span>
+                : selected.map((s) => <span key={s} className="px-2.5 py-1 rounded-md bg-[#D56115]/10 text-[#B34F0F] text-sm font-bold">{s}</span>)}
+            </div>
+          </div>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-[#6B7280]">Total {method === "cash" ? "(pas)" : "(+ kode unik)"}</span>
+            <span className="font-serif-display text-2xl text-[#D56115]" data-testid="walkin-total">{rupiah(total)}</span>
+          </div>
+
+          <Button onClick={submit} disabled={busy || selected.length === 0} data-testid="walkin-submit"
+            className="w-full h-12 bg-[#1E3A5F] hover:bg-[#16304f] text-base">
+            {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} Buat Tiket & Check-in
+          </Button>
+        </div>
+      </div>
+
+      {/* Result popup */}
+      <Dialog open={!!result} onOpenChange={() => setResult(null)}>
+        <DialogContent data-testid="walkin-result-dialog" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center mb-2"><CheckCircle2 className="h-5 w-5 text-[#10B981]" /></div>
+            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Tiket Dibuat & Check-in ✅</DialogTitle>
+          </DialogHeader>
+          {result && (
+            <div className="text-sm space-y-3">
+              <p><b>{result.name}</b> <span className="font-mono text-xs text-[#6B7280]">#{result.order_no}</span></p>
+              <p className="text-[#6B7280]">
+                {result.payment_method === "cash" ? "Cash" : result.payment_method === "qris" ? "QRIS" : "Transfer"} ·
+                Total <b className="text-[#D56115]">{rupiah(result.total_amount)}</b>
+                {result.unique_code ? <span className="text-xs"> (kode unik {result.unique_code})</span> : null}
+              </p>
+              <div className="rounded-lg bg-[#D56115]/10 p-4">
+                <p className="text-[#B34F0F] font-medium mb-2">🎟️ Serahkan tiket untuk kursi:</p>
+                <div className="flex flex-wrap gap-2" data-testid="walkin-result-seats">
+                  {result.seats.map((s) => (
+                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold text-lg border border-[#D56115]/30">{s}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setResult(null)} className="w-full h-11 bg-[#1E3A5F] hover:bg-[#16304f]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
