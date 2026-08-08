@@ -251,6 +251,7 @@ const ACTION_META = {
 function LogsPanel() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     try { const { data } = await adminApi.get("/admin/logs"); setLogs(data); }
@@ -258,14 +259,32 @@ function LogsPanel() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+  const exportLogs = async () => {
+    setExporting(true);
+    try {
+      const res = await adminApi.get("/admin/logs/export", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = "log_aktivitas.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Log berhasil diunduh");
+    } catch { toast.error("Gagal mengunduh log"); }
+    setExporting(false);
+  };
   return (
     <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] no-print">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
           <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2"><History className="h-5 w-5 text-[#D56115]" /> Log Aktivitas</h2>
           <p className="text-sm text-[#6B7280]">Catatan siapa melakukan aksi apa & kapan.</p>
         </div>
-        <Button variant="outline" onClick={load} data-testid="logs-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportLogs} disabled={exporting || logs.length === 0} data-testid="logs-export">
+            {exporting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />} Export Excel
+          </Button>
+          <Button variant="outline" onClick={load} data-testid="logs-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
+        </div>
       </div>
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>

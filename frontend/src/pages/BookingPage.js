@@ -34,6 +34,9 @@ const SessionCard = ({ s, active, selected, onSelect }) => {
     full: { t: "Penuh", c: "bg-[#EF4444]/15 text-[#EF4444]" },
     closed: { t: "Selesai", c: "bg-[#6B7280]/15 text-[#6B7280]" },
   }[s.status];
+  const remaining = Math.max(0, (s.capacity || 0) - (s.booked || 0));
+  const pct = s.capacity ? Math.min(100, Math.round((s.booked / s.capacity) * 100)) : 0;
+  const low = remaining > 0 && remaining <= 20;
   return (
     <button
       type="button"
@@ -52,7 +55,29 @@ const SessionCard = ({ s, active, selected, onSelect }) => {
         <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", badge.c)}>{badge.t}</span>
       </div>
       <p className="text-sm text-[#6B7280]">Pukul {s.time}</p>
-      <p className="text-xs text-[#6B7280] mt-3">{s.booked}/{s.capacity} kursi terisi</p>
+
+      {s.status === "open" ? (
+        <div className="mt-3" data-testid={`session-remaining-${s.id}`}>
+          <div className="flex items-baseline gap-1.5">
+            <span className={cn("font-serif-display text-3xl leading-none", low ? "text-[#D56115]" : "text-[#0F7A57]")}>{remaining}</span>
+            <span className="text-xs font-medium text-[#6B7280]">kursi tersisa</span>
+            {low && (
+              <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold text-[#B34F0F] bg-[#D56115]/10 px-2 py-0.5 rounded-full">
+                <AlertTriangle className="h-3 w-3" /> Segera penuh
+              </span>
+            )}
+          </div>
+          <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all", low ? "bg-[#D56115]" : "bg-[#10B981]")} style={{ width: `${pct}%` }} />
+          </div>
+          <p className="text-[11px] text-[#6B7280] mt-1">{s.booked}/{s.capacity} kursi terisi</p>
+        </div>
+      ) : s.status === "full" ? (
+        <p className="text-sm font-semibold text-[#EF4444] mt-3" data-testid={`session-remaining-${s.id}`}>Kursi habis terjual</p>
+      ) : (
+        <p className="text-xs text-[#6B7280] mt-3">{s.booked}/{s.capacity} kursi terisi</p>
+      )}
+
       {disabled && s.status === "locked" && (
         <span className="absolute top-4 right-4 text-[#6B7280]"><Lock className="h-3.5 w-3.5" /></span>
       )}

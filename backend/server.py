@@ -758,6 +758,60 @@ async def list_logs(user: dict = Depends(require_staff), limit: int = 300):
     return [clean(d) for d in docs]
 
 
+ACTION_LABEL_ID = {
+    "delete": "Hapus Order",
+    "verify": "Verifikasi",
+    "reject": "Tolak",
+    "bulk_verify": "Verifikasi Massal",
+    "bulk_reject": "Tolak Massal",
+    "checkin": "Check-in",
+    "user_create": "Buat User",
+    "user_delete": "Hapus User",
+}
+
+
+@api_router.get("/admin/logs/export")
+async def export_logs(_: bool = Depends(require_staff)):
+    docs = await db.activity_logs.find({}).sort("created_at", -1).to_list(5000)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Log Aktivitas"
+    headers = ["No", "Waktu (WIB)", "Petugas", "Username", "Aksi", "Detail"]
+    ws.append(headers)
+    header_fill = PatternFill("solid", fgColor="1E3A5F")
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    for i, l in enumerate(docs, 1):
+        waktu = l.get("created_at", "")
+        try:
+            dt = datetime.fromisoformat(waktu).astimezone(timezone(timedelta(hours=7)))
+            waktu = dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            pass
+        ws.append([
+            i, waktu,
+            l.get("actor_name") or l.get("actor_username", ""),
+            l.get("actor_username", ""),
+            ACTION_LABEL_ID.get(l.get("action"), l.get("action", "")),
+            l.get("detail", ""),
+        ])
+    for idx, w in enumerate([5, 18, 20, 16, 16, 55], 1):
+        ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
+    ws.freeze_panes = "A2"
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"log_aktivitas_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+
 
 app.include_router(api_router)
 
