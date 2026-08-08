@@ -82,7 +82,12 @@ export default function WalkinPage() {
   const [method, setMethod] = useState("cash");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [transfer, setTransfer] = useState(null);
   const pollRef = useRef(null);
+
+  useEffect(() => {
+    api.get("/event").then(({ data }) => setTransfer(data.transfer)).catch(() => {});
+  }, []);
 
   const loadMap = useCallback(async (sid, showSpinner = false) => {
     if (showSpinner) setLoadingMap(true);
@@ -240,25 +245,58 @@ export default function WalkinPage() {
 
       {/* Result popup */}
       <Dialog open={!!result} onOpenChange={() => setResult(null)}>
-        <DialogContent data-testid="walkin-result-dialog" className="max-w-sm rounded-2xl">
+        <DialogContent data-testid="walkin-result-dialog" className="max-w-3xl rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center mb-2"><CheckCircle2 className="h-5 w-5 text-[#10B981]" /></div>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Tiket Dibuat & Check-in ✅</DialogTitle>
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#10B981]" /></div>
+              <div>
+                <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Tiket Dibuat & Check-in ✅</DialogTitle>
+                {result && <p className="text-sm text-[#6B7280] mt-0.5"><b className="text-[#1A1A1A]">{result.name}</b> · <span className="font-mono text-xs">#{result.order_no}</span></p>}
+              </div>
+            </div>
           </DialogHeader>
           {result && (
-            <div className="text-sm space-y-3">
-              <p><b>{result.name}</b> <span className="font-mono text-xs text-[#6B7280]">#{result.order_no}</span></p>
-              <p className="text-[#6B7280]">
-                {result.payment_method === "cash" ? "Cash" : result.payment_method === "qris" ? "QRIS" : "Transfer"} ·
-                Total <b className="text-[#D56115]">{rupiah(result.total_amount)}</b>
-                {result.unique_code ? <span className="text-xs"> (kode unik {result.unique_code})</span> : null}
-              </p>
-              <div className="rounded-lg bg-[#D56115]/10 p-4">
-                <p className="text-[#B34F0F] font-medium mb-2">🎟️ Serahkan tiket untuk kursi:</p>
-                <div className="flex flex-wrap gap-2" data-testid="walkin-result-seats">
-                  {result.seats.map((s) => (
-                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold text-lg border border-[#D56115]/30">{s}</span>
-                  ))}
+            <div className="grid sm:grid-cols-2 gap-4 items-start text-sm">
+              {/* Kolom kiri: instruksi pembayaran */}
+              {result.payment_method === "qris" ? (
+                <div className="rounded-lg border border-[#1E3A5F]/15 bg-[#1E3A5F]/[0.03] p-4 text-center" data-testid="walkin-pay-qris-info">
+                  <p className="text-[#1E3A5F] font-medium mb-2">Silakan scan QRIS lalu bayar:</p>
+                  <img src={LOGOS.qris} alt="QRIS" className="mx-auto max-h-[42vh] w-auto rounded-lg border border-border bg-white" />
+                </div>
+              ) : result.payment_method === "transfer" ? (
+                <div className="rounded-lg border border-[#1E3A5F]/15 bg-[#1E3A5F]/[0.03] p-4" data-testid="walkin-pay-transfer-info">
+                  <p className="text-[#1E3A5F] font-medium mb-2">Silakan transfer ke rekening:</p>
+                  <div className="rounded-md bg-white border border-border p-3 space-y-1">
+                    <p className="text-xs text-[#6B7280]">{transfer?.bank || "BCA"}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-2xl font-bold text-[#1E3A5F] tracking-wide">{transfer?.account_number}</span>
+                      <button onClick={() => { navigator.clipboard?.writeText((transfer?.account_number || "").replace(/\s/g, "")); toast.success("No. rekening disalin"); }}
+                        data-testid="walkin-copy-rek" className="text-[#D56115] text-xs underline shrink-0">Salin</button>
+                    </div>
+                    <p className="text-xs text-[#6B7280]">a.n. {transfer?.account_name}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-[#10B981]/20 bg-[#10B981]/[0.05] p-4 text-center flex flex-col items-center justify-center" data-testid="walkin-pay-cash-info">
+                  <Banknote className="h-10 w-10 text-[#10B981] mb-2" />
+                  <p className="text-[#0F7A57] font-medium">Terima pembayaran tunai</p>
+                </div>
+              )}
+
+              {/* Kolom kanan: nominal + kursi */}
+              <div className="space-y-4">
+                <div className="rounded-lg bg-[#D56115]/10 p-4 text-center">
+                  <p className="text-[#6B7280]">Nominal {result.payment_method === "cash" ? "(pas)" : "(WAJIB PAS)"}:</p>
+                  <p className="font-serif-display text-4xl text-[#D56115] leading-tight">{rupiah(result.total_amount)}</p>
+                  {result.unique_code ? <p className="text-xs text-[#6B7280]">termasuk kode unik {result.unique_code}</p> : null}
+                </div>
+                <div className="rounded-lg bg-[#1E3A5F]/[0.04] border border-[#1E3A5F]/10 p-4">
+                  <p className="text-[#B34F0F] font-medium mb-2">🎟️ Serahkan tiket untuk kursi:</p>
+                  <div className="flex flex-wrap gap-2" data-testid="walkin-result-seats">
+                    {result.seats.map((s) => (
+                      <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold text-lg border border-[#D56115]/30">{s}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

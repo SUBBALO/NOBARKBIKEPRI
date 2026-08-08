@@ -12,7 +12,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store,
+  Store, Banknote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -179,6 +179,50 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
     </div>
   </div>
 );
+
+function SalesSummary({ stats }) {
+  const b = stats?.breakdown;
+  if (!b) return null;
+  const w = b.walkin, on = b.online;
+  const Row = ({ label, data, accent }) => (
+    <div className="flex items-center justify-between py-1.5 text-sm">
+      <span className={cn("text-[#6B7280]", accent && "font-medium text-[#1A1A1A]")}>{label}</span>
+      <span className="text-right">
+        <b className="text-[#1E3A5F]">{data.tickets}</b> <span className="text-xs text-[#6B7280]">tiket</span>
+        <span className="mx-1 text-[#D1D5DB]">·</span>
+        <b className="text-[#0F7A57]">{rupiah(data.revenue)}</b>
+      </span>
+    </div>
+  );
+  return (
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 no-print" data-testid="sales-summary">
+      <h2 className="font-serif-display text-xl text-[#1E3A5F] flex items-center gap-2 mb-4"><Wallet className="h-5 w-5 text-[#D56115]" /> Ringkasan Penjualan (terverifikasi)</h2>
+      <div className="grid sm:grid-cols-2 gap-5">
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-sm font-semibold text-[#1E3A5F] mb-1">Online (web)</p>
+          <Row label="Total" data={on} accent />
+        </div>
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-sm font-semibold text-[#1E3A5F] mb-1">Jual di Tempat (walk-in)</p>
+          <Row label="Total" data={w} accent />
+          <div className="mt-1 border-t border-dashed border-border pt-1">
+            <Row label="• Cash" data={w.cash} />
+            <Row label="• QRIS" data={w.qris} />
+            <Row label="• Transfer" data={w.transfer} />
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 rounded-xl bg-[#10B981]/[0.07] border border-[#10B981]/20 p-4 flex items-center justify-between" data-testid="cash-recap">
+        <div>
+          <p className="text-sm font-semibold text-[#0F7A57] flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Rekap Kas Cash (walk-in)</p>
+          <p className="text-xs text-[#6B7280]">Total uang tunai yang harus ada di tangan bendahara</p>
+        </div>
+        <span className="font-serif-display text-3xl text-[#0F7A57]" data-testid="cash-total">{rupiah(stats.cash_total || 0)}</span>
+      </div>
+    </div>
+  );
+}
+
 
 function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
   const q = query.trim().toLowerCase();
@@ -721,6 +765,7 @@ export default function AdminPage() {
       </div>
 
       {tab === "payment" && (<>
+      {stats && <SalesSummary stats={stats} />}
       {/* Session control */}
       {event && (
         <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print">

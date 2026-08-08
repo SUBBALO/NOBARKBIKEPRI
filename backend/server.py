@@ -541,6 +541,36 @@ async def admin_stats(user: dict = Depends(require_staff)):
         if st == "verified":
             stats["revenue_verified"] += g.get("revenue", 0) or 0
             stats["tickets_verified"] += g.get("tickets", 0) or 0
+
+    # Breakdown penjualan (hanya order terverifikasi): online vs walk-in per metode
+    online = {"orders": 0, "tickets": 0, "revenue": 0}
+    walkin = {"orders": 0, "tickets": 0, "revenue": 0,
+              "cash": {"orders": 0, "tickets": 0, "revenue": 0},
+              "qris": {"orders": 0, "tickets": 0, "revenue": 0},
+              "transfer": {"orders": 0, "tickets": 0, "revenue": 0}}
+    pipeline2 = [
+        {"$match": {"status": "verified"}},
+        {"$group": {
+            "_id": {"walkin": {"$ifNull": ["$walkin", False]}, "method": "$payment_method"},
+            "orders": {"$sum": 1},
+            "tickets": {"$sum": "$qty"},
+            "revenue": {"$sum": "$base_amount"},
+        }},
+    ]
+    async for g in db.orders.aggregate(pipeline2):
+        is_walkin = bool(g["_id"].get("walkin"))
+        method = g["_id"].get("method") or "transfer"
+        o, t, r = g.get("orders", 0), g.get("tickets", 0), g.get("revenue", 0) or 0
+        target = walkin if is_walkin else online
+        target["orders"] += o
+        target["tickets"] += t
+        target["revenue"] += r
+        if is_walkin and method in walkin:
+            walkin[method]["orders"] += o
+            walkin[method]["tickets"] += t
+            walkin[method]["revenue"] += r
+    stats["breakdown"] = {"online": online, "walkin": walkin}
+    stats["cash_total"] = walkin["cash"]["revenue"]
     return stats
 
 
