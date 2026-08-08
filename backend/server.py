@@ -9,6 +9,8 @@ import io
 import logging
 import random
 import uuid
+import bcrypt
+import jwt
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
@@ -25,6 +27,10 @@ db = client[os.environ['DB_NAME']]
 
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'mbi-nonton-2026-admin')
+JWT_SECRET = os.environ['JWT_SECRET']
+JWT_ALGO = "HS256"
+TOKEN_TTL_HOURS = 12
+ROLE_LABELS = {"superadmin": "Super Admin", "admin": "Admin", "checkin": "Petugas Check-in"}
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -71,7 +77,15 @@ class ProofUpload(BaseModel):
 
 
 class AdminLogin(BaseModel):
+    username: str
     password: str
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    name: Optional[str] = ""
+    role: Literal["superadmin", "admin", "checkin"] = "checkin"
 
 
 class SetActiveSession(BaseModel):
@@ -198,10 +212,73 @@ def clean(o):
     return o
 
 
-def require_admin(x_admin_token: Optional[str] = Header(None)):
-    if x_admin_token != ADMIN_TOKEN:
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(pw: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(pw.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+
+def create_token(user: dict) -> str:
+    payload = {
+        "sub": user["id"],
+        "username": user["username"],
+        "role": user["role"],
+        "name": user.get("name", ""),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_TTL_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+
+
+def public_user(u: dict) -> dict:
+    return {"id": u["id"], "username": u["username"], "name": u.get("name", ""),
+            "role": u["role"], "role_label": ROLE_LABELS.get(u["role"], u["role"]),
+            "created_at": u.get("created_at")}
+
+
+async def log_activity(actor: dict, action: str, detail: str, target_id: str = None):
+    await db.activity_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "actor_id": actor.get("id"),
+        "actor_username": actor.get("username"),
+        "actor_name": actor.get("name", ""),
+        "action": action,
+        "detail": detail,
+        "target_id": target_id,
+        "created_at": now_iso(),
+    })
+
+
+async def get_current_user(x_admin_token: Optional[str] = Header(None)):
+    if not x_admin_token:
         raise HTTPException(status_code=401, detail="Tidak diizinkan")
-    return True
+    try:
+        payload = jwt.decode(x_admin_token, JWT_SECRET, algorithms=[JWT_ALGO])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Sesi berakhir, silakan login ulang")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Tidak diizinkan")
+    u = await db.admin_users.find_one({"id": payload.get("sub")})
+    if not u:
+        raise HTTPException(status_code=401, detail="Akun tidak ditemukan")
+    return {"id": u["id"], "username": u["username"], "name": u.get("name", ""), "role": u["role"]}
+
+
+def require_roles(*roles):
+    async def dep(user: dict = Depends(get_current_user)):
+        if user["role"] not in roles:
+            raise HTTPException(status_code=403, detail="Akses tidak diizinkan untuk peran Anda")
+        return user
+    return dep
+
+
+require_any = get_current_user
+require_staff = require_roles("superadmin", "admin")
+require_super = require_roles("superadmin")
 
 
 # ---------------- Public endpoints ----------------
@@ -392,13 +469,22 @@ async def upload_proof(order_id: str, payload: ProofUpload):
 # ---------------- Admin endpoints ----------------
 @api_router.post("/admin/login")
 async def admin_login(payload: AdminLogin):
-    if payload.password != ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Password salah")
-    return {"token": ADMIN_TOKEN}
+    uname = payload.username.strip().lower()
+    u = await db.admin_users.find_one({"username": uname})
+    if not u or not verify_password(payload.password, u["password_hash"]):
+        raise HTTPException(status_code=401, detail="Username atau password salah")
+    token = create_token(u)
+    return {"token": token, "user": public_user(u)}
+
+
+@api_router.get("/admin/me")
+async def admin_me(user: dict = Depends(get_current_user)):
+    u = await db.admin_users.find_one({"id": user["id"]})
+    return public_user(u)
 
 
 @api_router.get("/admin/orders")
-async def admin_orders(_: bool = Depends(require_admin), status: Optional[str] = None):
+async def admin_orders(user: dict = Depends(require_staff), status: Optional[str] = None):
     match = {}
     if status:
         match["status"] = status
@@ -424,7 +510,7 @@ async def admin_orders(_: bool = Depends(require_admin), status: Optional[str] =
 
 
 @api_router.get("/admin/orders/{order_id}/proof-image")
-async def get_proof_image(order_id: str, _: bool = Depends(require_admin)):
+async def get_proof_image(order_id: str, user: dict = Depends(require_staff)):
     o = await db.orders.find_one({"id": order_id}, {"proof_image": 1})
     if not o or not o.get("proof_image"):
         raise HTTPException(status_code=404, detail="Bukti tidak ditemukan")
@@ -432,7 +518,7 @@ async def get_proof_image(order_id: str, _: bool = Depends(require_admin)):
 
 
 @api_router.get("/admin/stats")
-async def admin_stats(_: bool = Depends(require_admin)):
+async def admin_stats(user: dict = Depends(require_staff)):
     pipeline = [{"$group": {
         "_id": "$status",
         "count": {"$sum": 1},
@@ -453,33 +539,39 @@ async def admin_stats(_: bool = Depends(require_admin)):
 
 
 @api_router.post("/admin/orders/{order_id}/verify")
-async def verify_order(order_id: str, _: bool = Depends(require_admin)):
-    r = await db.orders.update_one({"id": order_id}, {"$set": {"status": "verified", "updated_at": now_iso()}})
-    if r.matched_count == 0:
+async def verify_order(order_id: str, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    await db.orders.update_one({"id": order_id}, {"$set": {"status": "verified", "updated_at": now_iso()}})
+    await log_activity(user, "verify", f"Verifikasi pembayaran #{o.get('order_no')} — {o.get('name')}", order_id)
     return clean(await db.orders.find_one({"id": order_id}))
 
 
 @api_router.post("/admin/orders/{order_id}/reject")
-async def reject_order(order_id: str, _: bool = Depends(require_admin)):
-    r = await db.orders.update_one({"id": order_id}, {"$set": {"status": "rejected", "updated_at": now_iso()}})
-    if r.matched_count == 0:
+async def reject_order(order_id: str, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    await db.orders.update_one({"id": order_id}, {"$set": {"status": "rejected", "updated_at": now_iso()}})
     await db.seat_locks.delete_many({"order_id": order_id})  # free the seats
+    await log_activity(user, "reject", f"Tolak pesanan #{o.get('order_no')} — {o.get('name')}", order_id)
     return clean(await db.orders.find_one({"id": order_id}))
 
 
 @api_router.delete("/admin/orders/{order_id}")
-async def delete_order(order_id: str, _: bool = Depends(require_admin)):
-    r = await db.orders.delete_one({"id": order_id})
-    if r.deleted_count == 0:
+async def delete_order(order_id: str, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    await db.orders.delete_one({"id": order_id})
     await db.seat_locks.delete_many({"order_id": order_id})  # free the seats
+    await log_activity(user, "delete", f"Hapus permanen pesanan #{o.get('order_no')} — {o.get('name')} ({o.get('phone')})", order_id)
     return {"deleted": True, "id": order_id}
 
 
 @api_router.post("/admin/orders/bulk")
-async def bulk_action(payload: BulkAction, _: bool = Depends(require_admin)):
+async def bulk_action(payload: BulkAction, user: dict = Depends(require_staff)):
     if not payload.ids:
         raise HTTPException(status_code=400, detail="Tidak ada pesanan dipilih")
     if payload.action == "verify":
@@ -493,11 +585,13 @@ async def bulk_action(payload: BulkAction, _: bool = Depends(require_admin)):
             {"$set": {"status": "rejected", "updated_at": now_iso()}},
         )
         await db.seat_locks.delete_many({"order_id": {"$in": payload.ids}})
+    act_label = "Verifikasi massal" if payload.action == "verify" else "Tolak massal"
+    await log_activity(user, f"bulk_{payload.action}", f"{act_label} {len(payload.ids)} pesanan")
     return {"updated": len(payload.ids), "action": payload.action}
 
 
 @api_router.post("/admin/orders/{order_id}/wa-sent")
-async def mark_wa_sent(order_id: str, _: bool = Depends(require_admin)):
+async def mark_wa_sent(order_id: str, user: dict = Depends(require_staff)):
     r = await db.orders.update_one(
         {"id": order_id},
         {"$set": {"wa_sent": True, "wa_sent_at": now_iso(), "updated_at": now_iso()}},
@@ -508,18 +602,22 @@ async def mark_wa_sent(order_id: str, _: bool = Depends(require_admin)):
 
 
 @api_router.post("/admin/orders/{order_id}/checkin")
-async def checkin_order(order_id: str, _: bool = Depends(require_admin)):
-    r = await db.orders.update_one(
+async def checkin_order(order_id: str, user: dict = Depends(require_any)):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    already = o.get("checked_in", False)
+    await db.orders.update_one(
         {"id": order_id},
         {"$set": {"checked_in": True, "checked_in_at": now_iso(), "updated_at": now_iso()}},
     )
-    if r.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    if not already:
+        await log_activity(user, "checkin", f"Check-in peserta #{o.get('order_no')} — {o.get('name')}", order_id)
     return clean(await db.orders.find_one({"id": order_id}))
 
 
 @api_router.post("/admin/active-session")
-async def set_active_session(payload: SetActiveSession, _: bool = Depends(require_admin)):
+async def set_active_session(payload: SetActiveSession, user: dict = Depends(require_staff)):
     if payload.session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
     await db.config.update_one({"_id": "config"}, {"$set": {"active_session": payload.session_id}}, upsert=True)
@@ -527,7 +625,7 @@ async def set_active_session(payload: SetActiveSession, _: bool = Depends(requir
 
 
 @api_router.get("/admin/participants")
-async def list_participants(_: bool = Depends(require_admin)):
+async def list_participants(user: dict = Depends(require_any)):
     docs = await db.orders.find({"status": "verified"}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
     result = []
     for o in docs:
@@ -541,7 +639,7 @@ async def list_participants(_: bool = Depends(require_admin)):
 
 
 @api_router.get("/admin/export")
-async def export_orders(_: bool = Depends(require_admin)):
+async def export_orders(_: bool = Depends(require_staff)):
     status_label = {
         "pending_payment": "Belum Bayar",
         "waiting_verification": "Perlu Verifikasi",
@@ -608,6 +706,59 @@ async def export_orders(_: bool = Depends(require_admin)):
     )
 
 
+# ---------------- User management (superadmin) ----------------
+@api_router.get("/admin/users")
+async def list_users(user: dict = Depends(require_super)):
+    docs = await db.admin_users.find({}).sort("created_at", 1).to_list(200)
+    return [public_user(u) for u in docs]
+
+
+@api_router.post("/admin/users")
+async def create_user(payload: UserCreate, user: dict = Depends(require_super)):
+    uname = payload.username.strip().lower()
+    if len(uname) < 3:
+        raise HTTPException(status_code=400, detail="Username minimal 3 karakter")
+    if len(payload.password) < 4:
+        raise HTTPException(status_code=400, detail="Password minimal 4 karakter")
+    if await db.admin_users.find_one({"username": uname}):
+        raise HTTPException(status_code=409, detail="Username sudah dipakai")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "username": uname,
+        "name": payload.name or uname,
+        "role": payload.role,
+        "password_hash": hash_password(payload.password),
+        "created_at": now_iso(),
+    }
+    await db.admin_users.insert_one(doc)
+    await log_activity(user, "user_create", f"Buat user '{uname}' ({ROLE_LABELS.get(payload.role, payload.role)})", doc["id"])
+    return public_user(doc)
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def delete_user(user_id: str, user: dict = Depends(require_super)):
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Tidak bisa menghapus akun sendiri")
+    target = await db.admin_users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    if target["role"] == "superadmin":
+        supers = await db.admin_users.count_documents({"role": "superadmin"})
+        if supers <= 1:
+            raise HTTPException(status_code=400, detail="Minimal harus ada 1 Super Admin")
+    await db.admin_users.delete_one({"id": user_id})
+    await log_activity(user, "user_delete", f"Hapus user '{target['username']}'", user_id)
+    return {"deleted": True, "id": user_id}
+
+
+# ---------------- Activity logs (staff) ----------------
+@api_router.get("/admin/logs")
+async def list_logs(user: dict = Depends(require_staff), limit: int = 300):
+    docs = await db.activity_logs.find({}).sort("created_at", -1).to_list(min(limit, 1000))
+    return [clean(d) for d in docs]
+
+
+
 app.include_router(api_router)
 
 app.add_middleware(
@@ -620,6 +771,33 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def seed_admin_users():
+    """Create default admin users on first run + unique index."""
+    try:
+        await db.admin_users.create_index("username", unique=True)
+        count = await db.admin_users.count_documents({})
+        if count == 0:
+            default_pw = os.environ.get("ADMIN_PASSWORD", "admin123")
+            defaults = [
+                ("admin1", "Admin 1", "superadmin"),
+                ("admin2", "Admin 2", "admin"),
+                ("admin3", "Petugas Check-in", "checkin"),
+            ]
+            for uname, name, role in defaults:
+                await db.admin_users.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "username": uname,
+                    "name": name,
+                    "role": role,
+                    "password_hash": hash_password(default_pw),
+                    "created_at": now_iso(),
+                })
+            logger.info("default admin_users seeded")
+    except Exception as e:
+        logger.error(f"seed admin_users error: {e}")
 
 
 @app.on_event("startup")

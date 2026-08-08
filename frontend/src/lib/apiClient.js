@@ -6,6 +6,20 @@ export const API = `${BACKEND_URL}/api`;
 export const api = axios.create({ baseURL: API });
 
 export const ADMIN_TOKEN_KEY = "mbi_admin_token";
+export const ADMIN_USER_KEY = "mbi_admin_user";
+
+export const getAdminUser = () => {
+  try { return JSON.parse(localStorage.getItem(ADMIN_USER_KEY) || "null"); }
+  catch { return null; }
+};
+export const setAdminSession = (token, user) => {
+  localStorage.setItem(ADMIN_TOKEN_KEY, token);
+  localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
+};
+export const clearAdminSession = () => {
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_USER_KEY);
+};
 
 export const adminApi = axios.create({ baseURL: API });
 adminApi.interceptors.request.use((config) => {

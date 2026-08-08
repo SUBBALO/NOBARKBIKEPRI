@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { adminApi, api, ADMIN_TOKEN_KEY, LOGOS } from "@/lib/apiClient";
+import { adminApi, api, ADMIN_TOKEN_KEY, clearAdminSession, setAdminSession, LOGOS } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,14 +23,15 @@ const fmtTime = (iso) => {
 };
 
 function Login({ onLogin }) {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await api.post("/admin/login", { password });
-      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+      const { data } = await api.post("/admin/login", { username, password });
+      setAdminSession(data.token, data.user);
       onLogin();
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Login gagal");
@@ -45,8 +46,11 @@ function Login({ onLogin }) {
           <ScanLine className="h-6 w-6 text-[#1E3A5F]" />
         </div>
         <h1 className="font-serif-display text-2xl text-[#1E3A5F]">Check-in Peserta</h1>
-        <p className="text-sm text-[#6B7280] mb-5">Masuk untuk mencatat kehadiran peserta.</p>
-        <Label htmlFor="pw">Password Admin</Label>
+        <p className="text-sm text-[#6B7280] mb-5">Masuk dengan akun Anda untuk mencatat kehadiran peserta.</p>
+        <Label htmlFor="uname">Username</Label>
+        <Input id="uname" value={username} onChange={(e) => setUsername(e.target.value)}
+          className="mt-1.5 mb-3" data-testid="checkin-login-username" placeholder="username" autoCapitalize="none" />
+        <Label htmlFor="pw">Password</Label>
         <Input id="pw" type="password" inputMode="text" value={password} onChange={(e) => setPassword(e.target.value)}
           className="mt-1.5" data-testid="checkin-login-password" placeholder="••••••••" />
         <Button type="submit" disabled={loading} data-testid="checkin-login-btn"
@@ -72,7 +76,7 @@ export default function CheckinPage() {
       const { data } = await adminApi.get("/admin/participants");
       setParticipants(data);
     } catch (err) {
-      if (err?.response?.status === 401) { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); }
+      if (err?.response?.status === 401) { clearAdminSession(); setAuthed(false); }
       else toast.error("Gagal memuat data");
     }
     setLoading(false);
@@ -114,7 +118,7 @@ export default function CheckinPage() {
               <p className="text-[11px] text-white/70 leading-tight">Nonton Bersama · MBI Kepri</p>
             </div>
           </div>
-          <button onClick={() => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); }}
+          <button onClick={() => { clearAdminSession(); setAuthed(false); }}
             data-testid="checkin-logout" className="text-xs text-white/80 underline">Keluar</button>
         </div>
         <div className="px-4 pb-3">

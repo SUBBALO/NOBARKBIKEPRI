@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { adminApi, api, ADMIN_TOKEN_KEY, rupiah, LOGOS } from "@/lib/apiClient";
+import { adminApi, api, ADMIN_TOKEN_KEY, getAdminUser, setAdminSession, clearAdminSession, rupiah, LOGOS } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import {
 import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
-  Trash2, AlertTriangle,
+  Trash2, AlertTriangle, UserPlus, History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -124,14 +124,15 @@ const FILTERS = [
 ];
 
 function LoginView({ onLogin }) {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await api.post("/admin/login", { password });
-      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+      const { data } = await api.post("/admin/login", { username, password });
+      setAdminSession(data.token, data.user);
       onLogin();
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Login gagal");
@@ -146,7 +147,10 @@ function LoginView({ onLogin }) {
           <ShieldCheck className="h-6 w-6 text-[#1E3A5F]" />
         </div>
         <h1 className="font-serif-display text-3xl text-[#1E3A5F]">Panel Admin</h1>
-        <p className="text-sm text-[#6B7280] mb-6">Masukkan password untuk mengelola pesanan.</p>
+        <p className="text-sm text-[#6B7280] mb-6">Masuk dengan akun Anda.</p>
+        <Label htmlFor="uname">Username</Label>
+        <Input id="uname" value={username} onChange={(e) => setUsername(e.target.value)}
+          className="mt-1.5 mb-4" data-testid="admin-username" placeholder="username" autoCapitalize="none" />
         <Label htmlFor="pw">Password</Label>
         <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           className="mt-1.5" data-testid="admin-password" placeholder="••••••••" />
@@ -158,6 +162,12 @@ function LoginView({ onLogin }) {
     </div>
   );
 }
+
+const ROLE_BADGE = {
+  superadmin: { t: "Super Admin", c: "bg-[#D56115]/15 text-[#B34F0F]" },
+  admin: { t: "Admin", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
+  checkin: { t: "Petugas Check-in", c: "bg-[#10B981]/15 text-[#0F7A57]" },
+};
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
   <div className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
@@ -226,8 +236,197 @@ function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
   );
 }
 
+const ACTION_META = {
+  delete: { label: "Hapus", c: "bg-[#EF4444]/15 text-[#EF4444]" },
+  verify: { label: "Verifikasi", c: "bg-[#10B981]/15 text-[#0F7A57]" },
+  reject: { label: "Tolak", c: "bg-[#D56115]/15 text-[#B34F0F]" },
+  bulk_verify: { label: "Verifikasi Massal", c: "bg-[#10B981]/15 text-[#0F7A57]" },
+  bulk_reject: { label: "Tolak Massal", c: "bg-[#D56115]/15 text-[#B34F0F]" },
+  checkin: { label: "Check-in", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
+  user_create: { label: "Buat User", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
+  user_delete: { label: "Hapus User", c: "bg-[#EF4444]/15 text-[#EF4444]" },
+};
+
+function LogsPanel() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { const { data } = await adminApi.get("/admin/logs"); setLogs(data); }
+    catch { toast.error("Gagal memuat log"); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  return (
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] no-print">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2"><History className="h-5 w-5 text-[#D56115]" /> Log Aktivitas</h2>
+          <p className="text-sm text-[#6B7280]">Catatan siapa melakukan aksi apa & kapan.</p>
+        </div>
+        <Button variant="outline" onClick={load} data-testid="logs-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
+      </div>
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+      ) : logs.length === 0 ? (
+        <p className="text-center text-sm text-[#6B7280] py-12" data-testid="logs-empty">Belum ada aktivitas tercatat.</p>
+      ) : (
+        <div className="space-y-2" data-testid="logs-list">
+          {logs.map((l) => {
+            const m = ACTION_META[l.action] || { label: l.action, c: "bg-muted text-[#6B7280]" };
+            return (
+              <div key={l.id} className="flex items-start gap-3 rounded-xl border border-border p-3">
+                <span className={cn("shrink-0 text-[11px] px-2 py-0.5 rounded-full font-medium", m.c)}>{m.label}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-[#1A1A1A]">{l.detail}</p>
+                  <p className="text-xs text-[#6B7280] mt-0.5">
+                    oleh <b>{l.actor_name || l.actor_username}</b> (@{l.actor_username}) · {fmtTime(l.created_at)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UsersPanel({ currentUser }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ username: "", name: "", password: "", role: "checkin" });
+  const [busy, setBusy] = useState(false);
+  const [delTarget, setDelTarget] = useState(null);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { const { data } = await adminApi.get("/admin/users"); setUsers(data); }
+    catch { toast.error("Gagal memuat user"); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const create = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await adminApi.post("/admin/users", form);
+      toast.success(`User "${form.username}" dibuat`);
+      setForm({ username: "", name: "", password: "", role: "checkin" });
+      await load();
+    } catch (err) { toast.error(err?.response?.data?.detail || "Gagal membuat user"); }
+    setBusy(false);
+  };
+  const doDelete = async () => {
+    if (!delTarget) return;
+    setBusy(true);
+    try {
+      await adminApi.delete(`/admin/users/${delTarget.id}`);
+      toast.success(`User "${delTarget.username}" dihapus`);
+      setDelTarget(null);
+      await load();
+    } catch (err) { toast.error(err?.response?.data?.detail || "Gagal menghapus user"); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-6 no-print">
+      {/* Create form */}
+      <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] h-fit">
+        <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2 mb-1"><UserPlus className="h-5 w-5 text-[#D56115]" /> Tambah User</h2>
+        <p className="text-sm text-[#6B7280] mb-4">Buat akun login baru untuk panitia.</p>
+        <form onSubmit={create} className="space-y-3">
+          <div>
+            <Label htmlFor="nu">Username</Label>
+            <Input id="nu" data-testid="user-username" value={form.username} autoCapitalize="none"
+              onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="mis. panitia1" className="mt-1.5" />
+          </div>
+          <div>
+            <Label htmlFor="nn">Nama Lengkap</Label>
+            <Input id="nn" data-testid="user-name" value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="mis. Budi" className="mt-1.5" />
+          </div>
+          <div>
+            <Label htmlFor="np">Password</Label>
+            <Input id="np" data-testid="user-password" value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="min. 4 karakter" className="mt-1.5" />
+          </div>
+          <div>
+            <Label htmlFor="nr">Peran</Label>
+            <select id="nr" data-testid="user-role" value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="checkin">Petugas Check-in (hanya check-in)</option>
+              <option value="admin">Admin (verifikasi + hapus + check-in)</option>
+              <option value="superadmin">Super Admin (semua + kelola user)</option>
+            </select>
+          </div>
+          <Button type="submit" disabled={busy} data-testid="user-create-btn" className="w-full bg-[#1E3A5F] hover:bg-[#16304f]">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserPlus className="h-4 w-4 mr-1.5" />} Buat User
+          </Button>
+        </form>
+      </div>
+
+      {/* List */}
+      <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2"><Users className="h-5 w-5 text-[#D56115]" /> Daftar User</h2>
+          <Button variant="outline" size="sm" onClick={load} data-testid="users-refresh"><RefreshCw className="h-4 w-4" /></Button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+        ) : (
+          <div className="space-y-2" data-testid="users-list">
+            {users.map((u) => {
+              const rb = ROLE_BADGE[u.role] || { t: u.role, c: "bg-muted" };
+              return (
+                <div key={u.id} data-testid={`user-row-${u.username}`} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[#1A1A1A] truncate">{u.name} <span className="text-xs text-[#6B7280] font-normal">@{u.username}</span></p>
+                    <span className={cn("inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium", rb.c)}>{rb.t}</span>
+                  </div>
+                  {u.id === currentUser?.id ? (
+                    <span className="text-[11px] text-[#6B7280]">Anda</span>
+                  ) : (
+                    <button onClick={() => setDelTarget(u)} data-testid={`user-delete-${u.username}`}
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <Dialog open={!!delTarget} onOpenChange={() => !busy && setDelTarget(null)}>
+        <DialogContent data-testid="user-delete-dialog" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#EF4444]/15 flex items-center justify-center mb-2"><AlertTriangle className="h-5 w-5 text-[#EF4444]" /></div>
+            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Hapus user ini?</DialogTitle>
+          </DialogHeader>
+          {delTarget && (
+            <p className="text-sm text-[#6B7280]">User <b className="text-[#1A1A1A]">{delTarget.name} (@{delTarget.username})</b> tidak akan bisa login lagi. Tindakan ini tidak bisa dibatalkan.</p>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setDelTarget(null)} disabled={busy} className="flex-1" data-testid="user-delete-cancel">Batal</Button>
+            <Button onClick={doDelete} disabled={busy} className="flex-1 bg-[#EF4444] hover:bg-[#DC2626]" data-testid="user-delete-confirm">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />} Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
 export default function AdminPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+  const [currentUser, setCurrentUser] = useState(getAdminUser());
+  const isSuper = currentUser?.role === "superadmin";
+  const isStaff = currentUser?.role === "superadmin" || currentUser?.role === "admin";
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState(null);
   const [event, setEvent] = useState(null);
@@ -251,6 +450,7 @@ export default function AdminPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = useCallback(async () => {
+    if (!isStaff) { setLoading(false); return; }
     setLoading(true);
     try {
       const [o, s, e] = await Promise.all([
@@ -260,13 +460,15 @@ export default function AdminPage() {
       ]);
       setOrders(o.data); setStats(s.data); setEvent(e.data);
     } catch (err) {
-      if (err?.response?.status === 401) { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); }
+      if (err?.response?.status === 401) { clearAdminSession(); setCurrentUser(null); setAuthed(false); }
       else toast.error("Gagal memuat data");
     }
     setLoading(false);
-  }, []);
+  }, [isStaff]);
 
   useEffect(() => { if (authed) load(); }, [authed, load]);
+
+  const onLoggedIn = () => { setCurrentUser(getAdminUser()); setAuthed(true); };
 
   const act = async (id, action) => {
     setBusyId(id);
@@ -283,7 +485,7 @@ export default function AdminPage() {
     catch { toast.error("Gagal ubah sesi"); }
   };
 
-  const logout = () => { localStorage.removeItem(ADMIN_TOKEN_KEY); setAuthed(false); };
+  const logout = () => { clearAdminSession(); setCurrentUser(null); setAuthed(false); };
 
   const doDelete = async () => {
     if (!deleteTarget) return;
@@ -367,7 +569,27 @@ export default function AdminPage() {
     setTimeout(() => window.print(), 250);
   };
 
-  if (!authed) return <LoginView onLogin={() => setAuthed(true)} />;
+  if (!authed) return <LoginView onLogin={onLoggedIn} />;
+
+  // Petugas Check-in tidak boleh akses panel verifikasi
+  if (!isStaff) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-24 text-center">
+        <div className="rounded-2xl border border-border bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+          <div className="h-12 w-12 rounded-full bg-[#10B981]/10 flex items-center justify-center mb-4 mx-auto">
+            <ScanLine className="h-6 w-6 text-[#10B981]" />
+          </div>
+          <h1 className="font-serif-display text-2xl text-[#1E3A5F]">Halo, {currentUser?.name}</h1>
+          <p className="text-sm text-[#6B7280] mt-1 mb-5">Akun Anda adalah <b>Petugas Check-in</b>, jadi hanya bisa mengakses halaman check-in peserta.</p>
+          <a href="/checkin" data-testid="goto-checkin"
+            className="inline-flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#16304f] text-white rounded-full px-6 py-3 text-sm font-medium">
+            <UserCheck className="h-4 w-4" /> Buka Halaman Check-in
+          </a>
+          <button onClick={logout} data-testid="checkin-role-logout" className="block mx-auto mt-5 text-xs text-[#EF4444] underline">Keluar</button>
+        </div>
+      </div>
+    );
+  }
 
   const sq = searchQuery.trim().toLowerCase();
   const nsq = sq.replace(/[\s-]/g, "");
@@ -398,7 +620,14 @@ export default function AdminPage() {
       <div className="flex items-center justify-between mb-6 no-print">
         <div>
           <h1 className="font-serif-display text-3xl text-[#1E3A5F]">Panel Admin</h1>
-          <p className="text-sm text-[#6B7280]">Kelola pesanan & verifikasi pembayaran.</p>
+          <p className="text-sm text-[#6B7280] flex items-center gap-2">
+            <span>Masuk sebagai <b className="text-[#1A1A1A]">{currentUser?.name}</b></span>
+            {currentUser?.role && (
+              <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", (ROLE_BADGE[currentUser.role] || {}).c)}>
+                {(ROLE_BADGE[currentUser.role] || {}).t}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportExcel} disabled={exporting} data-testid="btn-export">
@@ -430,6 +659,18 @@ export default function AdminPage() {
             tab === "checkin" ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/50")}>
           <UserCheck className="h-4 w-4" /> Check-in Peserta
         </button>
+        <button data-testid="admin-tab-logs" onClick={() => setTab("logs")}
+          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+            tab === "logs" ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/50")}>
+          <History className="h-4 w-4" /> Log Aktivitas
+        </button>
+        {isSuper && (
+          <button data-testid="admin-tab-users" onClick={() => setTab("users")}
+            className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+              tab === "users" ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/50")}>
+            <Users className="h-4 w-4" /> Kelola User
+          </button>
+        )}
       </div>
 
       {tab === "payment" && (<>
@@ -621,6 +862,10 @@ export default function AdminPage() {
         <CheckinPanel orders={orders} query={checkinQuery} setQuery={setCheckinQuery} busyId={busyId}
           onCheckin={async (o) => { await act(o.id, "checkin"); setCheckinPopup(o); }} />
       )}
+
+      {tab === "logs" && <LogsPanel />}
+
+      {tab === "users" && isSuper && <UsersPanel currentUser={currentUser} />}
 
       {/* Proof viewer */}
       <Dialog open={!!proofView} onOpenChange={() => setProofView(null)}>
