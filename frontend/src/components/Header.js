@@ -18,14 +18,14 @@ export const Header = () => {
           <Link
             to="/"
             data-testid="nav-pesan"
-            className="hidden sm:inline text-sm font-medium text-[#1E3A5F] hover:text-[#D56115] transition-colors"
+            className="hidden sm:inline text-sm font-medium text-[#7A241F] hover:text-[#B26A1E] transition-colors"
           >
             Pesan Tiket
           </Link>
           <Link
             to="/upload"
             data-testid="nav-upload"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#D56115] transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#7A241F] hover:text-[#B26A1E] transition-colors"
           >
             <Upload className="h-4 w-4" />
             <span className="hidden xs:inline sm:inline">Upload Bukti</span>
@@ -34,7 +34,7 @@ export const Header = () => {
             <Link
               to="/"
               data-testid="nav-admin"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1E3A5F] hover:text-[#D56115] transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#7A241F] hover:text-[#B26A1E] transition-colors"
             >
               <ShieldCheck className="h-4 w-4" />
               Ke Pemesanan

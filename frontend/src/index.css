@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Playfair+Display:wght@500;600;700;800;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,31 +11,36 @@ body {
 }
 
 .font-serif-display {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Playfair Display', serif;
+    letter-spacing: -0.01em;
+}
+
+.font-cursive {
+    font-family: 'Dancing Script', cursive;
 }
 
 @layer base {
     :root {
-        --background: 40 43% 98%;
-        --foreground: 0 0% 10%;
-        --card: 0 0% 100%;
-        --card-foreground: 0 0% 10%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 10%;
-        --primary: 22 82% 46%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 212 52% 24%;
+        --background: 42 33% 95%;
+        --foreground: 22 33% 13%;
+        --card: 40 33% 98%;
+        --card-foreground: 22 33% 13%;
+        --popover: 40 33% 98%;
+        --popover-foreground: 22 33% 13%;
+        --primary: 40 52% 52%;
+        --primary-foreground: 34 68% 6%;
+        --secondary: 3 59% 30%;
         --secondary-foreground: 0 0% 100%;
-        --muted: 40 20% 94%;
-        --muted-foreground: 220 9% 46%;
-        --accent: 40 30% 92%;
-        --accent-foreground: 212 52% 24%;
-        --destructive: 0 84% 60%;
+        --muted: 34 23% 87%;
+        --muted-foreground: 25 13% 42%;
+        --accent: 41 53% 81%;
+        --accent-foreground: 22 33% 13%;
+        --destructive: 0 70% 35%;
         --destructive-foreground: 0 0% 100%;
-        --border: 220 13% 91%;
-        --input: 220 13% 91%;
-        --ring: 22 82% 46%;
-        --radius: 0.75rem;
+        --border: 37 26% 80%;
+        --input: 37 26% 80%;
+        --ring: 40 52% 52%;
+        --radius: 1rem;
     }
 }
 

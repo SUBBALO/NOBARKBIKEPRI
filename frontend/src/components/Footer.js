@@ -8,15 +8,15 @@ export const Footer = () => (
         <img src={LOGOS.kbi} alt="KBI" className="h-9 w-auto object-contain" />
       </div>
       <div className="text-sm">
-        <p className="text-[#6B7280] mb-1">Butuh bantuan? Hubungi kontak person:</p>
+        <p className="text-[#7A6A5E] mb-1">Butuh bantuan? Hubungi kontak person:</p>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="font-semibold text-[#1E3A5F]">{CONTACT.label}</span>
+          <span className="font-semibold text-[#7A241F]">{CONTACT.label}</span>
           <a href={`tel:${CONTACT.phone.replace(/-/g, "")}`} data-testid="footer-contact-phone"
-            className="inline-flex items-center gap-1.5 text-[#D56115] hover:underline font-medium">
+            className="inline-flex items-center gap-1.5 text-[#B26A1E] hover:underline font-medium">
             <Phone className="h-4 w-4" /> {CONTACT.phone}
           </a>
           <a href={CONTACT.waLink} target="_blank" rel="noreferrer" data-testid="footer-contact-wa"
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#10B981]/10 text-[#0F7A57] px-3 py-1 hover:bg-[#10B981]/20 transition-colors">
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#2F703E]/10 text-[#255E33] px-3 py-1 hover:bg-[#2F703E]/20 transition-colors">
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </a>
         </div>
@@ -26,7 +26,7 @@ export const Footer = () => (
       <p className="text-center text-[11px] text-[#9CA3AF] py-3">
         Developed by{" "}
         <a href="https://instagram.com/alam_tenang" target="_blank" rel="noreferrer"
-          data-testid="footer-credit" className="text-[#9CA3AF] hover:text-[#D56115] hover:underline transition-colors">
+          data-testid="footer-credit" className="text-[#9CA3AF] hover:text-[#B26A1E] hover:underline transition-colors">
           Alam Tenang
         </a>
       </p>

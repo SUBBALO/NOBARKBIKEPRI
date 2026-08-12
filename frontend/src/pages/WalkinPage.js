@@ -46,14 +46,14 @@ function Login({ onLogin }) {
     setLoading(false);
   };
   return (
-    <div className="min-h-screen bg-[#1E3A5F] flex flex-col items-center justify-center px-6">
+    <div className="min-h-screen bg-[#7A241F] flex flex-col items-center justify-center px-6">
       <img src={LOGOS.kbi} alt="KBI" className="h-14 mb-6 bg-white/95 rounded-lg p-2" />
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white p-7 shadow-xl">
-        <div className="h-12 w-12 rounded-full bg-[#D56115]/10 flex items-center justify-center mb-3">
-          <Store className="h-6 w-6 text-[#D56115]" />
+        <div className="h-12 w-12 rounded-full bg-[#B26A1E]/10 flex items-center justify-center mb-3">
+          <Store className="h-6 w-6 text-[#B26A1E]" />
         </div>
-        <h1 className="font-serif-display text-2xl text-[#1E3A5F]">Jual Tiket di Tempat</h1>
-        <p className="text-sm text-[#6B7280] mb-5">Masuk dengan akun panitia (Admin).</p>
+        <h1 className="font-serif-display text-2xl text-[#7A241F]">Jual Tiket di Tempat</h1>
+        <p className="text-sm text-[#7A6A5E] mb-5">Masuk dengan akun panitia (Admin).</p>
         <Label htmlFor="u">Username</Label>
         <Input id="u" value={username} autoCapitalize="none" onChange={(e) => setUsername(e.target.value)}
           className="mt-1.5 mb-3" data-testid="walkin-login-username" placeholder="username" />
@@ -61,7 +61,7 @@ function Login({ onLogin }) {
         <Input id="p" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           className="mt-1.5" data-testid="walkin-login-password" placeholder="••••••••" />
         <Button type="submit" disabled={loading} data-testid="walkin-login-btn"
-          className="w-full mt-5 bg-[#D56115] hover:bg-[#B34F0F] rounded-full h-11">
+          className="w-full mt-5 bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full h-11">
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Masuk
         </Button>
       </form>
@@ -112,7 +112,7 @@ export default function WalkinPage() {
   if (!isStaff) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center px-6 text-center">
-        <p className="text-[#6B7280]">Akun Anda tidak diizinkan menjual tiket di tempat.</p>
+        <p className="text-[#7A6A5E]">Akun Anda tidak diizinkan menjual tiket di tempat.</p>
         <button onClick={() => { clearAdminSession(); setAuthed(false); }} className="mt-3 text-xs text-[#EF4444] underline">Keluar</button>
       </div>
     );
@@ -151,7 +151,7 @@ export default function WalkinPage() {
   return (
     <div className="min-h-screen bg-[#FDFBF7]">
       {/* Top bar */}
-      <div className="sticky top-0 z-40 bg-[#1E3A5F] text-white">
+      <div className="sticky top-0 z-40 bg-[#7A241F] text-white">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img src={LOGOS.kbi} alt="KBI" className="h-8 bg-white/95 rounded p-1" />
@@ -172,12 +172,12 @@ export default function WalkinPage() {
               {SESSIONS.map((s) => (
                 <button key={s.id} data-testid={`walkin-session-${s.id}`} onClick={() => setSessionId(s.id)}
                   className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                    sessionId === s.id ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/50")}>
+                    sessionId === s.id ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
                   {s.name} · {s.time}
                 </button>
               ))}
             </div>
-            <button onClick={() => loadMap(sessionId, true)} className="inline-flex items-center gap-1 text-xs text-[#6B7280] hover:text-[#D56115]">
+            <button onClick={() => loadMap(sessionId, true)} className="inline-flex items-center gap-1 text-xs text-[#7A6A5E] hover:text-[#B26A1E]">
               <RefreshCw className="h-3.5 w-3.5" /> Perbarui
             </button>
           </div>
@@ -185,22 +185,22 @@ export default function WalkinPage() {
           {mapData && (
             <p className="text-sm mb-3" data-testid="walkin-remaining">
               {sold ? <span className="font-semibold text-[#EF4444]">Kursi sesi ini habis terjual</span>
-                : <>Sisa <b className="text-[#0F7A57] text-lg">{remaining}</b> kursi · {mapData.booked}/{mapData.capacity} terisi</>}
+                : <>Sisa <b className="text-[#255E33] text-lg">{remaining}</b> kursi · {mapData.booked}/{mapData.capacity} terisi</>}
             </p>
           )}
 
           {loadingMap ? (
-            <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#D56115]" /></div>
+            <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#B26A1E]" /></div>
           ) : mapData ? (
             <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} />
           ) : (
-            <p className="text-center text-sm text-[#6B7280] py-16">Gagal memuat peta kursi.</p>
+            <p className="text-center text-sm text-[#7A6A5E] py-16">Gagal memuat peta kursi.</p>
           )}
         </div>
 
         {/* Order form */}
         <div className="rounded-2xl border border-border bg-white p-5 h-fit lg:sticky lg:top-20">
-          <h2 className="font-serif-display text-xl text-[#1E3A5F] mb-3">Data Pembeli</h2>
+          <h2 className="font-serif-display text-xl text-[#7A241F] mb-3">Data Pembeli</h2>
           <Label htmlFor="wn">Nama</Label>
           <Input id="wn" data-testid="walkin-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama pembeli" className="mt-1.5 mb-3" />
           <Label htmlFor="wp">No. HP <span className="text-[#9CA3AF]">(opsional)</span></Label>
@@ -213,29 +213,29 @@ export default function WalkinPage() {
               return (
                 <button type="button" key={m.k} data-testid={`walkin-pay-${m.k}`} onClick={() => setMethod(m.k)}
                   className={cn("rounded-xl border p-2.5 text-center transition-colors",
-                    active ? "border-[#D56115] bg-[#D56115]/5 ring-2 ring-[#D56115]/30" : "border-border hover:border-[#D56115]/50")}>
-                  <Icon className={cn("h-5 w-5 mx-auto mb-0.5", active ? "text-[#D56115]" : "text-[#6B7280]")} />
-                  <span className="text-xs font-medium text-[#1A1A1A]">{m.t}</span>
+                    active ? "border-[#B26A1E] bg-[#B26A1E]/5 ring-2 ring-[#B26A1E]/30" : "border-border hover:border-[#B26A1E]/50")}>
+                  <Icon className={cn("h-5 w-5 mx-auto mb-0.5", active ? "text-[#B26A1E]" : "text-[#7A6A5E]")} />
+                  <span className="text-xs font-medium text-[#2C1E16]">{m.t}</span>
                 </button>
               );
             })}
           </div>
-          <p className="text-[11px] text-[#6B7280] mb-4">{method === "cash" ? "Cash: nominal pas, tanpa kode unik." : "Nominal akan ditambah kode unik otomatis."}</p>
+          <p className="text-[11px] text-[#7A6A5E] mb-4">{method === "cash" ? "Cash: nominal pas, tanpa kode unik." : "Nominal akan ditambah kode unik otomatis."}</p>
 
           <div className="rounded-lg bg-muted/40 p-3 mb-2">
-            <p className="text-xs text-[#6B7280] mb-1">Kursi dipilih ({selected.length})</p>
+            <p className="text-xs text-[#7A6A5E] mb-1">Kursi dipilih ({selected.length})</p>
             <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="walkin-selected-seats">
               {selected.length === 0 ? <span className="text-xs text-[#9CA3AF]">Belum ada kursi dipilih</span>
-                : selected.map((s) => <span key={s} className="px-2.5 py-1 rounded-md bg-[#D56115]/10 text-[#B34F0F] text-sm font-bold">{s}</span>)}
+                : selected.map((s) => <span key={s} className="px-2.5 py-1 rounded-md bg-[#B26A1E]/10 text-[#8A3A12] text-sm font-bold">{s}</span>)}
             </div>
           </div>
           <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-[#6B7280]">Total {method === "cash" ? "(pas)" : "(+ kode unik)"}</span>
-            <span className="font-serif-display text-2xl text-[#D56115]" data-testid="walkin-total">{rupiah(total)}</span>
+            <span className="text-sm text-[#7A6A5E]">Total {method === "cash" ? "(pas)" : "(+ kode unik)"}</span>
+            <span className="font-serif-display text-2xl text-[#B26A1E]" data-testid="walkin-total">{rupiah(total)}</span>
           </div>
 
           <Button onClick={submit} disabled={busy || selected.length === 0} data-testid="walkin-submit"
-            className="w-full h-12 bg-[#1E3A5F] hover:bg-[#16304f] text-base">
+            className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
             {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} Buat Tiket & Check-in
           </Button>
         </div>
@@ -246,10 +246,10 @@ export default function WalkinPage() {
         <DialogContent data-testid="walkin-result-dialog" className="max-w-3xl rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#10B981]" /></div>
+              <div className="h-11 w-11 rounded-full bg-[#2F703E]/15 flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#2F703E]" /></div>
               <div>
-                <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Tiket Dibuat & Check-in ✅</DialogTitle>
-                {result && <p className="text-sm text-[#6B7280] mt-0.5"><b className="text-[#1A1A1A]">{result.name}</b> · <span className="font-mono text-xs">#{result.order_no}</span></p>}
+                <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Tiket Dibuat & Check-in ✅</DialogTitle>
+                {result && <p className="text-sm text-[#7A6A5E] mt-0.5"><b className="text-[#2C1E16]">{result.name}</b> · <span className="font-mono text-xs">#{result.order_no}</span></p>}
               </div>
             </div>
           </DialogHeader>
@@ -257,46 +257,46 @@ export default function WalkinPage() {
             <div className="grid sm:grid-cols-2 gap-4 items-start text-sm">
               {/* Kolom kiri: instruksi pembayaran */}
               {result.payment_method === "qris" ? (
-                <div className="rounded-lg border border-[#1E3A5F]/15 bg-[#1E3A5F]/[0.03] p-4 text-center" data-testid="walkin-pay-qris-info">
-                  <p className="text-[#1E3A5F] font-medium mb-2">Silakan scan QRIS lalu bayar:</p>
+                <div className="rounded-lg border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4 text-center" data-testid="walkin-pay-qris-info">
+                  <p className="text-[#7A241F] font-medium mb-2">Silakan scan QRIS lalu bayar:</p>
                   <img src={LOGOS.qris} alt="QRIS" className="mx-auto max-h-[42vh] w-auto rounded-lg border border-border bg-white" />
                 </div>
               ) : result.payment_method === "transfer" ? (
-                <div className="rounded-lg border border-[#1E3A5F]/15 bg-[#1E3A5F]/[0.03] p-4" data-testid="walkin-pay-transfer-info">
-                  <p className="text-[#1E3A5F] font-medium mb-2">Silakan transfer ke rekening:</p>
+                <div className="rounded-lg border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4" data-testid="walkin-pay-transfer-info">
+                  <p className="text-[#7A241F] font-medium mb-2">Silakan transfer ke rekening:</p>
                   <div className="rounded-md bg-white border border-border p-3 space-y-1">
-                    <p className="text-xs text-[#6B7280]">{transfer?.bank || "BCA"}</p>
+                    <p className="text-xs text-[#7A6A5E]">{transfer?.bank || "BCA"}</p>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-2xl font-bold text-[#1E3A5F] tracking-wide">{transfer?.account_number}</span>
+                      <span className="font-mono text-2xl font-bold text-[#7A241F] tracking-wide">{transfer?.account_number}</span>
                       <button onClick={() => { navigator.clipboard?.writeText((transfer?.account_number || "").replace(/\s/g, "")); toast.success("No. rekening disalin"); }}
-                        data-testid="walkin-copy-rek" className="text-[#D56115] text-xs underline shrink-0">Salin</button>
+                        data-testid="walkin-copy-rek" className="text-[#B26A1E] text-xs underline shrink-0">Salin</button>
                     </div>
-                    <p className="text-xs text-[#6B7280]">a.n. {transfer?.account_name}</p>
+                    <p className="text-xs text-[#7A6A5E]">a.n. {transfer?.account_name}</p>
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-[#10B981]/20 bg-[#10B981]/[0.05] p-4 text-center flex flex-col items-center justify-center" data-testid="walkin-pay-cash-info">
-                  <Banknote className="h-10 w-10 text-[#10B981] mb-2" />
-                  <p className="text-[#0F7A57] font-medium">Terima pembayaran tunai</p>
+                <div className="rounded-lg border border-[#2F703E]/20 bg-[#2F703E]/[0.05] p-4 text-center flex flex-col items-center justify-center" data-testid="walkin-pay-cash-info">
+                  <Banknote className="h-10 w-10 text-[#2F703E] mb-2" />
+                  <p className="text-[#255E33] font-medium">Terima pembayaran tunai</p>
                 </div>
               )}
 
               {/* Kolom kanan: nominal + kursi */}
               <div className="space-y-4">
-                <div className="rounded-lg bg-[#D56115]/10 p-4 text-center">
-                  <p className="text-[#6B7280]">Nominal {result.payment_method === "cash" ? "(pas)" : "(WAJIB PAS)"}:</p>
-                  <p className="font-serif-display text-4xl text-[#D56115] leading-tight">{rupiah(result.total_amount)}</p>
-                  {result.unique_code ? <p className="text-xs text-[#6B7280]">termasuk kode unik {result.unique_code}</p> : null}
+                <div className="rounded-lg bg-[#B26A1E]/10 p-4 text-center">
+                  <p className="text-[#7A6A5E]">Nominal {result.payment_method === "cash" ? "(pas)" : "(WAJIB PAS)"}:</p>
+                  <p className="font-serif-display text-4xl text-[#B26A1E] leading-tight">{rupiah(result.total_amount)}</p>
+                  {result.unique_code ? <p className="text-xs text-[#7A6A5E]">termasuk kode unik {result.unique_code}</p> : null}
                 </div>
-                <div className="rounded-lg bg-[#1E3A5F]/[0.04] border border-[#1E3A5F]/10 p-4">
-                  <p className="text-[#B34F0F] font-medium mb-2">🎟️ Serahkan tiket:</p>
-                  <p className="font-serif-display text-2xl text-[#1E3A5F] mb-2" data-testid="walkin-result-session">
+                <div className="rounded-lg bg-[#7A241F]/[0.04] border border-[#7A241F]/10 p-4">
+                  <p className="text-[#8A3A12] font-medium mb-2">🎟️ Serahkan tiket:</p>
+                  <p className="font-serif-display text-2xl text-[#7A241F] mb-2" data-testid="walkin-result-session">
                     {(SESSIONS.find((s) => s.id === result.session_id)?.name || `Sesi ${result.session_id}`).toUpperCase()} · {SESSIONS.find((s) => s.id === result.session_id)?.time}
                   </p>
-                  <p className="text-xs text-[#6B7280] mb-1">Nomor kursi:</p>
+                  <p className="text-xs text-[#7A6A5E] mb-1">Nomor kursi:</p>
                   <div className="flex flex-wrap gap-2" data-testid="walkin-result-seats">
                     {result.seats.map((s) => (
-                      <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold text-lg border border-[#D56115]/30">{s}</span>
+                      <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold text-lg border border-[#B26A1E]/30">{s}</span>
                     ))}
                   </div>
                 </div>
@@ -304,7 +304,7 @@ export default function WalkinPage() {
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setResult(null)} className="w-full h-11 bg-[#1E3A5F] hover:bg-[#16304f]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
+            <Button onClick={() => setResult(null)} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

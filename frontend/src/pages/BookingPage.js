@@ -25,14 +25,15 @@ const STEPS = [
 ];
 
 const PRICE = 50000;
+const POSTER_URL = "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/h7ivo2nv_POSTER.webp";
 
 const SessionCard = ({ s, active, selected, onSelect }) => {
   const disabled = s.status !== "open";
   const badge = {
-    open: { t: "Dibuka", c: "bg-[#10B981]/15 text-[#0F7A57]" },
-    locked: { t: "Terkunci", c: "bg-[#6B7280]/15 text-[#6B7280]" },
+    open: { t: "Dibuka", c: "bg-[#2F703E]/15 text-[#255E33]" },
+    locked: { t: "Terkunci", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
     full: { t: "Penuh", c: "bg-[#EF4444]/15 text-[#EF4444]" },
-    closed: { t: "Selesai", c: "bg-[#6B7280]/15 text-[#6B7280]" },
+    closed: { t: "Selesai", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
   }[s.status];
   const remaining = Math.max(0, (s.capacity || 0) - (s.booked || 0));
   const pct = s.capacity ? Math.min(100, Math.round((s.booked / s.capacity) * 100)) : 0;
@@ -46,40 +47,40 @@ const SessionCard = ({ s, active, selected, onSelect }) => {
       className={cn(
         "text-left rounded-xl border p-5 transition-colors duration-200 relative",
         disabled ? "opacity-60 cursor-not-allowed bg-muted/40 border-border" :
-          selected === s.id ? "border-[#D56115] bg-[#D56115]/5 ring-2 ring-[#D56115]/30" :
-            "border-border bg-white hover:border-[#D56115]/50"
+          selected === s.id ? "border-[#B26A1E] bg-[#B26A1E]/5 ring-2 ring-[#B26A1E]/30" :
+            "border-border bg-white hover:border-[#B26A1E]/50"
       )}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="font-serif-display text-2xl text-[#1E3A5F]">{s.name}</span>
+        <span className="font-serif-display text-2xl text-[#7A241F]">{s.name}</span>
         <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", badge.c)}>{badge.t}</span>
       </div>
-      <p className="text-sm text-[#6B7280]">Pukul {s.time}</p>
+      <p className="text-sm text-[#7A6A5E]">Pukul {s.time}</p>
 
       {s.status === "open" ? (
         <div className="mt-3" data-testid={`session-remaining-${s.id}`}>
           <div className="flex items-baseline gap-1.5">
-            <span className={cn("font-serif-display text-3xl leading-none", low ? "text-[#D56115]" : "text-[#0F7A57]")}>{remaining}</span>
-            <span className="text-xs font-medium text-[#6B7280]">kursi tersisa</span>
+            <span className={cn("font-serif-display text-3xl leading-none", low ? "text-[#B26A1E]" : "text-[#255E33]")}>{remaining}</span>
+            <span className="text-xs font-medium text-[#7A6A5E]">kursi tersisa</span>
             {low && (
-              <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold text-[#B34F0F] bg-[#D56115]/10 px-2 py-0.5 rounded-full">
+              <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold text-[#8A3A12] bg-[#B26A1E]/10 px-2 py-0.5 rounded-full">
                 <AlertTriangle className="h-3 w-3" /> Segera penuh
               </span>
             )}
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all", low ? "bg-[#D56115]" : "bg-[#10B981]")} style={{ width: `${pct}%` }} />
+            <div className={cn("h-full rounded-full transition-all", low ? "bg-[#B26A1E]" : "bg-[#2F703E]")} style={{ width: `${pct}%` }} />
           </div>
-          <p className="text-[11px] text-[#6B7280] mt-1">{s.booked}/{s.capacity} kursi terisi</p>
+          <p className="text-[11px] text-[#7A6A5E] mt-1">{s.booked}/{s.capacity} kursi terisi</p>
         </div>
       ) : s.status === "full" ? (
         <p className="text-sm font-semibold text-[#EF4444] mt-3" data-testid={`session-remaining-${s.id}`}>Kursi habis terjual</p>
       ) : (
-        <p className="text-xs text-[#6B7280] mt-3">{s.booked}/{s.capacity} kursi terisi</p>
+        <p className="text-xs text-[#7A6A5E] mt-3">{s.booked}/{s.capacity} kursi terisi</p>
       )}
 
       {disabled && s.status === "locked" && (
-        <span className="absolute top-4 right-4 text-[#6B7280]"><Lock className="h-3.5 w-3.5" /></span>
+        <span className="absolute top-4 right-4 text-[#7A6A5E]"><Lock className="h-3.5 w-3.5" /></span>
       )}
     </button>
   );
@@ -176,41 +177,58 @@ export default function BookingPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
+      {/* Top banner: sudah bayar tapi lupa upload bukti */}
+      <Link to="/upload" data-testid="link-upload-strip"
+        className="flex items-center justify-between gap-3 rounded-2xl border border-[#B26A1E]/40 bg-[#E8D8B6]/50 p-3.5 sm:p-4 mb-5 hover:bg-[#E8D8B6]/80 hover:-translate-y-0.5 transition-all duration-300">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="h-10 w-10 rounded-lg bg-[#7A241F]/10 flex items-center justify-center shrink-0">
+            <UploadCloud className="h-5 w-5 text-[#7A241F]" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-semibold text-[#7A241F] text-sm sm:text-base">Sudah bayar tapi lupa upload bukti?</p>
+            <p className="text-xs text-[#7A6A5E] truncate">Cari pesanan dengan nomor HP Anda, lalu upload buktinya di sini.</p>
+          </div>
+        </div>
+        <span className="shrink-0 inline-flex items-center gap-1 text-sm font-semibold text-white bg-[#7A241F] px-4 py-2 rounded-full">
+          Upload <ArrowRight className="h-4 w-4" />
+        </span>
+      </Link>
+
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-2xl border border-border bg-[#1E3A5F] text-white p-6 sm:p-8 mb-6 grain"
+        className="relative overflow-hidden rounded-3xl border border-[#5E1B17] bg-[#7A241F] text-white mb-6 grain shadow-xl shadow-amber-900/10"
       >
-        <div className="relative z-10 max-w-3xl">
-          <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/10 px-3 py-1 rounded-full">
-            <CalendarDays className="h-3.5 w-3.5" /> {event?.date || "Minggu, 13 September 2026"} · {event?.location || "CGV Grand Batam"}
-          </span>
-          <h1 className="font-serif-display text-2xl sm:text-4xl leading-tight mt-3">
-            Nonton Bersama Film Dokumenter
-          </h1>
-          <p className="font-serif-display text-lg sm:text-xl text-[#F0C48A] mt-1 italic">
-            “Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara”
-          </p>
-          <p className="text-sm text-white/80 mt-3">
-            Harga tiket {rupiah(PRICE)} / kursi · Pembayaran QRIS atau Transfer BCA
-          </p>
-        </div>
-        <div className="absolute -right-16 -bottom-16 h-64 w-64 rounded-full bg-[#D56115]/30 blur-3xl z-0" />
-      </motion.div>
-
-      {/* Lupa upload strip */}
-      <div className="mb-6">
-        <Link to="/upload" data-testid="link-upload-strip"
-          className="rounded-xl border border-border bg-white p-5 flex items-center gap-4 hover:border-[#D56115]/50 transition-colors">
-          <span className="h-11 w-11 rounded-lg bg-[#1E3A5F]/10 flex items-center justify-center shrink-0">
-            <UploadCloud className="h-5 w-5 text-[#1E3A5F]" />
-          </span>
-          <div>
-            <p className="font-semibold text-[#1E3A5F]">Sudah bayar tapi lupa upload bukti?</p>
-            <p className="text-sm text-[#6B7280]">Klik di sini, cari pesanan dengan nomor HP Anda lalu upload buktinya.</p>
+        <div className="absolute -right-20 -top-16 h-72 w-72 rounded-full bg-[#B26A1E]/30 blur-3xl z-0" />
+        <div className="absolute -left-16 -bottom-20 h-64 w-64 rounded-full bg-[#E4C57E]/20 blur-3xl z-0" />
+        <div className="relative z-10 grid md:grid-cols-2 gap-6 items-center p-6 sm:p-8">
+          {/* Text */}
+          <div className="order-2 md:order-1">
+            <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/10 px-3 py-1 rounded-full backdrop-blur">
+              <CalendarDays className="h-3.5 w-3.5" /> {event?.date || "Minggu, 13 September 2026"} · {event?.location || "CGV Grand Batam"}
+            </span>
+            <p className="font-cursive text-2xl sm:text-3xl text-[#E4C57E] mt-3 leading-none">Nonton Bersama</p>
+            <h1 className="font-serif-display text-3xl sm:text-5xl font-extrabold leading-[1.05] mt-1">
+              ASHIN<br className="hidden sm:block" /> JINARAKKHITA
+            </h1>
+            <p className="text-sm sm:text-base text-white/85 mt-3 max-w-md">
+              Film dokumenter — Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 mt-4">
+              <span className="inline-flex items-center gap-2 bg-[#B26A1E] text-white text-sm font-semibold px-4 py-2 rounded-full">
+                Tiket {rupiah(PRICE)} / kursi
+              </span>
+              <span className="text-xs text-white/70">QRIS atau Transfer BCA</span>
+            </div>
           </div>
-        </Link>
-      </div>
+          {/* Poster */}
+          <div className="order-1 md:order-2 flex justify-center md:justify-end">
+            <img src={POSTER_URL} alt="Poster Ashin Jinarakkhita"
+              data-testid="hero-poster"
+              className="w-auto max-h-[240px] sm:max-h-[300px] md:max-h-[420px] rounded-2xl border border-white/20 shadow-2xl shadow-black/30 bg-white/5" />
+          </div>
+        </div>
+      </motion.div>
 
       {/* Stepper */}
       <div className="flex items-center justify-between mb-6 max-w-2xl">
@@ -223,14 +241,14 @@ export default function BookingPage() {
               <div className="flex flex-col items-center gap-1.5">
                 <div className={cn(
                   "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
-                  done ? "bg-[#10B981] text-white" : cur ? "bg-[#D56115] text-white" : "bg-muted text-[#6B7280]"
+                  done ? "bg-[#2F703E] text-white" : cur ? "bg-[#B26A1E] text-white" : "bg-muted text-[#7A6A5E]"
                 )}>
                   {done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-4 w-4" />}
                 </div>
-                <span className={cn("text-[11px] font-medium", cur ? "text-[#D56115]" : "text-[#6B7280]")}>{s.label}</span>
+                <span className={cn("text-[11px] font-medium", cur ? "text-[#B26A1E]" : "text-[#7A6A5E]")}>{s.label}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={cn("h-0.5 flex-1 mx-2 rounded", step > s.n ? "bg-[#10B981]" : "bg-border")} />
+                <div className={cn("h-0.5 flex-1 mx-2 rounded", step > s.n ? "bg-[#2F703E]" : "bg-border")} />
               )}
             </div>
           );
@@ -245,8 +263,8 @@ export default function BookingPage() {
         {/* STEP 1 */}
         {step === 1 && (
           <div className="max-w-md">
-            <h2 className="font-serif-display text-3xl text-[#1E3A5F] mb-1">Data Diri</h2>
-            <p className="text-sm text-[#6B7280] mb-6">Isi data pemesan tiket.</p>
+            <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Data Diri</h2>
+            <p className="text-sm text-[#7A6A5E] mb-6">Isi data pemesan tiket.</p>
             <div className="space-y-4">
               <div>
                 <Label htmlFor="name">Nama Lengkap</Label>
@@ -265,8 +283,8 @@ export default function BookingPage() {
         {/* STEP 2 */}
         {step === 2 && (
           <div>
-            <h2 className="font-serif-display text-3xl text-[#1E3A5F] mb-1">Pilih Sesi</h2>
-            <p className="text-sm text-[#6B7280] mb-6">
+            <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Pilih Sesi</h2>
+            <p className="text-sm text-[#7A6A5E] mb-6">
               Hanya 1 sesi dibuka pada satu waktu. Sesi berikutnya terbuka otomatis saat sesi berjalan penuh.
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -283,20 +301,20 @@ export default function BookingPage() {
           <div>
             <div className="flex flex-wrap items-end justify-between gap-2 mb-6">
               <div>
-                <h2 className="font-serif-display text-3xl text-[#1E3A5F] mb-1">Pilih Kursi</h2>
-                <p className="text-sm text-[#6B7280]">
+                <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Pilih Kursi</h2>
+                <p className="text-sm text-[#7A6A5E]">
                   {activeSession ? `${activeSession.name} · ${activeSession.time}` : ""} — pilih kursi sebanyak yang dibutuhkan. Denah diperbarui otomatis.
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-[#6B7280]">Terpilih</p>
-                <p className="font-semibold text-[#D56115]" data-testid="selected-seats-label">
+                <p className="text-xs text-[#7A6A5E]">Terpilih</p>
+                <p className="font-semibold text-[#B26A1E]" data-testid="selected-seats-label">
                   {selected.length ? selected.join(", ") : "—"}
                 </p>
               </div>
             </div>
             {seatsLoading ? (
-              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+              <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
             ) : (
               <SeatMap rows={rows} selected={selected} onToggle={toggleSeat} />
             )}
@@ -307,8 +325,8 @@ export default function BookingPage() {
         {step === 4 && (
           <div className="grid md:grid-cols-2 gap-8">
             <div>
-              <h2 className="font-serif-display text-3xl text-[#1E3A5F] mb-1">Metode Pembayaran</h2>
-              <p className="text-sm text-[#6B7280] mb-6">Pilih cara pembayaran Anda.</p>
+              <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Metode Pembayaran</h2>
+              <p className="text-sm text-[#7A6A5E] mb-6">Pilih cara pembayaran Anda.</p>
               <div className="space-y-3">
                 {[
                   { k: "qris", label: "QRIS", desc: "Scan & bayar via e-wallet / m-banking", icon: QrCode },
@@ -319,14 +337,14 @@ export default function BookingPage() {
                     <button key={m.k} type="button" data-testid={`method-${m.k}`}
                       onClick={() => setMethod(m.k)}
                       className={cn("w-full flex items-center gap-4 rounded-xl border p-4 text-left transition-colors",
-                        method === m.k ? "border-[#D56115] bg-[#D56115]/5 ring-2 ring-[#D56115]/30" : "border-border hover:border-[#D56115]/50")}>
+                        method === m.k ? "border-[#B26A1E] bg-[#B26A1E]/5 ring-2 ring-[#B26A1E]/30" : "border-border hover:border-[#B26A1E]/50")}>
                       <span className={cn("h-10 w-10 rounded-lg flex items-center justify-center",
-                        method === m.k ? "bg-[#D56115] text-white" : "bg-muted text-[#6B7280]")}>
+                        method === m.k ? "bg-[#B26A1E] text-white" : "bg-muted text-[#7A6A5E]")}>
                         <Icon className="h-5 w-5" />
                       </span>
                       <span>
-                        <span className="block font-semibold text-[#1E3A5F]">{m.label}</span>
-                        <span className="block text-xs text-[#6B7280]">{m.desc}</span>
+                        <span className="block font-semibold text-[#7A241F]">{m.label}</span>
+                        <span className="block text-xs text-[#7A6A5E]">{m.desc}</span>
                       </span>
                     </button>
                   );
@@ -334,20 +352,20 @@ export default function BookingPage() {
               </div>
             </div>
             <div className="rounded-xl border border-border bg-[#FDFBF7] p-6">
-              <h3 className="font-semibold text-[#1E3A5F] mb-4">Ringkasan Pesanan</h3>
+              <h3 className="font-semibold text-[#7A241F] mb-4">Ringkasan Pesanan</h3>
               <dl className="space-y-2.5 text-sm">
-                <div className="flex justify-between"><dt className="text-[#6B7280]">Nama</dt><dd className="font-medium">{name}</dd></div>
-                <div className="flex justify-between"><dt className="text-[#6B7280]">No. HP</dt><dd className="font-medium">{phone}</dd></div>
-                <div className="flex justify-between"><dt className="text-[#6B7280]">Sesi</dt><dd className="font-medium">{activeSession?.name} · {activeSession?.time}</dd></div>
-                <div className="flex justify-between"><dt className="text-[#6B7280]">Kursi</dt><dd className="font-medium text-right">{selected.join(", ")}</dd></div>
-                <div className="flex justify-between"><dt className="text-[#6B7280]">Jumlah</dt><dd className="font-medium">{selected.length} × {rupiah(PRICE)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[#7A6A5E]">Nama</dt><dd className="font-medium">{name}</dd></div>
+                <div className="flex justify-between"><dt className="text-[#7A6A5E]">No. HP</dt><dd className="font-medium">{phone}</dd></div>
+                <div className="flex justify-between"><dt className="text-[#7A6A5E]">Sesi</dt><dd className="font-medium">{activeSession?.name} · {activeSession?.time}</dd></div>
+                <div className="flex justify-between"><dt className="text-[#7A6A5E]">Kursi</dt><dd className="font-medium text-right">{selected.join(", ")}</dd></div>
+                <div className="flex justify-between"><dt className="text-[#7A6A5E]">Jumlah</dt><dd className="font-medium">{selected.length} × {rupiah(PRICE)}</dd></div>
               </dl>
               <div className="border-t border-border mt-4 pt-4 flex justify-between items-center">
-                <span className="text-[#6B7280]">Total</span>
-                <span className="font-serif-display text-2xl text-[#D56115]" data-testid="summary-total">{rupiah(total)}</span>
+                <span className="text-[#7A6A5E]">Total</span>
+                <span className="font-serif-display text-2xl text-[#B26A1E]" data-testid="summary-total">{rupiah(total)}</span>
               </div>
-              <p className="text-[11px] text-[#6B7280] mt-2 flex items-start gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#D56115]" />
+              <p className="text-[11px] text-[#7A6A5E] mt-2 flex items-start gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-[#B26A1E]" />
                 Nominal PAS + kode unik akan langsung tampil di halaman pembayaran setelah Anda konfirmasi — bayar tepat sejumlah itu agar mudah kami cek di mutasi.
               </p>
             </div>
@@ -357,17 +375,17 @@ export default function BookingPage() {
         {/* Nav buttons */}
         <div className="flex justify-between mt-10">
           <Button variant="ghost" data-testid="btn-back" onClick={back} disabled={step === 1}
-            className="text-[#6B7280]">
+            className="text-[#7A6A5E]">
             <ArrowLeft className="h-4 w-4 mr-1.5" /> Kembali
           </Button>
           {step < 4 ? (
             <Button data-testid="btn-next" onClick={next}
-              className="bg-[#D56115] hover:bg-[#B34F0F] rounded-full px-6">
+              className="bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full px-6">
               Lanjut <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           ) : (
             <Button data-testid="btn-confirm-open" onClick={() => setConfirmOpen(true)}
-              className="bg-[#D56115] hover:bg-[#B34F0F] rounded-full px-6">
+              className="bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full px-6">
               Konfirmasi Pesanan <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           )}
@@ -381,8 +399,8 @@ export default function BookingPage() {
             <div className="h-11 w-11 rounded-full bg-[#EF4444]/10 flex items-center justify-center mb-2">
               <AlertTriangle className="h-5 w-5 text-[#EF4444]" />
             </div>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Konfirmasi Pesanan</DialogTitle>
-            <DialogDescription className="text-[#6B7280]">
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Konfirmasi Pesanan</DialogTitle>
+            <DialogDescription className="text-[#7A6A5E]">
               Setelah dikonfirmasi, pesanan <b>TIDAK dapat diubah atau dibatalkan</b>. Kursi akan dikunci dan Anda harus segera melakukan pembayaran serta mengunggah bukti.
             </DialogDescription>
           </DialogHeader>
@@ -393,7 +411,7 @@ export default function BookingPage() {
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" data-testid="btn-cancel-confirm" onClick={() => setConfirmOpen(false)}>Batal</Button>
             <Button data-testid="btn-submit-order" onClick={submit} disabled={submitting}
-              className="bg-[#D56115] hover:bg-[#B34F0F]">
+              className="bg-[#B26A1E] hover:bg-[#8A3A12]">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
               Ya, Buat Pesanan
             </Button>

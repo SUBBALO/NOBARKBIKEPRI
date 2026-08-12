@@ -57,21 +57,21 @@ const waPhone = (phone) => {
 
 const sendWA = (o) => {
   const msg =
-`Namo Buddhaya ${o.name} 🙏
-Terima kasih, pembayaran Anda sudah kami *VERIFIKASI* ✅
+`Namo Buddhaya, ${o.name}
+Terima kasih, pembayaran Anda sudah kami *VERIFIKASI*.
 
-🧾 No. Order: #${o.order_no}
-👤 Nama: ${o.name}
-📱 No HP: ${o.phone}
+No. Order: #${o.order_no}
+Nama: ${o.name}
+No HP: ${o.phone}
 
 Berikut e-tiket Anda:
-🎬 Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"
-🗓️ Minggu, 13 September 2026
-📍 CGV Grand Batam
-🎟️ ${o.session?.name || "Sesi"} (${o.session?.time || "-"})
-💺 Kursi: ${o.seats.join(", ")}
+Film: "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"
+Hari/Tanggal: Minggu, 13 September 2026
+Tempat: CGV Grand Batam
+${o.session?.name || "Sesi"} (${o.session?.time || "-"})
+Kursi: ${o.seats.join(", ")}
 
-Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa! 🙏
+Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa!
 — Sekretariat MBI Kepri`;
   window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
 };
@@ -79,41 +79,41 @@ Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa! 🙏
 const sendReminderWA = (o) => {
   const link = `${window.location.origin}/order/${o.id}`;
   const msg =
-`Namo Buddhaya ${o.name} 🙏
+`Namo Buddhaya, ${o.name}
 Terima kasih sudah memesan tiket Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara".
 
 Namun kami *BELUM menerima bukti pembayaran* Anda untuk:
-🧾 No. Order: #${o.order_no}
-🎟️ ${o.session?.name || "Sesi"} · Kursi ${o.seats.join(", ")}
-💰 Total: ${rupiah(o.total_amount)} (mohon bayar PAS termasuk kode unik)
+No. Order: #${o.order_no}
+${o.session?.name || "Sesi"} - Kursi ${o.seats.join(", ")}
+Total: ${rupiah(o.total_amount)} (mohon bayar PAS termasuk kode unik)
 
 Mohon segera lakukan pembayaran & *upload bukti transfer* melalui link berikut:
 ${link}
 
-Atau Anda cukup *kirim foto bukti transfer ke chat WhatsApp ini*, nanti kami bantu upload-kan. 🙏
+Atau Anda cukup *kirim foto bukti transfer ke chat WhatsApp ini*, nanti kami bantu upload-kan.
 
-Jika sudah membayar, mohon abaikan pesan ini. Terima kasih 🙏
+Jika sudah membayar, mohon abaikan pesan ini. Terima kasih.
 — Sekretariat MBI Kepri`;
   window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
 };
 
 const orderProgress = (o) => {
-  if (o.status === "pending_payment") return { t: "Belum Bayar", c: "bg-[#D56115]/15 text-[#B34F0F]" };
-  if (o.status === "waiting_verification") return { t: "⚠ Belum cek payment", c: "bg-[#D56115]/20 text-[#B34F0F]" };
+  if (o.status === "pending_payment") return { t: "Belum Bayar", c: "bg-[#B26A1E]/15 text-[#8A3A12]" };
+  if (o.status === "waiting_verification") return { t: "⚠ Belum cek payment", c: "bg-[#B26A1E]/20 text-[#8A3A12]" };
   if (o.status === "verified") return o.wa_sent
-    ? { t: "✅ Complete", c: "bg-[#10B981]/15 text-[#0F7A57]" }
-    : { t: "Belum kirim WhatsApp", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" };
+    ? { t: "✅ Complete", c: "bg-[#2F703E]/15 text-[#255E33]" }
+    : { t: "Belum kirim WhatsApp", c: "bg-[#7A241F]/15 text-[#7A241F]" };
   if (o.status === "rejected") return { t: "Ditolak", c: "bg-[#EF4444]/15 text-[#EF4444]" };
-  if (o.status === "expired") return { t: "Kadaluarsa", c: "bg-[#6B7280]/15 text-[#6B7280]" };
+  if (o.status === "expired") return { t: "Kadaluarsa", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" };
   return { t: o.status, c: "bg-muted" };
 };
 
 const STATUS_META = {
-  pending_payment: { t: "Belum Bayar", c: "bg-[#D56115]/15 text-[#B34F0F]" },
-  waiting_verification: { t: "Perlu Verifikasi", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
-  verified: { t: "Terverifikasi", c: "bg-[#10B981]/15 text-[#0F7A57]" },
+  pending_payment: { t: "Belum Bayar", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  waiting_verification: { t: "Perlu Verifikasi", c: "bg-[#7A241F]/15 text-[#7A241F]" },
+  verified: { t: "Terverifikasi", c: "bg-[#2F703E]/15 text-[#255E33]" },
   rejected: { t: "Ditolak", c: "bg-[#EF4444]/15 text-[#EF4444]" },
-  expired: { t: "Kadaluarsa", c: "bg-[#6B7280]/15 text-[#6B7280]" },
+  expired: { t: "Kadaluarsa", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
 };
 
 const FILTERS = [
@@ -144,11 +144,11 @@ function LoginView({ onLogin }) {
     <div className="max-w-md mx-auto px-4 py-24">
       <motion.form initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         onSubmit={submit} className="rounded-2xl border border-border bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <div className="h-12 w-12 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center mb-4">
-          <ShieldCheck className="h-6 w-6 text-[#1E3A5F]" />
+        <div className="h-12 w-12 rounded-full bg-[#7A241F]/10 flex items-center justify-center mb-4">
+          <ShieldCheck className="h-6 w-6 text-[#7A241F]" />
         </div>
-        <h1 className="font-serif-display text-3xl text-[#1E3A5F]">Panel Admin</h1>
-        <p className="text-sm text-[#6B7280] mb-6">Masuk dengan akun Anda.</p>
+        <h1 className="font-serif-display text-3xl text-[#7A241F]">Panel Admin</h1>
+        <p className="text-sm text-[#7A6A5E] mb-6">Masuk dengan akun Anda.</p>
         <Label htmlFor="uname">Username</Label>
         <Input id="uname" value={username} onChange={(e) => setUsername(e.target.value)}
           className="mt-1.5 mb-4" data-testid="admin-username" placeholder="username" autoCapitalize="none" />
@@ -156,7 +156,7 @@ function LoginView({ onLogin }) {
         <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           className="mt-1.5" data-testid="admin-password" placeholder="••••••••" />
         <Button type="submit" disabled={loading} data-testid="admin-login-btn"
-          className="w-full mt-5 bg-[#1E3A5F] hover:bg-[#16304f] rounded-full">
+          className="w-full mt-5 bg-[#7A241F] hover:bg-[#5E1B17] rounded-full">
           {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Masuk
         </Button>
       </motion.form>
@@ -165,17 +165,17 @@ function LoginView({ onLogin }) {
 }
 
 const ROLE_BADGE = {
-  superadmin: { t: "Super Admin", c: "bg-[#D56115]/15 text-[#B34F0F]" },
-  admin: { t: "Admin", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
-  checkin: { t: "Petugas Check-in", c: "bg-[#10B981]/15 text-[#0F7A57]" },
+  superadmin: { t: "Super Admin", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  admin: { t: "Admin", c: "bg-[#7A241F]/15 text-[#7A241F]" },
+  checkin: { t: "Petugas Check-in", c: "bg-[#2F703E]/15 text-[#255E33]" },
 };
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
   <div className="rounded-xl border border-border bg-white p-4 flex items-center gap-3">
     <span className={cn("h-10 w-10 rounded-lg flex items-center justify-center", color)}><Icon className="h-5 w-5" /></span>
     <div>
-      <p className="text-xs text-[#6B7280]">{label}</p>
-      <p className="font-semibold text-lg text-[#1E3A5F]">{value}</p>
+      <p className="text-xs text-[#7A6A5E]">{label}</p>
+      <p className="font-semibold text-lg text-[#7A241F]">{value}</p>
     </div>
   </div>
 );
@@ -186,24 +186,24 @@ function SalesSummary({ stats }) {
   const w = b.walkin, on = b.online;
   const Row = ({ label, data, accent }) => (
     <div className="flex items-center justify-between py-1.5 text-sm">
-      <span className={cn("text-[#6B7280]", accent && "font-medium text-[#1A1A1A]")}>{label}</span>
+      <span className={cn("text-[#7A6A5E]", accent && "font-medium text-[#2C1E16]")}>{label}</span>
       <span className="text-right">
-        <b className="text-[#1E3A5F]">{data.tickets}</b> <span className="text-xs text-[#6B7280]">tiket</span>
+        <b className="text-[#7A241F]">{data.tickets}</b> <span className="text-xs text-[#7A6A5E]">tiket</span>
         <span className="mx-1 text-[#D1D5DB]">·</span>
-        <b className="text-[#0F7A57]">{rupiah(data.revenue)}</b>
+        <b className="text-[#255E33]">{rupiah(data.revenue)}</b>
       </span>
     </div>
   );
   return (
     <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 no-print" data-testid="sales-summary">
-      <h2 className="font-serif-display text-xl text-[#1E3A5F] flex items-center gap-2 mb-4"><Wallet className="h-5 w-5 text-[#D56115]" /> Ringkasan Penjualan (terverifikasi)</h2>
+      <h2 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2 mb-4"><Wallet className="h-5 w-5 text-[#B26A1E]" /> Ringkasan Penjualan (terverifikasi)</h2>
       <div className="grid sm:grid-cols-2 gap-5">
         <div className="rounded-xl border border-border p-4">
-          <p className="text-sm font-semibold text-[#1E3A5F] mb-1">Online (web)</p>
+          <p className="text-sm font-semibold text-[#7A241F] mb-1">Online (web)</p>
           <Row label="Total" data={on} accent />
         </div>
         <div className="rounded-xl border border-border p-4">
-          <p className="text-sm font-semibold text-[#1E3A5F] mb-1">Jual di Tempat (walk-in)</p>
+          <p className="text-sm font-semibold text-[#7A241F] mb-1">Jual di Tempat (walk-in)</p>
           <Row label="Total" data={w} accent />
           <div className="mt-1 border-t border-dashed border-border pt-1">
             <Row label="• Cash" data={w.cash} />
@@ -212,12 +212,12 @@ function SalesSummary({ stats }) {
           </div>
         </div>
       </div>
-      <div className="mt-4 rounded-xl bg-[#10B981]/[0.07] border border-[#10B981]/20 p-4 flex items-center justify-between" data-testid="cash-recap">
+      <div className="mt-4 rounded-xl bg-[#2F703E]/[0.07] border border-[#2F703E]/20 p-4 flex items-center justify-between" data-testid="cash-recap">
         <div>
-          <p className="text-sm font-semibold text-[#0F7A57] flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Rekap Kas Cash (walk-in)</p>
-          <p className="text-xs text-[#6B7280]">Total uang tunai yang harus ada di tangan bendahara</p>
+          <p className="text-sm font-semibold text-[#255E33] flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Rekap Kas Cash (walk-in)</p>
+          <p className="text-xs text-[#7A6A5E]">Total uang tunai yang harus ada di tangan bendahara</p>
         </div>
-        <span className="font-serif-display text-3xl text-[#0F7A57]" data-testid="cash-total">{rupiah(stats.cash_total || 0)}</span>
+        <span className="font-serif-display text-3xl text-[#255E33]" data-testid="cash-total">{rupiah(stats.cash_total || 0)}</span>
       </div>
     </div>
   );
@@ -233,43 +233,43 @@ function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
   );
   return (
     <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] no-print">
-      <h2 className="font-serif-display text-2xl text-[#1E3A5F] mb-1">Check-in Peserta</h2>
-      <p className="text-sm text-[#6B7280] mb-4">Cari peserta dengan nama atau nomor HP, tandai kehadiran, lalu serahkan tiket kursinya.</p>
+      <h2 className="font-serif-display text-2xl text-[#7A241F] mb-1">Check-in Peserta</h2>
+      <p className="text-sm text-[#7A6A5E] mb-4">Cari peserta dengan nama atau nomor HP, tandai kehadiran, lalu serahkan tiket kursinya.</p>
       <a href="/checkin" target="_blank" rel="noreferrer" data-testid="open-mobile-checkin"
-        className="inline-flex items-center gap-1.5 text-sm text-[#D56115] hover:underline font-medium mb-4">
+        className="inline-flex items-center gap-1.5 text-sm text-[#B26A1E] hover:underline font-medium mb-4">
         <ScanLine className="h-4 w-4" /> Buka halaman Check-in khusus HP (mobile) → /checkin
       </a>
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#7A6A5E]" />
         <Input data-testid="checkin-search" value={query} onChange={(e) => setQuery(e.target.value)}
           placeholder="Ketik nama atau nomor HP peserta..." className="pl-9" />
       </div>
       <div className="mt-5 space-y-3">
         {q.length > 0 && results.length === 0 && (
-          <p className="text-sm text-[#6B7280]" data-testid="checkin-empty">Tidak ada peserta terverifikasi yang cocok. (Hanya pesanan Terverifikasi yang tampil)</p>
+          <p className="text-sm text-[#7A6A5E]" data-testid="checkin-empty">Tidak ada peserta terverifikasi yang cocok. (Hanya pesanan Terverifikasi yang tampil)</p>
         )}
         {results.map((o) => (
           <div key={o.id} data-testid={`checkin-result-${o.id.slice(0, 8)}`}
             className="rounded-xl border border-border p-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-semibold text-[#1A1A1A]">{o.name}</p>
-              <p className="text-xs text-[#6B7280]">{o.phone} · {o.session?.name} · {o.session?.time}</p>
+              <p className="font-semibold text-[#2C1E16]">{o.name}</p>
+              <p className="text-xs text-[#7A6A5E]">{o.phone} · {o.session?.name} · {o.session?.time}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {o.seats.map((s) => (
-                  <span key={s} className="px-2.5 py-1 rounded-md bg-[#D56115]/10 text-[#B34F0F] text-sm font-semibold">{s}</span>
+                  <span key={s} className="px-2.5 py-1 rounded-md bg-[#B26A1E]/10 text-[#8A3A12] text-sm font-semibold">{s}</span>
                 ))}
               </div>
             </div>
             <div className="text-right">
               {o.checked_in ? (
                 <div className="text-right">
-                  <span className="inline-flex items-center gap-1.5 text-sm text-[#10B981] font-medium"><CheckCircle2 className="h-4 w-4" /> Sudah Hadir</span>
-                  {o.checked_in_at && <p className="text-[11px] text-[#6B7280] mt-0.5">Check-in: {fmtTime(o.checked_in_at)}</p>}
-                  {o.checked_in_by && <p className="text-[11px] text-[#6B7280]">oleh <b className="text-[#0F7A57]">{o.checked_in_by}</b></p>}
+                  <span className="inline-flex items-center gap-1.5 text-sm text-[#2F703E] font-medium"><CheckCircle2 className="h-4 w-4" /> Sudah Hadir</span>
+                  {o.checked_in_at && <p className="text-[11px] text-[#7A6A5E] mt-0.5">Check-in: {fmtTime(o.checked_in_at)}</p>}
+                  {o.checked_in_by && <p className="text-[11px] text-[#7A6A5E]">oleh <b className="text-[#255E33]">{o.checked_in_by}</b></p>}
                 </div>
               ) : (
                 <Button onClick={() => onCheckin(o)} disabled={busyId === o.id} data-testid={`checkin-btn-${o.id.slice(0, 8)}`}
-                  className="bg-[#1E3A5F] hover:bg-[#16304f]">
+                  className="bg-[#7A241F] hover:bg-[#5E1B17]">
                   {busyId === o.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserCheck className="h-4 w-4 mr-1.5" />}
                   Tandai Sudah Datang
                 </Button>
@@ -284,14 +284,14 @@ function CheckinPanel({ orders, query, setQuery, onCheckin, busyId }) {
 
 const ACTION_META = {
   delete: { label: "Hapus", c: "bg-[#EF4444]/15 text-[#EF4444]" },
-  verify: { label: "Verifikasi", c: "bg-[#10B981]/15 text-[#0F7A57]" },
-  reject: { label: "Tolak", c: "bg-[#D56115]/15 text-[#B34F0F]" },
-  bulk_verify: { label: "Verifikasi Massal", c: "bg-[#10B981]/15 text-[#0F7A57]" },
-  bulk_reject: { label: "Tolak Massal", c: "bg-[#D56115]/15 text-[#B34F0F]" },
-  checkin: { label: "Check-in", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
-  user_create: { label: "Buat User", c: "bg-[#1E3A5F]/15 text-[#1E3A5F]" },
+  verify: { label: "Verifikasi", c: "bg-[#2F703E]/15 text-[#255E33]" },
+  reject: { label: "Tolak", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  bulk_verify: { label: "Verifikasi Massal", c: "bg-[#2F703E]/15 text-[#255E33]" },
+  bulk_reject: { label: "Tolak Massal", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  checkin: { label: "Check-in", c: "bg-[#7A241F]/15 text-[#7A241F]" },
+  user_create: { label: "Buat User", c: "bg-[#7A241F]/15 text-[#7A241F]" },
   user_delete: { label: "Hapus User", c: "bg-[#EF4444]/15 text-[#EF4444]" },
-  walkin: { label: "Jual di Tempat", c: "bg-[#D56115]/15 text-[#B34F0F]" },
+  walkin: { label: "Jual di Tempat", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
 };
 
 function LogsPanel() {
@@ -322,8 +322,8 @@ function LogsPanel() {
     <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] no-print">
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div>
-          <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2"><History className="h-5 w-5 text-[#D56115]" /> Log Aktivitas</h2>
-          <p className="text-sm text-[#6B7280]">Catatan siapa melakukan aksi apa & kapan.</p>
+          <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2"><History className="h-5 w-5 text-[#B26A1E]" /> Log Aktivitas</h2>
+          <p className="text-sm text-[#7A6A5E]">Catatan siapa melakukan aksi apa & kapan.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportLogs} disabled={exporting || logs.length === 0} data-testid="logs-export">
@@ -333,19 +333,19 @@ function LogsPanel() {
         </div>
       </div>
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
       ) : logs.length === 0 ? (
-        <p className="text-center text-sm text-[#6B7280] py-12" data-testid="logs-empty">Belum ada aktivitas tercatat.</p>
+        <p className="text-center text-sm text-[#7A6A5E] py-12" data-testid="logs-empty">Belum ada aktivitas tercatat.</p>
       ) : (
         <div className="space-y-2" data-testid="logs-list">
           {logs.map((l) => {
-            const m = ACTION_META[l.action] || { label: l.action, c: "bg-muted text-[#6B7280]" };
+            const m = ACTION_META[l.action] || { label: l.action, c: "bg-muted text-[#7A6A5E]" };
             return (
               <div key={l.id} className="flex items-start gap-3 rounded-xl border border-border p-3">
                 <span className={cn("shrink-0 text-[11px] px-2 py-0.5 rounded-full font-medium", m.c)}>{m.label}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-[#1A1A1A]">{l.detail}</p>
-                  <p className="text-xs text-[#6B7280] mt-0.5">
+                  <p className="text-sm text-[#2C1E16]">{l.detail}</p>
+                  <p className="text-xs text-[#7A6A5E] mt-0.5">
                     oleh <b>{l.actor_name || l.actor_username}</b> (@{l.actor_username}) · {fmtTime(l.created_at)}
                   </p>
                 </div>
@@ -399,8 +399,8 @@ function UsersPanel({ currentUser }) {
     <div className="grid lg:grid-cols-2 gap-6 no-print">
       {/* Create form */}
       <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] h-fit">
-        <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2 mb-1"><UserPlus className="h-5 w-5 text-[#D56115]" /> Tambah User</h2>
-        <p className="text-sm text-[#6B7280] mb-4">Buat akun login baru untuk panitia.</p>
+        <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2 mb-1"><UserPlus className="h-5 w-5 text-[#B26A1E]" /> Tambah User</h2>
+        <p className="text-sm text-[#7A6A5E] mb-4">Buat akun login baru untuk panitia.</p>
         <form onSubmit={create} className="space-y-3">
           <div>
             <Label htmlFor="nu">Username</Label>
@@ -427,7 +427,7 @@ function UsersPanel({ currentUser }) {
               <option value="superadmin">Super Admin (semua + kelola user)</option>
             </select>
           </div>
-          <Button type="submit" disabled={busy} data-testid="user-create-btn" className="w-full bg-[#1E3A5F] hover:bg-[#16304f]">
+          <Button type="submit" disabled={busy} data-testid="user-create-btn" className="w-full bg-[#7A241F] hover:bg-[#5E1B17]">
             {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserPlus className="h-4 w-4 mr-1.5" />} Buat User
           </Button>
         </form>
@@ -436,11 +436,11 @@ function UsersPanel({ currentUser }) {
       {/* List */}
       <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-serif-display text-2xl text-[#1E3A5F] flex items-center gap-2"><Users className="h-5 w-5 text-[#D56115]" /> Daftar User</h2>
+          <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2"><Users className="h-5 w-5 text-[#B26A1E]" /> Daftar User</h2>
           <Button variant="outline" size="sm" onClick={load} data-testid="users-refresh"><RefreshCw className="h-4 w-4" /></Button>
         </div>
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
         ) : (
           <div className="space-y-2" data-testid="users-list">
             {users.map((u) => {
@@ -448,11 +448,11 @@ function UsersPanel({ currentUser }) {
               return (
                 <div key={u.id} data-testid={`user-row-${u.username}`} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[#1A1A1A] truncate">{u.name} <span className="text-xs text-[#6B7280] font-normal">@{u.username}</span></p>
+                    <p className="font-semibold text-[#2C1E16] truncate">{u.name} <span className="text-xs text-[#7A6A5E] font-normal">@{u.username}</span></p>
                     <span className={cn("inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium", rb.c)}>{rb.t}</span>
                   </div>
                   {u.id === currentUser?.id ? (
-                    <span className="text-[11px] text-[#6B7280]">Anda</span>
+                    <span className="text-[11px] text-[#7A6A5E]">Anda</span>
                   ) : (
                     <button onClick={() => setDelTarget(u)} data-testid={`user-delete-${u.username}`}
                       className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10">
@@ -470,10 +470,10 @@ function UsersPanel({ currentUser }) {
         <DialogContent data-testid="user-delete-dialog" className="max-w-sm rounded-2xl">
           <DialogHeader>
             <div className="h-11 w-11 rounded-full bg-[#EF4444]/15 flex items-center justify-center mb-2"><AlertTriangle className="h-5 w-5 text-[#EF4444]" /></div>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Hapus user ini?</DialogTitle>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Hapus user ini?</DialogTitle>
           </DialogHeader>
           {delTarget && (
-            <p className="text-sm text-[#6B7280]">User <b className="text-[#1A1A1A]">{delTarget.name} (@{delTarget.username})</b> tidak akan bisa login lagi. Tindakan ini tidak bisa dibatalkan.</p>
+            <p className="text-sm text-[#7A6A5E]">User <b className="text-[#2C1E16]">{delTarget.name} (@{delTarget.username})</b> tidak akan bisa login lagi. Tindakan ini tidak bisa dibatalkan.</p>
           )}
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" onClick={() => setDelTarget(null)} disabled={busy} className="flex-1" data-testid="user-delete-cancel">Batal</Button>
@@ -492,15 +492,15 @@ function WalkinPanel() {
   return (
     <div className="max-w-xl mx-auto no-print">
       <div className="rounded-2xl border border-border bg-white p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <div className="h-14 w-14 rounded-full bg-[#D56115]/10 flex items-center justify-center mb-4 mx-auto">
-          <Store className="h-7 w-7 text-[#D56115]" />
+        <div className="h-14 w-14 rounded-full bg-[#B26A1E]/10 flex items-center justify-center mb-4 mx-auto">
+          <Store className="h-7 w-7 text-[#B26A1E]" />
         </div>
-        <h2 className="font-serif-display text-2xl text-[#1E3A5F]">Jual Tiket di Tempat</h2>
-        <p className="text-sm text-[#6B7280] mt-1 mb-5 max-w-md mx-auto">
+        <h2 className="font-serif-display text-2xl text-[#7A241F]">Jual Tiket di Tempat</h2>
+        <p className="text-sm text-[#7A6A5E] mt-1 mb-5 max-w-md mx-auto">
           Halaman khusus layar monitor: pembeli melihat peta kursi, petugas memilih kursi, langsung lunas & check-in. Ketersediaan kursi mengikuti sistem secara real-time.
         </p>
         <a href="/walkin" target="_blank" rel="noreferrer" data-testid="open-walkin"
-          className="inline-flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#16304f] text-white rounded-full px-6 py-3 text-sm font-medium">
+          className="inline-flex items-center gap-2 bg-[#7A241F] hover:bg-[#5E1B17] text-white rounded-full px-6 py-3 text-sm font-medium">
           <Store className="h-4 w-4" /> Buka Halaman Jual di Tempat &rarr; /walkin
         </a>
       </div>
@@ -662,13 +662,13 @@ export default function AdminPage() {
     return (
       <div className="max-w-md mx-auto px-4 py-24 text-center">
         <div className="rounded-2xl border border-border bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-          <div className="h-12 w-12 rounded-full bg-[#10B981]/10 flex items-center justify-center mb-4 mx-auto">
-            <ScanLine className="h-6 w-6 text-[#10B981]" />
+          <div className="h-12 w-12 rounded-full bg-[#2F703E]/10 flex items-center justify-center mb-4 mx-auto">
+            <ScanLine className="h-6 w-6 text-[#2F703E]" />
           </div>
-          <h1 className="font-serif-display text-2xl text-[#1E3A5F]">Halo, {currentUser?.name}</h1>
-          <p className="text-sm text-[#6B7280] mt-1 mb-5">Akun Anda adalah <b>Petugas Check-in</b>, jadi hanya bisa mengakses halaman check-in peserta.</p>
+          <h1 className="font-serif-display text-2xl text-[#7A241F]">Halo, {currentUser?.name}</h1>
+          <p className="text-sm text-[#7A6A5E] mt-1 mb-5">Akun Anda adalah <b>Petugas Check-in</b>, jadi hanya bisa mengakses halaman check-in peserta.</p>
           <a href="/checkin" data-testid="goto-checkin"
-            className="inline-flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#16304f] text-white rounded-full px-6 py-3 text-sm font-medium">
+            className="inline-flex items-center gap-2 bg-[#7A241F] hover:bg-[#5E1B17] text-white rounded-full px-6 py-3 text-sm font-medium">
             <UserCheck className="h-4 w-4" /> Buka Halaman Check-in
           </a>
           <button onClick={logout} data-testid="checkin-role-logout" className="block mx-auto mt-5 text-xs text-[#EF4444] underline">Keluar</button>
@@ -705,9 +705,9 @@ export default function AdminPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
       <div className="flex items-center justify-between mb-6 no-print">
         <div>
-          <h1 className="font-serif-display text-3xl text-[#1E3A5F]">Panel Admin</h1>
-          <p className="text-sm text-[#6B7280] flex items-center gap-2">
-            <span>Masuk sebagai <b className="text-[#1A1A1A]">{currentUser?.name}</b></span>
+          <h1 className="font-serif-display text-3xl text-[#7A241F]">Panel Admin</h1>
+          <p className="text-sm text-[#7A6A5E] flex items-center gap-2">
+            <span>Masuk sebagai <b className="text-[#2C1E16]">{currentUser?.name}</b></span>
             {currentUser?.role && (
               <span className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium", (ROLE_BADGE[currentUser.role] || {}).c)}>
                 {(ROLE_BADGE[currentUser.role] || {}).t}
@@ -726,10 +726,10 @@ export default function AdminPage() {
 
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 no-print">
-          <StatCard icon={Clock} label="Perlu Verifikasi" value={stats.waiting_verification} color="bg-[#1E3A5F]/10 text-[#1E3A5F]" />
-          <StatCard icon={CheckCircle2} label="Terverifikasi" value={stats.verified} color="bg-[#10B981]/10 text-[#10B981]" />
-          <StatCard icon={Ticket} label="Tiket Terjual" value={stats.tickets_verified} color="bg-[#D56115]/10 text-[#D56115]" />
-          <StatCard icon={Wallet} label="Pendapatan" value={rupiah(stats.revenue_verified)} color="bg-[#10B981]/10 text-[#10B981]" />
+          <StatCard icon={Clock} label="Perlu Verifikasi" value={stats.waiting_verification} color="bg-[#7A241F]/10 text-[#7A241F]" />
+          <StatCard icon={CheckCircle2} label="Terverifikasi" value={stats.verified} color="bg-[#2F703E]/10 text-[#2F703E]" />
+          <StatCard icon={Ticket} label="Tiket Terjual" value={stats.tickets_verified} color="bg-[#B26A1E]/10 text-[#B26A1E]" />
+          <StatCard icon={Wallet} label="Pendapatan" value={rupiah(stats.revenue_verified)} color="bg-[#2F703E]/10 text-[#2F703E]" />
         </div>
       )}
 
@@ -737,28 +737,28 @@ export default function AdminPage() {
       <div className="flex flex-wrap gap-2 mb-6 no-print">
         <button data-testid="admin-tab-payment" onClick={() => setTab("payment")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-            tab === "payment" ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/50")}>
+            tab === "payment" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
           <Wallet className="h-4 w-4" /> Verifikasi Pembayaran
         </button>
         <button data-testid="admin-tab-checkin" onClick={() => setTab("checkin")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-            tab === "checkin" ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/50")}>
+            tab === "checkin" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
           <UserCheck className="h-4 w-4" /> Check-in Peserta
         </button>
         <button data-testid="admin-tab-walkin" onClick={() => setTab("walkin")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-            tab === "walkin" ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/50")}>
+            tab === "walkin" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
           <Store className="h-4 w-4" /> Jual di Tempat
         </button>
         <button data-testid="admin-tab-logs" onClick={() => setTab("logs")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-            tab === "logs" ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/50")}>
+            tab === "logs" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
           <History className="h-4 w-4" /> Log Aktivitas
         </button>
         {isSuper && (
           <button data-testid="admin-tab-users" onClick={() => setTab("users")}
             className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-              tab === "users" ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/50")}>
+              tab === "users" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
             <Users className="h-4 w-4" /> Kelola User
           </button>
         )}
@@ -769,12 +769,12 @@ export default function AdminPage() {
       {/* Session control */}
       {event && (
         <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print">
-          <p className="text-sm font-medium text-[#1E3A5F] mb-2 flex items-center gap-2"><Users className="h-4 w-4" /> Kontrol Sesi (aktif: Sesi {event.active_session})</p>
+          <p className="text-sm font-medium text-[#7A241F] mb-2 flex items-center gap-2"><Users className="h-4 w-4" /> Kontrol Sesi (aktif: Sesi {event.active_session})</p>
           <div className="flex flex-wrap gap-2">
             {event.sessions.map((s) => (
               <button key={s.id} data-testid={`admin-session-${s.id}`} onClick={() => setActiveSession(s.id)}
                 className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                  event.active_session === s.id ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/50")}>
+                  event.active_session === s.id ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
                 {s.name} · {s.booked}/{s.capacity}
               </button>
             ))}
@@ -784,16 +784,16 @@ export default function AdminPage() {
 
       {/* Filter per sesi */}
       <div className="flex flex-wrap items-center gap-2 mb-3 no-print">
-        <span className="text-xs text-[#6B7280] mr-1">Filter sesi:</span>
+        <span className="text-xs text-[#7A6A5E] mr-1">Filter sesi:</span>
         <button data-testid="session-filter-all" onClick={() => setSessionFilter("all")}
           className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-            sessionFilter === "all" ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/40")}>
+            sessionFilter === "all" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/40")}>
           Semua Sesi
         </button>
         {[1, 2, 3, 4].map((sid) => (
           <button key={sid} data-testid={`session-filter-${sid}`} onClick={() => setSessionFilter(sid)}
             className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-              sessionFilter === sid ? "bg-[#D56115] text-white border-[#D56115]" : "bg-white text-[#6B7280] border-border hover:border-[#D56115]/40")}>
+              sessionFilter === sid ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/40")}>
             Sesi {sid} ({orders.filter((o) => o.session_id === sid).length})
           </button>
         ))}
@@ -804,7 +804,7 @@ export default function AdminPage() {
         {FILTERS.map((f) => (
           <button key={f.k} data-testid={`filter-${f.k}`} onClick={() => setFilter(f.k)}
             className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-              filter === f.k ? "bg-[#1E3A5F] text-white border-[#1E3A5F]" : "bg-white text-[#6B7280] border-border hover:border-[#1E3A5F]/40")}>
+              filter === f.k ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/40")}>
             {f.t}
           </button>
         ))}
@@ -813,47 +813,47 @@ export default function AdminPage() {
       {/* Search + bulk actions */}
       <div className="flex flex-wrap items-center gap-3 mb-4 no-print">
         <div className="relative flex-1 min-w-[220px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#7A6A5E]" />
           <Input data-testid="orders-search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari nama, no HP, atau no order..." className="pl-9" />
         </div>
         {selectedIds.length > 0 && (
-          <div className="flex items-center gap-2 rounded-full bg-[#1E3A5F]/5 border border-[#1E3A5F]/20 px-3 py-1.5">
-            <span className="text-sm text-[#1E3A5F] font-medium" data-testid="bulk-count">{selectedIds.length} dipilih</span>
+          <div className="flex items-center gap-2 rounded-full bg-[#7A241F]/5 border border-[#7A241F]/20 px-3 py-1.5">
+            <span className="text-sm text-[#7A241F] font-medium" data-testid="bulk-count">{selectedIds.length} dipilih</span>
             <Button size="sm" onClick={() => bulkAct("verify")} disabled={bulkBusy} data-testid="bulk-verify"
-              className="h-8 bg-[#10B981] hover:bg-[#0F7A57]">
+              className="h-8 bg-[#2F703E] hover:bg-[#255E33]">
               {bulkBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />} Verifikasi
             </Button>
             <Button size="sm" variant="outline" onClick={() => bulkAct("reject")} disabled={bulkBusy} data-testid="bulk-reject"
               className="h-8 text-[#EF4444] border-[#EF4444]/40">
               <XCircle className="h-3.5 w-3.5 mr-1" /> Tolak
             </Button>
-            <button onClick={() => setSelectedIds([])} className="text-xs text-[#6B7280] underline">bersihkan</button>
+            <button onClick={() => setSelectedIds([])} className="text-xs text-[#7A6A5E] underline">bersihkan</button>
           </div>
         )}
       </div>
 
       {/* Orders table */}
       <div className="flex items-center justify-between mb-2 no-print">
-        <h2 className="font-serif-display text-xl text-[#1E3A5F] flex items-center gap-2">
-          <Wallet className="h-5 w-5 text-[#D56115]" /> Daftar Pesanan — Verifikasi Pembayaran
+        <h2 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-[#B26A1E]" /> Daftar Pesanan — Verifikasi Pembayaran
         </h2>
-        <span className="text-xs text-[#6B7280]">{filtered.length} pesanan</span>
+        <span className="text-xs text-[#7A6A5E]">{filtered.length} pesanan</span>
       </div>
-      <p className="text-xs text-[#6B7280] mb-3 no-print">Klik <b>Lihat</b> pada kolom Bukti untuk melihat bukti transfer & memverifikasi.</p>
+      <p className="text-xs text-[#7A6A5E] mb-3 no-print">Klik <b>Lihat</b> pada kolom Bukti untuk melihat bukti transfer & memverifikasi.</p>
       <div className="rounded-2xl border border-border bg-white overflow-hidden no-print">
         {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-sm text-[#6B7280]">Tidak ada pesanan yang cocok.</div>
+          <div className="py-16 text-center text-sm text-[#7A6A5E]">Tidak ada pesanan yang cocok.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="orders-table">
-              <thead className="bg-muted/50 text-left text-xs text-[#6B7280]">
+              <thead className="bg-muted/50 text-left text-xs text-[#7A6A5E]">
                 <tr>
                   <th className="px-3 py-3 font-medium">
                     <input type="checkbox" data-testid="select-all" checked={allSelected} onChange={toggleSelectAll}
-                      disabled={selectableIds.length === 0} className="accent-[#1E3A5F] h-4 w-4 align-middle" />
+                      disabled={selectableIds.length === 0} className="accent-[#7A241F] h-4 w-4 align-middle" />
                   </th>
                   <th className="px-4 py-3 font-medium">Pemesan</th>
                   <th className="px-4 py-3 font-medium">Waktu Pesan</th>
@@ -874,21 +874,21 @@ export default function AdminPage() {
                         {o.status === "waiting_verification" && (
                           <input type="checkbox" data-testid={`select-${o.id.slice(0, 8)}`}
                             checked={selectedIds.includes(o.id)} onChange={() => toggleSelect(o.id)}
-                            className="accent-[#1E3A5F] h-4 w-4 align-middle" />
+                            className="accent-[#7A241F] h-4 w-4 align-middle" />
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-[#1A1A1A]">{o.name} <span className="font-mono text-[10px] text-[#6B7280]">#{o.order_no}</span></p>
-                        <p className="text-xs text-[#6B7280]">{o.phone}</p>
+                        <p className="font-medium text-[#2C1E16]">{o.name} <span className="font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></p>
+                        <p className="text-xs text-[#7A6A5E]">{o.phone}</p>
                       </td>
                       <td className="px-4 py-3" data-testid={`order-time-${o.id.slice(0, 8)}`}>
-                        <p className="text-xs text-[#6B7280] whitespace-nowrap">{fmtTime(o.created_at)}</p>
+                        <p className="text-xs text-[#7A6A5E] whitespace-nowrap">{fmtTime(o.created_at)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <p>{o.session?.name}</p>
-                        <p className="text-xs text-[#6B7280]">{o.seats.join(", ")}</p>
+                        <p className="text-xs text-[#7A6A5E]">{o.seats.join(", ")}</p>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-[#1E3A5F]">{rupiah(o.total_amount)}</td>
+                      <td className="px-4 py-3 font-semibold text-[#7A241F]">{rupiah(o.total_amount)}</td>
                       <td className="px-4 py-3">
                         <span data-testid={`status-${o.id.slice(0, 8)}`} className={cn("text-[11px] px-2 py-0.5 rounded-full font-medium inline-block", dstat.c)}>{dstat.t}</span>
                       </td>
@@ -896,26 +896,26 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-center">
                         {o.status === "waiting_verification" ? (
                           <Button size="sm" onClick={() => openProof(o)} data-testid={`verify-open-${o.id.slice(0, 8)}`}
-                            className="h-8 bg-[#D56115] hover:bg-[#B34F0F] text-xs">
+                            className="h-8 bg-[#B26A1E] hover:bg-[#8A3A12] text-xs">
                             <Eye className="h-3.5 w-3.5 mr-1" /> Cek Bukti
                           </Button>
                         ) : o.status === "verified" ? (
                           <button onClick={() => o.has_proof && openProof(o)} data-testid={`verify-done-${o.id.slice(0, 8)}`}
-                            className="inline-flex items-center gap-1 text-[#0F7A57] text-xs font-medium">
+                            className="inline-flex items-center gap-1 text-[#255E33] text-xs font-medium">
                             <CheckCircle2 className="h-4 w-4" /> Payment OK
                           </button>
                         ) : o.status === "pending_payment" ? (
                           <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
-                            data-testid={`admin-upload-${o.id.slice(0, 8)}`} className="h-8 text-xs border-[#1E3A5F]/40 text-[#1E3A5F]">
+                            data-testid={`admin-upload-${o.id.slice(0, 8)}`} className="h-8 text-xs border-[#7A241F]/40 text-[#7A241F]">
                             {busyId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <UploadCloud className="h-3.5 w-3.5 mr-1" />} Upload Bukti
                           </Button>
                         ) : o.status === "expired" ? (
                           <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
-                            data-testid={`admin-upload-${o.id.slice(0, 8)}`} className="h-8 text-xs border-[#1E3A5F]/40 text-[#1E3A5F]">
+                            data-testid={`admin-upload-${o.id.slice(0, 8)}`} className="h-8 text-xs border-[#7A241F]/40 text-[#7A241F]">
                             {busyId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <UploadCloud className="h-3.5 w-3.5 mr-1" />} Upload Bukti
                           </Button>
                         ) : (
-                          <span className="text-xs text-[#6B7280]">—</span>
+                          <span className="text-xs text-[#7A6A5E]">—</span>
                         )}
                       </td>
                       {/* Kirim Pesan */}
@@ -923,17 +923,17 @@ export default function AdminPage() {
                         {o.status === "verified" ? (
                           <div className="flex items-center justify-center gap-1.5">
                             <Button size="sm" onClick={() => sendAndMarkWA(o)} data-testid={`wa-${o.id.slice(0, 8)}`}
-                              className={cn("h-8 text-xs", o.wa_sent ? "bg-white text-[#0F7A57] border border-[#10B981]/50 hover:bg-[#10B981]/10" : "bg-[#10B981] hover:bg-[#0F7A57]")}>
+                              className={cn("h-8 text-xs", o.wa_sent ? "bg-white text-[#255E33] border border-[#2F703E]/50 hover:bg-[#2F703E]/10" : "bg-[#2F703E] hover:bg-[#255E33]")}>
                               <MessageCircle className="h-3.5 w-3.5 mr-1" /> {o.wa_sent ? "Kirim Ulang" : "Kirim Pesan"}
                             </Button>
                           </div>
                         ) : (o.status === "pending_payment" || o.status === "expired") ? (
                           <Button size="sm" onClick={() => sendReminderWA(o)} data-testid={`remind-${o.id.slice(0, 8)}`}
-                            className="h-8 text-xs bg-[#D56115] hover:bg-[#B34F0F]">
+                            className="h-8 text-xs bg-[#B26A1E] hover:bg-[#8A3A12]">
                             <MessageCircle className="h-3.5 w-3.5 mr-1" /> Ingatkan Upload
                           </Button>
                         ) : (
-                          <span className="text-xs text-[#6B7280]">—</span>
+                          <span className="text-xs text-[#7A6A5E]">—</span>
                         )}
                       </td>
                       {/* Hapus */}
@@ -969,46 +969,46 @@ export default function AdminPage() {
       <Dialog open={!!proofView} onOpenChange={() => setProofView(null)}>
         <DialogContent data-testid="proof-dialog">
           <DialogHeader>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">
               {dialogVerified ? "Terverifikasi ✅" : "Verifikasi Pembayaran"}
             </DialogTitle>
           </DialogHeader>
           {proofView && (
             <div>
               <div className="text-sm mb-3 space-y-0.5">
-                <p><b>{proofView.name}</b> <span className="font-mono text-xs text-[#6B7280]">#{proofView.order_no}</span></p>
-                <p className="text-[#6B7280]">{proofView.phone} · {proofView.session?.name} · Kursi {proofView.seats.join(", ")}</p>
-                <p>Nominal: <b className="text-[#D56115]">{rupiah(proofView.total_amount)}</b> (kode unik {proofView.unique_code})</p>
+                <p><b>{proofView.name}</b> <span className="font-mono text-xs text-[#7A6A5E]">#{proofView.order_no}</span></p>
+                <p className="text-[#7A6A5E]">{proofView.phone} · {proofView.session?.name} · Kursi {proofView.seats.join(", ")}</p>
+                <p>Nominal: <b className="text-[#B26A1E]">{rupiah(proofView.total_amount)}</b> (kode unik {proofView.unique_code})</p>
               </div>
 
               {!dialogVerified && (
                 proofLoading ? (
-                  <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#D56115]" /></div>
+                  <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
                 ) : proofImage ? (
                   <img src={proofImage} alt="Bukti" className="w-full rounded-lg border border-border max-h-[45vh] object-contain bg-muted/30" />
                 ) : (
-                  <p className="text-sm text-[#6B7280] py-4 text-center">Bukti tidak tersedia.</p>
+                  <p className="text-sm text-[#7A6A5E] py-4 text-center">Bukti tidak tersedia.</p>
                 )
               )}
 
               {dialogVerified ? (
                 <div className="mt-4">
-                  <div className="rounded-lg bg-[#10B981]/10 p-4 text-center mb-3">
-                    <CheckCircle2 className="h-8 w-8 text-[#10B981] mx-auto mb-1" />
-                    <p className="text-sm text-[#0F7A57] font-medium">Pembayaran diverifikasi. Kirim tiket ke pembeli via WhatsApp.</p>
+                  <div className="rounded-lg bg-[#2F703E]/10 p-4 text-center mb-3">
+                    <CheckCircle2 className="h-8 w-8 text-[#2F703E] mx-auto mb-1" />
+                    <p className="text-sm text-[#255E33] font-medium">Pembayaran diverifikasi. Kirim tiket ke pembeli via WhatsApp.</p>
                   </div>
                   <Button onClick={() => { sendAndMarkWA(proofView); }} data-testid="dialog-send-wa"
-                    className="w-full bg-[#10B981] hover:bg-[#0F7A57]">
+                    className="w-full bg-[#2F703E] hover:bg-[#255E33]">
                     <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
                   </Button>
-                  <Button variant="ghost" onClick={() => setProofView(null)} className="w-full mt-1 text-[#6B7280]" data-testid="dialog-close">
+                  <Button variant="ghost" onClick={() => setProofView(null)} className="w-full mt-1 text-[#7A6A5E]" data-testid="dialog-close">
                     Selesai
                   </Button>
                 </div>
               ) : proofView.status === "waiting_verification" ? (
                 <div className="flex gap-2 mt-4">
                   <Button onClick={verifyInDialog} disabled={busyId === proofView.id} data-testid="dialog-verify"
-                    className="flex-1 bg-[#10B981] hover:bg-[#0F7A57]">
+                    className="flex-1 bg-[#2F703E] hover:bg-[#255E33]">
                     {busyId === proofView.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Payment Masuk
                   </Button>
                   <Button variant="outline" onClick={() => { act(proofView.id, "reject"); setProofView(null); }}
@@ -1018,7 +1018,7 @@ export default function AdminPage() {
                 </div>
               ) : proofView.status === "verified" ? (
                 <Button onClick={() => sendAndMarkWA(proofView)} data-testid="dialog-send-wa-2"
-                  className="w-full mt-4 bg-[#10B981] hover:bg-[#0F7A57]">
+                  className="w-full mt-4 bg-[#2F703E] hover:bg-[#255E33]">
                   <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
                 </Button>
               ) : null}
@@ -1031,30 +1031,30 @@ export default function AdminPage() {
       <Dialog open={!!checkinPopup} onOpenChange={() => setCheckinPopup(null)}>
         <DialogContent data-testid="checkin-popup">
           <DialogHeader>
-            <div className="h-11 w-11 rounded-full bg-[#10B981]/15 flex items-center justify-center mb-2">
-              <Ticket className="h-5 w-5 text-[#10B981]" />
+            <div className="h-11 w-11 rounded-full bg-[#2F703E]/15 flex items-center justify-center mb-2">
+              <Ticket className="h-5 w-5 text-[#2F703E]" />
             </div>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Peserta Sudah Datang</DialogTitle>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Peserta Sudah Datang</DialogTitle>
           </DialogHeader>
           {checkinPopup && (
             <div className="text-sm space-y-3">
               <p><b>{checkinPopup.name}</b> ({checkinPopup.phone}) — {checkinPopup.session?.name} · {checkinPopup.session?.time}</p>
-              <p className="text-xs text-[#10B981] font-medium">✓ Check-in tercatat: {fmtTime(new Date().toISOString())}</p>
-              <div className="rounded-lg bg-[#D56115]/10 p-4">
-                <p className="text-[#B34F0F] font-medium mb-2">Pastikan sudah serahkan tiket:</p>
-                <p className="font-serif-display text-2xl text-[#1E3A5F] mb-2" data-testid="checkin-popup-session">{checkinPopup.session?.name?.toUpperCase()} · {checkinPopup.session?.time}</p>
-                <p className="text-xs text-[#6B7280] mb-1">Nomor kursi <b className="text-[#B34F0F]">({checkinPopup.seats.length} tiket)</b>:</p>
+              <p className="text-xs text-[#2F703E] font-medium">✓ Check-in tercatat: {fmtTime(new Date().toISOString())}</p>
+              <div className="rounded-lg bg-[#B26A1E]/10 p-4">
+                <p className="text-[#8A3A12] font-medium mb-2">Pastikan sudah serahkan tiket:</p>
+                <p className="font-serif-display text-2xl text-[#7A241F] mb-2" data-testid="checkin-popup-session">{checkinPopup.session?.name?.toUpperCase()} · {checkinPopup.session?.time}</p>
+                <p className="text-xs text-[#7A6A5E] mb-1">Nomor kursi <b className="text-[#8A3A12]">({checkinPopup.seats.length} tiket)</b>:</p>
                 <div className="flex flex-wrap gap-2">
                   {checkinPopup.seats.map((s) => (
-                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#B34F0F] font-bold text-base border border-[#D56115]/30">{s}</span>
+                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold text-base border border-[#B26A1E]/30">{s}</span>
                   ))}
                 </div>
               </div>
-              <p className="text-[#6B7280] text-xs">Jangan lupa memberikan tiket kursi di atas kepada peserta ini agar tidak terjadi double.</p>
+              <p className="text-[#7A6A5E] text-xs">Jangan lupa memberikan tiket kursi di atas kepada peserta ini agar tidak terjadi double.</p>
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button onClick={() => setCheckinPopup(null)} className="bg-[#1E3A5F] hover:bg-[#16304f] w-full" data-testid="checkin-popup-ok">
+            <Button onClick={() => setCheckinPopup(null)} className="bg-[#7A241F] hover:bg-[#5E1B17] w-full" data-testid="checkin-popup-ok">
               Sudah Saya Berikan
             </Button>
           </DialogFooter>
@@ -1068,17 +1068,17 @@ export default function AdminPage() {
             <div className="h-11 w-11 rounded-full bg-[#EF4444]/15 flex items-center justify-center mb-2">
               <AlertTriangle className="h-5 w-5 text-[#EF4444]" />
             </div>
-            <DialogTitle className="font-serif-display text-2xl text-[#1E3A5F]">Anda yakin hapus?</DialogTitle>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Anda yakin hapus?</DialogTitle>
           </DialogHeader>
           {deleteTarget && (
             <div className="text-sm space-y-3">
-              <p className="text-[#6B7280]">
+              <p className="text-[#7A6A5E]">
                 Pesanan berikut akan <b className="text-[#EF4444]">dihapus permanen</b> dan
                 <b> tidak bisa dikembalikan</b>.
               </p>
               <div className="rounded-lg border border-border bg-muted/30 p-3">
-                <p className="font-semibold text-[#1A1A1A]">{deleteTarget.name} <span className="font-mono text-xs text-[#6B7280]">#{deleteTarget.order_no}</span></p>
-                <p className="text-xs text-[#6B7280]">{deleteTarget.phone} · {deleteTarget.session?.name} · {rupiah(deleteTarget.total_amount)}</p>
+                <p className="font-semibold text-[#2C1E16]">{deleteTarget.name} <span className="font-mono text-xs text-[#7A6A5E]">#{deleteTarget.order_no}</span></p>
+                <p className="text-xs text-[#7A6A5E]">{deleteTarget.phone} · {deleteTarget.session?.name} · {rupiah(deleteTarget.total_amount)}</p>
               </div>
             </div>
           )}
@@ -1098,13 +1098,13 @@ export default function AdminPage() {
       {/* Printable ticket */}
       {printOrder && (
         <div id="print-area" className="hidden print:block p-8">
-          <div className="border-2 border-[#1E3A5F] rounded-xl p-6 max-w-md">
+          <div className="border-2 border-[#7A241F] rounded-xl p-6 max-w-md">
             <div className="flex items-center gap-3 border-b border-dashed border-gray-300 pb-3 mb-3">
               <img src={LOGOS.kbi} alt="KBI" className="h-10" />
               <img src={LOGOS.mbi} alt="MBI" className="h-10" />
             </div>
             <p className="text-xs text-gray-500">TIKET NONTON BERSAMA · Minggu, 13 September 2026 · CGV Grand Batam</p>
-            <p className="font-serif-display text-xl text-[#1E3A5F] leading-tight mt-1">
+            <p className="font-serif-display text-xl text-[#7A241F] leading-tight mt-1">
               Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara
             </p>
             <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
