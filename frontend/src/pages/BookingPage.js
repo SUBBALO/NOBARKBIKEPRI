@@ -285,12 +285,12 @@ export default function BookingPage() {
           <div>
             <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Pilih Sesi</h2>
             <p className="text-sm text-[#7A6A5E] mb-6">
-              Hanya 1 sesi dibuka pada satu waktu. Sesi berikutnya terbuka otomatis saat sesi berjalan penuh.
+              Tekan sesi yang dibuka untuk langsung memilih kursi. Sesi berikutnya terbuka otomatis saat sesi berjalan penuh.
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {event?.sessions?.map((s) => (
                 <SessionCard key={s.id} s={s} selected={sessionId}
-                  onSelect={(id) => { setSessionId(id); setSelected([]); }} />
+                  onSelect={(id) => { setSessionId(id); setSelected([]); setStep(3); }} />
               ))}
             </div>
           </div>
@@ -378,7 +378,7 @@ export default function BookingPage() {
             className="text-[#7A6A5E]">
             <ArrowLeft className="h-4 w-4 mr-1.5" /> Kembali
           </Button>
-          {step < 4 ? (
+          {step === 2 ? null : step < 4 ? (
             <Button data-testid="btn-next" onClick={next}
               className="bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full px-6">
               Lanjut <ArrowRight className="h-4 w-4 ml-1.5" />
