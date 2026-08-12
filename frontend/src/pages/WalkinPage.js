@@ -23,7 +23,6 @@ const PAY = [
   { k: "transfer", t: "Transfer", icon: Landmark },
 ];
 const PRICE = 50000;
-const MAX = 6;
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -122,7 +121,6 @@ export default function WalkinPage() {
   const toggle = (label) => {
     setSelected((p) => {
       if (p.includes(label)) return p.filter((x) => x !== label);
-      if (p.length >= MAX) { toast.error(`Maksimal ${MAX} kursi per transaksi`); return p; }
       return [...p, label];
     });
   };

@@ -662,8 +662,6 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
     seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
     if not seats:
         raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
-    if len(seats) > MAX_SEATS_PER_ORDER:
-        raise HTTPException(status_code=400, detail=f"Maksimal {MAX_SEATS_PER_ORDER} kursi per transaksi")
     for seat in seats:
         if seat not in ALL_SEAT_LABELS:
             raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
