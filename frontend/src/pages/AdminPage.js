@@ -856,6 +856,7 @@ export default function AdminPage() {
                       disabled={selectableIds.length === 0} className="accent-[#1E3A5F] h-4 w-4 align-middle" />
                   </th>
                   <th className="px-4 py-3 font-medium">Pemesan</th>
+                  <th className="px-4 py-3 font-medium">Waktu Pesan</th>
                   <th className="px-4 py-3 font-medium">Sesi / Kursi</th>
                   <th className="px-4 py-3 font-medium">Total</th>
                   <th className="px-4 py-3 font-medium">Status</th>
@@ -879,6 +880,9 @@ export default function AdminPage() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-[#1A1A1A]">{o.name} <span className="font-mono text-[10px] text-[#6B7280]">#{o.order_no}</span></p>
                         <p className="text-xs text-[#6B7280]">{o.phone}</p>
+                      </td>
+                      <td className="px-4 py-3" data-testid={`order-time-${o.id.slice(0, 8)}`}>
+                        <p className="text-xs text-[#6B7280] whitespace-nowrap">{fmtTime(o.created_at)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <p>{o.session?.name}</p>
