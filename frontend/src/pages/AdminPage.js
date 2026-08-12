@@ -15,6 +15,9 @@ import {
   Store, Banknote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+} from "recharts";
 
 const compressImage = (file) =>
   new Promise((resolve, reject) => {
@@ -179,6 +182,78 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
     </div>
   </div>
 );
+
+function DailySalesChart({ stats }) {
+  const daily = stats?.daily || [];
+  if (daily.length === 0) return null;
+  const fmtDate = (d) => {
+    const [y, m, day] = d.split("-");
+    const bulan = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+    return `${parseInt(day, 10)} ${bulan[parseInt(m, 10) - 1]}`;
+  };
+  const data = daily.map((d) => ({
+    ...d,
+    label: fmtDate(d.date),
+    pending: Math.max(0, (d.tickets || 0) - (d.tickets_verified || 0)),
+  }));
+  const totalTickets = data.reduce((a, d) => a + (d.tickets || 0), 0);
+  return (
+    <div className="rounded-2xl border border-border bg-white p-4 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-6 no-print" data-testid="daily-sales-chart">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <h2 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2">
+          <History className="h-5 w-5 text-[#B26A1E]" /> Pembelian Tiket per Hari
+        </h2>
+        <span className="text-xs text-[#7A6A5E]">{data.length} hari · total <b className="text-[#7A241F]">{totalTickets}</b> tiket</span>
+      </div>
+      <div className="h-56 sm:h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EDE5D8" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#7A6A5E" }} axisLine={false} tickLine={false} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#7A6A5E" }} axisLine={false} tickLine={false} />
+            <Tooltip
+              cursor={{ fill: "rgba(178,106,30,0.06)" }}
+              contentStyle={{ borderRadius: 12, border: "1px solid #EDE5D8", fontSize: 12 }}
+              formatter={(v, nm) => [`${v} tiket`, nm]}
+              labelFormatter={(l, p) => {
+                const row = p?.[0]?.payload;
+                return row ? `${l} · ${row.orders} pesanan · ${rupiah(row.revenue_verified)}` : l;
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar dataKey="tickets_verified" name="Terverifikasi" stackId="a" fill="#2F703E" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="pending" name="Belum verifikasi" stackId="a" fill="#E4C57E" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-sm min-w-[440px]" data-testid="daily-sales-table">
+          <thead>
+            <tr className="text-left text-xs text-[#7A6A5E] border-b border-border">
+              <th className="py-2 pr-3 font-medium">Tanggal</th>
+              <th className="py-2 pr-3 font-medium text-right">Pesanan</th>
+              <th className="py-2 pr-3 font-medium text-right">Tiket</th>
+              <th className="py-2 pr-3 font-medium text-right">Terverifikasi</th>
+              <th className="py-2 font-medium text-right">Pendapatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...data].reverse().map((d) => (
+              <tr key={d.date} className="border-b border-dashed border-border/70 last:border-0">
+                <td className="py-1.5 pr-3 font-medium text-[#2C1E16]">{d.label}</td>
+                <td className="py-1.5 pr-3 text-right">{d.orders}</td>
+                <td className="py-1.5 pr-3 text-right font-semibold text-[#7A241F]">{d.tickets}</td>
+                <td className="py-1.5 pr-3 text-right text-[#255E33]">{d.tickets_verified}</td>
+                <td className="py-1.5 text-right text-[#255E33]">{rupiah(d.revenue_verified)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 
 function SalesSummary({ stats }) {
   const b = stats?.breakdown;
@@ -766,6 +841,7 @@ export default function AdminPage() {
 
       {tab === "payment" && (<>
       {stats && <SalesSummary stats={stats} />}
+      {stats && <DailySalesChart stats={stats} />}
       {/* Session control */}
       {event && (
         <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print">

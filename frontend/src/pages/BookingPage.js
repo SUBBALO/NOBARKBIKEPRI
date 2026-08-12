@@ -186,7 +186,7 @@ export default function BookingPage() {
           </span>
           <div className="min-w-0">
             <p className="font-semibold text-[#7A241F] text-sm sm:text-base">Sudah bayar tapi lupa upload bukti?</p>
-            <p className="text-xs text-[#7A6A5E] truncate">Cari pesanan dengan nomor HP Anda, lalu upload buktinya di sini.</p>
+            <p className="text-xs text-[#7A6A5E]">Cari pesanan dengan nomor HP Anda, lalu upload buktinya di sini.</p>
           </div>
         </div>
         <span className="shrink-0 inline-flex items-center gap-1 text-sm font-semibold text-white bg-[#7A241F] px-4 py-2 rounded-full">
@@ -258,7 +258,7 @@ export default function BookingPage() {
       <motion.div
         key={step}
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
-        className="rounded-2xl border border-border bg-white p-6 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
+        className="rounded-2xl border border-border bg-white p-4 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
       >
         {/* STEP 1 */}
         {step === 1 && (

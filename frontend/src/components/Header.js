@@ -28,7 +28,7 @@ export const Header = () => {
             className="inline-flex items-center gap-1.5 text-sm font-medium text-[#7A241F] hover:text-[#B26A1E] transition-colors"
           >
             <Upload className="h-4 w-4" />
-            <span className="hidden xs:inline sm:inline">Upload Bukti</span>
+            <span>Upload Bukti</span>
           </Link>
           {onAdmin && (
             <Link

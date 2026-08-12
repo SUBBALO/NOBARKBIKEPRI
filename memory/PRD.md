@@ -29,6 +29,10 @@ Default seed: admin1(superadmin)/admin2(admin)/admin3(checkin), semua password `
 - Export Log Aktivitas ke Excel (tombol di tab Log, endpoint GET /api/admin/logs/export).
 - Indikator "sisa kursi" menonjol di halaman Pilih Sesi (angka besar + progress bar; label "Segera penuh" bila sisa ≤ 20).
 - Menu Walk-in "Jual di Tempat" (staff, halaman monitor `/walkin`): login username+password (hanya admin/superadmin). Pilih kursi MANUAL dari peta kursi live (auto-refresh 5 dtk, mengikuti ketersediaan sistem). Isi nama + no HP opsional + metode Cash/QRIS/Transfer → order langsung status verified + checked_in (checked_in_by = petugas). Cash = nominal pas tanpa kode unik & tanpa bukti; QRIS/Transfer = pakai kode unik. Popup hasil menampilkan no order, total (+kode unik), dan kursi untuk diserahkan. Endpoint POST /api/admin/walkin menerima {name,phone,session_id,seats[],payment_method}. Tab admin "Jual di Tempat" = launcher ke /walkin.
+- (Agu 2026) Re-theme poster warm maroon/gold/cream; poster di hero (POSTER_URL); banner "Sudah bayar tapi lupa upload bukti?" pindah ke paling atas homepage.
+- (Agu 2026) Klik kartu sesi yang dibuka → langsung masuk Pilih Kursi (tanpa tombol Lanjut di step 2).
+- (Agu 2026) Audit Mobile: SeatMap muat penuh di 390px (kursi 24px + gap kecil di mobile, sm: ukuran lama), header "Upload Bukti" selalu bertext, banner subtitle tidak truncate, padding kartu step p-4 di mobile. Step 4 & /upload tanpa horizontal overflow.
+- (Agu 2026) Grafik "Pembelian Tiket per Hari" di panel admin (recharts stacked bar terverifikasi vs belum + tabel harian). Backend: `stats["daily"]` per tanggal WIB {date, orders, tickets, tickets_verified, revenue_verified}, exclude expired/rejected.
 
 ## Key APIs
 - POST /api/admin/login {username,password} → {token, user}

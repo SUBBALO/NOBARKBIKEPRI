@@ -19,11 +19,11 @@ export const SeatMap = ({ rows, selected, onToggle }) => {
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className="min-w-[520px] flex flex-col gap-2 items-center">
+        <div className="sm:min-w-[520px] flex flex-col gap-1.5 sm:gap-2 items-center">
           {rows.map((row) => (
-            <div key={row.row} className="flex items-center gap-3">
-              <span className="w-5 text-xs font-semibold text-[#7A6A5E]">{row.row}</span>
-              <div className="flex gap-1.5">
+            <div key={row.row} className="flex items-center gap-1.5 sm:gap-3">
+              <span className="w-4 sm:w-5 text-[10px] sm:text-xs font-semibold text-[#7A6A5E]">{row.row}</span>
+              <div className="flex gap-1 sm:gap-1.5">
                 {row.seats.map((seat, idx) => {
                   const isSel = selected.includes(seat.label);
                   const st = isSel ? "selected" : seat.status;
@@ -37,8 +37,8 @@ export const SeatMap = ({ rows, selected, onToggle }) => {
                       onClick={() => onToggle(seat.label)}
                       title={seat.label}
                       className={cn(
-                        "relative h-7 w-7 sm:h-8 sm:w-8 rounded-md text-[10px] font-semibold flex items-center justify-center transition-colors duration-150",
-                        idx === 4 ? "mr-4" : "",
+                        "relative h-6 w-6 text-[9px] sm:h-8 sm:w-8 rounded-md sm:text-[10px] font-semibold flex items-center justify-center transition-colors duration-150",
+                        idx === 4 ? "mr-2.5 sm:mr-4" : "",
                         st === "available" && "bg-[#E5E7EB] text-[#374151] hover:bg-[#B26A1E]/30",
                         st === "selected" && "bg-[#B26A1E] text-white seat-pop shadow-md",
                         st === "booked" && "bg-[#9CA3AF] text-white/70 cursor-not-allowed",

@@ -571,6 +571,26 @@ async def admin_stats(user: dict = Depends(require_staff)):
             walkin[method]["revenue"] += r
     stats["breakdown"] = {"online": online, "walkin": walkin}
     stats["cash_total"] = walkin["cash"]["revenue"]
+
+    # Riwayat pembelian per hari (WIB)
+    wib = timezone(timedelta(hours=7))
+    daily = {}
+    async for o in db.orders.find(
+        {"status": {"$nin": ["expired", "rejected"]}},
+        {"created_at": 1, "qty": 1, "status": 1, "base_amount": 1},
+    ):
+        try:
+            d = datetime.fromisoformat(o["created_at"]).astimezone(wib).strftime("%Y-%m-%d")
+        except (ValueError, TypeError, KeyError):
+            continue
+        row = daily.setdefault(d, {"date": d, "orders": 0, "tickets": 0,
+                                    "tickets_verified": 0, "revenue_verified": 0})
+        row["orders"] += 1
+        row["tickets"] += o.get("qty", 0) or 0
+        if o.get("status") == "verified":
+            row["tickets_verified"] += o.get("qty", 0) or 0
+            row["revenue_verified"] += o.get("base_amount", 0) or 0
+    stats["daily"] = [daily[k] for k in sorted(daily)]
     return stats
 
 
