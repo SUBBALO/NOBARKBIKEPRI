@@ -1,121 +1,99 @@
 {
-  "theme": "light",
-  "typography": {
-    "headings": "Cormorant Garamond, serif (for a dignified, traditional, and respectful tone)",
-    "body": "DM Sans, sans-serif (for highly legible UI elements, forms, and data)",
-    "scale": {
-      "h1": "text-4xl sm:text-5xl tracking-tight text-secondary",
-      "h2": "text-2xl sm:text-3xl tracking-tight text-secondary",
-      "h3": "text-xl sm:text-2xl text-secondary",
-      "body": "text-base leading-relaxed text-gray-800",
-      "small": "text-sm text-gray-600"
-    },
-    "rules": "Never use Inter for headings. Keep headings tight and body relaxed."
-  },
+  "theme_mode": "light",
+  "design_concept": "Cinematic-Spiritual (Warm Gold, Brown, Cream, Maroon). Grounded, premium, emotionally resonant matching the Ashin Jinarakkhita documentary poster.",
   "colors": {
-    "archetype": "Organic & Earthy mixed with Trust (Saffron & Deep Blue)",
-    "palette": {
-      "background": "#FDFBF7",
-      "surface": "#FFFFFF",
-      "primary": "#D56115",
-      "primary_hover": "#B34F0F",
-      "secondary": "#1E3A5F",
-      "text_main": "#1A1A1A",
-      "text_muted": "#6B7280",
-      "border": "#E5E7EB",
-      "seat_available": "#E5E7EB",
-      "seat_selected": "#D56115",
-      "seat_booked": "#9CA3AF",
-      "success": "#10B981",
-      "error": "#EF4444"
-    },
-    "rules": "Avoid generic SaaS blue. Ensure all text meets APCA/WCAG contrast ratios against backgrounds."
+    "background": "#F8F5EE",
+    "foreground": "#2C1E16",
+    "primary": "#C49A45",
+    "primary_foreground": "#1A1105",
+    "secondary": "#7A241F",
+    "secondary_foreground": "#FFFFFF",
+    "surface": "#FDFBF7",
+    "muted": "#E5DED5",
+    "muted_foreground": "#7A6A5E",
+    "accent": "#E8D8B6",
+    "accent_foreground": "#2C1E16",
+    "border": "#D9D0C1",
+    "success": "#2F703E",
+    "success_foreground": "#FFFFFF",
+    "danger": "#991B1B",
+    "warning": "#D97706"
   },
-  "visual_enhancers": {
-    "shadows": "Use soft, ambient shadows for floating elements: shadow-[0_8px_30px_rgb(0,0,0,0.04)]",
-    "borders": "1px solid #E5E7EB for cards. Radii: rounded-xl for main cards, rounded-md for buttons and seats.",
-    "glassmorphism": "Used only for sticky header: backdrop-blur-xl bg-[#FDFBF7]/80 with 1px bottom border border-black/5.",
-    "textures": "Subtle grain on hero background to reduce digital flatness."
+  "shadcn_css_variables_hsl": {
+    "--background": "42 33% 95%",
+    "--foreground": "22 33% 13%",
+    "--card": "40 33% 98%",
+    "--card-foreground": "22 33% 13%",
+    "--popover": "40 33% 98%",
+    "--popover-foreground": "22 33% 13%",
+    "--primary": "40 52% 52%",
+    "--primary-foreground": "34 68% 6%",
+    "--secondary": "3 59% 30%",
+    "--secondary-foreground": "0 0% 100%",
+    "--muted": "34 23% 87%",
+    "--muted-foreground": "25 13% 42%",
+    "--accent": "41 53% 81%",
+    "--accent-foreground": "22 33% 13%",
+    "--destructive": "0 70% 35%",
+    "--destructive-foreground": "0 0% 100%",
+    "--border": "37 26% 80%",
+    "--input": "37 26% 80%",
+    "--ring": "40 52% 52%",
+    "--radius": "1rem"
   },
-  "components": {
-    "header": "Sticky header with backdrop-blur. Contains KBI and MBI logos paired together, and the event title. MUST have navigation (e.g., 'Pesan Tiket', 'Tentang Acara').",
-    "booking_stepper": "Linear progression layout (Bento or Stacked Cards). Must have distinct sections: 1. Data Diri (Name, Phone), 2. Pilih Sesi (4 sessions), 3. Pilih Kursi, 4. Pembayaran.",
-    "seat_map": "CSS Grid for seating. Add a curved 'LAYAR' (Screen) indicator at the top. Rows labeled A-K. Legend showing Available, Selected, Booked.",
-    "payment_card": "Prominent display of Total + Unique Code (e.g., Rp 100.011). Tabs for QRIS and Bank Transfer (BCA 061 518 3381, PD Majelis Buddhayana Indonesia Prov Kepri). Prominent upload button for proof.",
-    "admin_dashboard": "Clean, dense table layout. Shadcn table with columns for Order ID, Name, Phone, Session, Seats, Total, Proof Image, Actions (Verify/Reject).",
-    "printable_ticket": "Minimalist card layout suitable for thermal or standard printing. Shows Name, Session, Seats, and Unique Code prominently."
+  "typography": {
+    "heading_font": "Playfair Display, serif",
+    "body_font": "DM Sans, sans-serif",
+    "accent_font": "Dancing Script, cursive",
+    "imports": "@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=DM+Sans:opsz,wght@9..40,400;500;600&family=Playfair+Display:wght@500;600;700;800&display=swap');",
+    "guidelines": "Use 'Playfair Display' (font-serif) for all major headings (H1, H2, H3). Apply tracking-tight for elegance. Use 'DM Sans' (font-sans) for body text, form inputs, seat maps, and admin data tables for extreme legibility. Use 'Dancing Script' for the maroon cursive accent text 'Membangunkannya'."
   },
-  "grids": {
-    "main_layout": "grid-cols-1 md:grid-cols-12 gap-8. Hero content spans 8 cols, side info 4 cols.",
-    "seat_grid": "grid-cols-[auto_repeat(10,minmax(0,1fr))] or similar, adjusting for exact seat count per row. Gap-2 or gap-3."
+  "hero_section_strategy": {
+    "desktop": "Split layout (Grid 12 cols). Left (col-span-6): Cinematic serif typography (dark brown), KBI logo, KBI multi-logo top-left logic, KBI info bar (cream with brown circular icons), maroon 'PEMESANAN TIKET' label/CTA. Right (col-span-6): The official poster image rendered inside a beautiful rounded-2xl frame. Add a soft, warm ambient shadow (shadow-2xl shadow-yellow-900/20). DO NOT crop or stretch the poster; maintain its natural portrait aspect ratio.",
+    "mobile": "Stacked layout. Place the poster prominent at the top (full width, rounded-b-3xl, respecting aspect ratio). Below it, display the event details and CTAs in a cleanly padded section. Alternative: Full height container with the poster as a background and a heavy gradient overlay (bg-gradient-to-t from-[#F8F5EE] via-[#F8F5EE]/90 to-transparent) on the lower 50% to ensure dark serif text is fully readable.",
+    "hero_image_url": "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/h7ivo2nv_POSTER.webp"
+  },
+  "component_guidelines": {
+    "buttons": "Pill-shaped (rounded-full). Primary uses Gold (#C49A45) with dark brown text (#1A1105). Secondary/Accent uses Maroon (#7A241F) with white text. Hover states: scale-105 with slightly increased brightness/shadow. Do not use default Vercel-black.",
+    "cards_public": "Soft rounded-2xl or rounded-3xl corners. Surface color #FDFBF7. Thin, subtle borders (border border-[#D9D0C1]/40). Shadow: shadow-lg shadow-amber-900/5. Generous padding (p-6 to p-8).",
+    "cards_admin": "Dense, functional flat cards. rounded-lg or rounded-xl, crisp borders (border-[#D9D0C1]). Minimal to no drop-shadow.",
+    "forms": "Use Shadcn components. Inputs must have warm off-white background (bg-white/60) and brown/gold focus rings (focus:ring-primary). Remove any default blue outlines.",
+    "seat_map": "High legibility required. Available seats: muted cream/border color. Selected seats: Maroon or Gold. Booked/Unavailable seats: greyish brown (#E5DED5) and disabled. The 'LAYAR' (screen) indicator must be visually prominent, perhaps with a subtle cinematic glow.",
+    "navigation": "Sticky headers should use crystal glassmorphism (backdrop-blur-xl bg-[#F8F5EE]/80) with a subtle bottom border. Do not use fully transparent headers if content scrolls behind them."
   },
   "layouts": {
-    "general": "Generous spacing. p-6 to p-12 for sections. Max-w-7xl mx-auto for containers.",
-    "mobile": "Ensure seat map is horizontally scrollable on mobile devices (overflow-x-auto) to prevent layout breakage."
+    "spacing": "Generous. p-6, p-8, p-12 for public-facing elements. Give the aesthetic room to breathe.",
+    "admin_dashboard": "Sidebar or top-nav based layout. Keep data dense and scannable but swap standard greys for muted warm tones (e.g., hover:bg-[#E5DED5]/30 for table rows)."
   },
   "motion": {
-    "interactions": "Hover states on buttons (slight scale or color darken). Hover on available seats.",
-    "transitions": "transition-colors duration-200 for buttons/links. Avoid transition-all.",
-    "entrances": "Staggered fade-up for booking steps to guide the user's eye."
+    "guidelines": "Smooth micro-interactions. Hovering over movie sessions/cards should apply a slight lift (-translate-y-1) and shadow expansion. CTAs must have hover feedback. Avoid harsh, instant transitions (use transition-all duration-300 ease-out)."
+  },
+  "images": {
+    "poster": {
+      "url": "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/h7ivo2nv_POSTER.webp",
+      "category": "Hero Section",
+      "description": "The official Ashin Jinarakkhita event poster. Needs to dictate the visual theme of the site."
+    }
   },
   "accessibility": {
-    "contrast": "Text over backgrounds must exceed 4.5:1 ratio. White text on Primary (#D56115) is accessible.",
-    "focus": "focus:ring-2 focus:ring-primary focus:outline-none on all inputs and buttons.",
-    "testing": "All interactive elements MUST include data-testid attributes (e.g., data-testid='seat-A1', data-testid='btn-submit-payment')."
+    "contrast": "Deep brown text (#2C1E16) on cream backgrounds (#F8F5EE) exceeds WCAG standards. Gold buttons must use very dark brown text (#1A1105) for sufficient contrast.",
+    "data_testid": "MANDATORY: All interactive elements, inputs, form submissions, seats, and tables MUST retain their `data-testid` attributes. Do not remove or alter existing test identifiers."
   },
-  "media": {
-    "images": "Use logos in headers. Use QRIS asset strictly in the payment section. Hero background should be dimmed with bg-black/40 overlay to ensure text readability."
-  },
-  "3d_libraries": "Not recommended for this transactional, community-focused app. Focus on clean 2D layout and fast load times.",
-  "image_urls": {
-    "logos": [
-      {
-        "url": "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/xgt43uvr_image.png",
-        "description": "KBI Logo (Orange Dharma Wheel)",
-        "category": "header, footer"
-      },
-      {
-        "url": "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/rvkwvhfz_image.png",
-        "description": "MBI Logo (Blue Emblem)",
-        "category": "header, footer"
-      }
-    ],
-    "payment": [
-      {
-        "url": "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/q6kwbelz_image.png",
-        "description": "Official QRIS Code",
-        "category": "payment_section"
-      }
-    ],
-    "backgrounds": [
-      {
-        "url": "https://images.unsplash.com/photo-1589400554239-7c6cf8393a6e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHwyfHxidWRkaGlzdCUyMG1lZGl0YXRpb24lMjB3YXJtJTIwbGlnaHR8ZW58MHx8fHwxNzg1OTE3NjU2fDA&ixlib=rb-4.1.0&q=85",
-        "description": "Warm Buddhist aesthetic background",
-        "category": "hero_section"
-      }
-    ]
-  },
-  "instructions_to_main_agent": [
-    "Language MUST be Indonesian (Bahasa Indonesia). Event Name: Nonton Bersama Film Dokumenter 'Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara'.",
-    "Ticket price is Rp 50.000 per seat. When calculating total, multiply selected seats by 50000, then ADD a random 2-digit unique code (11-99). E.g. 2 seats = 100.000 + 11 = Rp 100.011. This helps admin verify exact transfers.",
-    "Implement 4 sequential sessions. Only one session can be booked at a time.",
-    "For the Seat Map: Create a visually clear 'LAYAR' (Screen) at the top. Use rows A-K. Make sure to track selected seats in an array. Display a legend (Tersedia, Terpilih, Terisi).",
-    "Payment Flow: Show total WITH unique code prominently. Users MUST upload a payment proof (image). Show a popup reminder to upload proof after checkout.",
-    "Admin Dashboard: Build a protected route for admins to view orders, see payment proof images, and Verify/Reject orders. Also include a 'Print Ticket' action.",
-    "Use pure HTML + Tailwind for structural layouts, and use Shadcn for complex components like Dialogs, Inputs, Tables. Write components in .js files.",
-    "Do NOT use completely transparent backgrounds over images for headers/navbars."
-  ],
   "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
-    "You tend to converge toward generic, 'on distribution' outputs. Make creative, distinctive frontends that surprise and delight.",
-    "Create depth through layered design elements with z-index hierarchy.",
-    "Use glass-morphism effects with backdrop filters (12-24px blur) where appropriate, avoiding muddy grays.",
-    "You MUST NOT apply universal transition (transition: all). Use specific transitions (transition-colors, transition-opacity).",
-    "You MUST NOT center align the app container (.App { text-align: center; }). Keep natural reading flow.",
-    "Always use modern button styles (pill-shaped or crisp slight rounded) with hover animations.",
-    "NEVER use emojis (🤖🧠💭💡) for icons. Use lucide-react.",
-    "Every interaction needs micro-animations - hover states, focus states, etc.",
-    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
-    "Use sonner for toast notifications (e.g., 'Kursi berhasil dipilih', 'Bukti pembayaran diunggah').",
-    "Include data-testid on every interactive element."
+    "You MUST completely replace the old Navy (#1E3A5F) / Orange (#D56115) theme with the new Gold/Brown/Cream/Maroon palette defined here.",
+    "Map these colors to Tailwind CSS via CSS variables (in index.css) to ensure shadcn/ui components adopt them natively.",
+    "Keep all Indonesian text verbatim. Do not change content, pricing, or logic.",
+    "Ensure the booking flow (Data Diri, Pilih Sesi, SeatMap, Payment), Admin panels, Walk-in monitor, and Mobile Check-in remain fully functional and retain their data-testids.",
+    "Avoid the 'AI slop' aesthetic: No generic centered landing page layouts, no simplistic linear gradients. Build asymmetrical layouts for the hero, utilize depth, z-index layering, and glassmorphism.",
+    "Only generate guidelines for .js/.jsx files as requested by the user, not .tsx.",
+    "Never use completely transparent backgrounds on dropdowns or overlays where text intersects with background content. Always use solid or blurred backdrops."
+  ],
+  "instructions_to_main_agent": [
+    "Step 1: Replace global CSS variables in index.css with the provided HSL values to set the new theme.",
+    "Step 2: Add Google Fonts imports for Playfair Display, DM Sans, and Dancing Script in index.css. Update tailwind.config.js font families.",
+    "Step 3: Redesign the Hero section on the landing page (Home.js/jsx) applying the split/stack strategy, incorporating the provided poster URL.",
+    "Step 4: Update the typography across all pages: font-serif for major headings, font-sans for body/admin, and cursive for special accents.",
+    "Step 5: Apply updated styling (rounded corners, warm shadows, pill-shaped buttons) to the Booking Flow, QRIS Payment step, SeatMap, and UI cards.",
+    "Step 6: Update the Admin Dashboard and Walk-in monitor pages to inherit the warm palette while preserving their dense, highly legible layout and functionality."
   ]
 }
