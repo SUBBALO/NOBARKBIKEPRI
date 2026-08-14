@@ -6,7 +6,7 @@ const LEGEND = [
   { key: "available", label: "Tersedia", cls: "bg-[#E5E7EB]" },
   { key: "selected", label: "Terpilih", cls: "bg-[#B26A1E]" },
   { key: "booked", label: "Terisi", cls: "bg-[#9CA3AF]" },
-  { key: "couple", label: "Couple (wajib 2)", cls: "bg-[#F9A8D4]" },
+  { key: "couple", label: "Sweetbox (wajib 2 orang)", cls: "bg-[#F9A8D4]" },
   { key: "disability", label: "Disabilitas (beli di lokasi)", cls: "bg-[#6EE7B7]" },
   { key: "reserved", label: "Operator", cls: "bg-[#4B5563]" },
 ];
@@ -77,7 +77,7 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
                         data-testid={`seat-${seat.label}`}
                         disabled={disabled}
                         onClick={() => handleClick(seat.label)}
-                        title={seat.status === "reserved" ? `${seat.label} (operator)` : seat.disability ? `${seat.label} (disabilitas — beli di lokasi)` : seat.couple ? `${seat.label} (couple)` : seat.label}
+                        title={seat.status === "reserved" ? `${seat.label} (operator)` : seat.disability ? `${seat.label} (disabilitas — beli di lokasi)` : seat.couple ? `${seat.label} (sweetbox)` : seat.label}
                         style={{ height: sz, width: sz, fontSize: fs }}
                         className={cn(
                           "relative rounded-md font-semibold flex items-center justify-center transition-colors duration-150",
@@ -121,7 +121,7 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
         ))}
       </div>
       <p className="text-center text-[11px] text-[#B26A1E] mt-2">
-        Kursi couple (pink) otomatis terpilih sepasang — wajib dibeli untuk 2 orang.
+        Kursi Sweetbox (pink) otomatis terpilih sepasang — wajib dibeli untuk 2 orang.
       </p>
     </div>
   );

@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 10 (file iteration_9.json). Verified: (A) 4 sessions with new times S1 09.30-11.30, S2 12.00-14.00, S3 14.30-16.30, S4 17.00-19.00 with walkin_open bool, no session 5. (B) Bendahara now covers UMUM (online) + PANITIA (walk-in), correct structure grand_total {cash,qris,transfer,amount,tickets,orders,umum_amount,panitia_amount}, by_date[] desc with by_seller & by_location, orders[] flat. Consistency amount = umum+panitia = cash+qris+transfer. Soft-deleted orders excluded. (B2) Export xlsx 3 sheets: Semua Transaksi, Ringkasan per Tanggal, Per Petugas. Checkin role -> 403. (C) Walk-in requires location for cash & QRIS/Transfer requires proof_image. Cash+location success, QRIS+location+proof success. (D) Admin panel tabs Check-in & Jual di Tempat removed; remaining tabs verified. Regression: chelyn can_delete soft-delete + super restore OK. Backend pytest 14/14. UI verified via Playwright.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter10_bendahara_sessions.py",
+    "/app/test_reports/pytest/iter10.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py walkin_order: validation order is proof -> location. If both missing on qris/transfer, user gets proof error first. Not a bug but consider validating location before proof so message is deterministic.",
+    "_collect_recap_orders limits to_list(8000) — fine for now but add pagination for large events.",
+    "BendaharaPanel loads full orders list client-side; for many orders, consider server-side pagination/filtering.",
+    "AdminPage.js is 1707 lines — split BendaharaPanel/UsersPanel/TrashPanel into own files for maintainability (per <700-line guideline)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter10_bendahara_sessions.py (new)"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (super), admin2/admin123 (admin), admin3/admin123 (checkin), chelyn/Chelyn123456 (admin+can_delete)",
+  "seed_data_creation": "Created 2 walk-in TEST_iter10 orders (session 4, seats M6 & M7) to verify inclusion in bendahara. Both soft-deleted via cleanup; also chelyn-delete regression removed one and it was restored back by super admin; both were then soft-deleted at the end of tests (still in Kotak Sampah). Session 3 walkin was opened briefly then closed.",
+  "final_state": "Sudah dikembalikan: coming_soon=ON; semua open_sessions & walkin_sessions kosong (all 4 sessions closed for both public & walkin).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend endpoints validated: GET /api/event (4 sesi + walkin_open), GET /api/admin/bendahara (grand_total with umum_amount/panitia_amount, by_date desc, orders flat), GET /api/admin/bendahara/export (xlsx 3 sheets), POST /api/admin/walkin now enforces {location required, proof_image data:image required for qris/transfer}. Admin tabs checkin & walkin removed (only payment/bendahara/logs/users/trash exist; users & trash superadmin-only). Walkin FE: submit disabled when !location or (qris/transfer && !proof). Suggestion chips read from localStorage key 'walkin_locations'. footer-credit uses class 'text-base font-semibold text-[#B26A1E]' (16px).",
+  "verified_flows": [
+    "GET /api/event -> exactly 4 sessions with new times and walkin_open bool; no session 5.",
+    "GET /api/admin/bendahara superadmin=200, admin=200, checkin=403; structure grand_total{cash,qris,transfer,amount,tickets,orders,umum_amount,panitia_amount}; amount=umum+panitia=cash+qris+transfer; by_date sorted desc; orders flat with channel/seller/location/method fields; umum -> seller 'Umum (Online)' location 'Online'.",
+    "GET /api/admin/bendahara/export xlsx valid; sheetnames == {Semua Transaksi, Ringkasan per Tanggal, Per Petugas}; checkin -> 403.",
+    "POST /api/admin/walkin cash without location -> 400 'Lokasi penjualan wajib diisi'; qris with location but no proof -> 400 bukti; cash+location -> 200 verified/checked_in/walkin/sold_by/location; qris+location+proof(data:image..) -> 200.",
+    "Walk-in orders appear in /api/admin/bendahara as channel=panitia; grand_total.panitia_amount includes them.",
+    "chelyn DELETE order -> soft delete; super restore works; soft-deleted orders excluded from bendahara.",
+    "UI /admin (admin1): tabs present = payment, bendahara, logs, users, trash; admin-tab-checkin & admin-tab-walkin ABSENT.",
+    "UI Bendahara tab: bendahara-grand (Rp 1.550.386, 7 transaksi 31 tiket, Umum Rp 1.150.122, Panitia Rp 400.264, chips Cash/QRIS/Transfer), bendahara-filters (Semua/Umum/Panitia, dropdown petugas & sort, search), bendahara-txn-table populated, 2 bendahara-day-* cards with matching bendahara-toggle-* buttons, bendahara-export enabled.",
+    "UI /walkin (chelyn): 4 sesi displayed with new times + '• TUTUP'/'• BUKA' labels; no session 5; opening closed session shows walkin-session-closed panel.",
+    "UI /walkin: walkin-location input rendered; walkin-loc-suggestions chips shown when localStorage 'walkin_locations' has entries; walkin-proof-box appears when method=QRIS/Transfer and disappears on Cash; walkin-submit disabled when location empty or (qris/transfer && no proof).",
+    "UI footer-credit: text='Alam Tenang', class='text-base font-semibold text-[#B26A1E]', font-size 16px (larger than default)."
+  ],
+  "rca of the issue": "N/A — no bugs found. All 4 changes (sessions, bendahara umum+panitia + export, walkin location/proof, removed admin tabs) work as specified. Preview state restored (coming_soon ON, all sessions closed)."
+}

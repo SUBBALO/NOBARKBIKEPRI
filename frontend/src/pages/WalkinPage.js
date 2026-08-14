@@ -8,15 +8,38 @@ import { SeatMap } from "@/components/SeatMap";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock } from "lucide-react";
+import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const compressImage = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1400;
+        let { width, height } = img;
+        if (width > max || height > max) {
+          const r = Math.min(max / width, max / height);
+          width = Math.round(width * r); height = Math.round(height * r);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 const SESSIONS = [
-  { id: 1, name: "Sesi 1", time: "09.00–10.30 WIB" },
-  { id: 2, name: "Sesi 2", time: "12.30–14.30 WIB" },
-  { id: 3, name: "Sesi 3", time: "15.00–17.00 WIB" },
+  { id: 1, name: "Sesi 1", time: "09.30–11.30 WIB" },
+  { id: 2, name: "Sesi 2", time: "12.00–14.00 WIB" },
+  { id: 3, name: "Sesi 3", time: "14.30–16.30 WIB" },
   { id: 4, name: "Sesi 4", time: "17.00–19.00 WIB" },
-  { id: 5, name: "Sesi 5", time: "19.00–21.00 WIB" },
 ];
 const PAY = [
   { k: "cash", t: "Cash", icon: Banknote },
@@ -79,8 +102,14 @@ export default function WalkinPage() {
   const [selected, setSelected] = useState([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [location, setLocation] = useState(() => localStorage.getItem("walkin_location") || "");
+  const [locHistory, setLocHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("walkin_locations") || "[]"); } catch { return []; }
+  });
   const [method, setMethod] = useState("cash");
   const [amountText, setAmountText] = useState("");
+  const [proof, setProof] = useState(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [transfer, setTransfer] = useState(null);
@@ -146,13 +175,22 @@ export default function WalkinPage() {
     if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
     if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
     if (amount <= 0) { toast.error("Isi nominal dana sukarela"); return; }
+    if (!location.trim()) { toast.error("Isi lokasi penjualan"); return; }
+    if (method !== "cash" && !proof) { toast.error("Untuk QRIS/Transfer wajib upload foto bukti pembayaran"); return; }
     setBusy(true);
     try {
       const { data } = await adminApi.post("/admin/walkin", {
         name, phone, session_id: sessionId, seats: selected, payment_method: method, amount,
+        proof_image: method !== "cash" ? proof : null,
+        location: location.trim(),
       });
+      localStorage.setItem("walkin_location", location.trim());
+      const loc = location.trim();
+      const nextHist = [loc, ...locHistory.filter((l) => l.toLowerCase() !== loc.toLowerCase())].slice(0, 12);
+      setLocHistory(nextHist);
+      localStorage.setItem("walkin_locations", JSON.stringify(nextHist));
       setResult(data);
-      setName(""); setPhone(""); setSelected([]); setAmountText("");
+      setName(""); setPhone(""); setSelected([]); setAmountText(""); setProof(null);
       loadMap(sessionId, false);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Gagal membuat tiket");
@@ -238,7 +276,31 @@ export default function WalkinPage() {
           <Label htmlFor="wn">Nama</Label>
           <Input id="wn" data-testid="walkin-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama pembeli" className="mt-1.5 mb-3" />
           <Label htmlFor="wp">No. HP <span className="text-[#9CA3AF]">(opsional)</span></Label>
-          <Input id="wp" data-testid="walkin-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08xxxx" className="mt-1.5 mb-4" />
+          <Input id="wp" data-testid="walkin-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08xxxx" className="mt-1.5 mb-3" />
+
+          <Label htmlFor="wl">Lokasi Penjualan <span className="text-[#EF4444]">*</span></Label>
+          <div className="relative mt-1.5 mb-1">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B26A1E]" />
+            <Input id="wl" data-testid="walkin-location" value={location} onChange={(e) => setLocation(e.target.value)}
+              list="walkin-loc-list" autoComplete="off"
+              placeholder="mis. Vihara Duta Maitreya" className="pl-9" />
+            <datalist id="walkin-loc-list">
+              {locHistory.map((l) => <option key={l} value={l} />)}
+            </datalist>
+          </div>
+          {locHistory.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4" data-testid="walkin-loc-suggestions">
+              {locHistory.slice(0, 5).map((l) => (
+                <button key={l} type="button" onClick={() => setLocation(l)}
+                  className={cn("text-[11px] rounded-full px-2.5 py-1 border transition-colors",
+                    location.trim().toLowerCase() === l.toLowerCase()
+                      ? "bg-[#B26A1E] text-white border-[#B26A1E]"
+                      : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]")}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
 
           <Label>Metode Pembayaran</Label>
           <div className="grid grid-cols-3 gap-2 mt-1.5 mb-2">
@@ -266,13 +328,9 @@ export default function WalkinPage() {
           <div className="rounded-lg border border-[#B26A1E]/30 bg-[#F3E9DD]/50 p-3 mb-3">
             <p className="text-xs font-semibold text-[#7A241F]">Dana Sukarela</p>
             <p className="text-[11px] text-[#7A6A5E]">Acuan {selected.length || 0} tiket × Rp60.000 = <b>{rupiah(refTotal)}</b></p>
-            <div className="flex gap-2 mt-2">
-              <button type="button" data-testid="walkin-use-reference" onClick={() => setAmountText(String(refTotal))}
-                disabled={selected.length === 0}
-                className="text-[11px] font-semibold rounded-full px-3 py-1.5 border border-[#B26A1E]/40 text-[#7A241F] bg-white hover:border-[#B26A1E] disabled:opacity-40">
-                Pakai acuan
-              </button>
-            </div>
+            <p className="text-sm font-semibold text-[#7A241F] mt-1.5" data-testid="walkin-free-note">
+              Nominal tetap <span className="text-[#B26A1E]">bebas</span> sesuai kerelaan 🙏
+            </p>
             <div className="relative mt-2">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
               <Input data-testid="walkin-amount" inputMode="numeric"
@@ -281,12 +339,44 @@ export default function WalkinPage() {
                 placeholder="0" className="pl-9 h-11 text-base font-semibold bg-white" />
             </div>
           </div>
+
+          {method !== "cash" && (
+            <div className="rounded-lg border border-[#7A241F]/30 bg-[#7A241F]/[0.03] p-3 mb-3" data-testid="walkin-proof-box">
+              <p className="text-xs font-semibold text-[#7A241F] flex items-center gap-1.5">
+                <Camera className="h-4 w-4" /> Foto Bukti Pembayaran <span className="text-[#EF4444]">(wajib)</span>
+              </p>
+              <p className="text-[11px] text-[#7A6A5E] mb-2">Untuk {method === "qris" ? "QRIS" : "Transfer"}, foto/screenshot bukti bayar pembeli.</p>
+              {proof ? (
+                <div className="relative">
+                  <img src={proof} alt="Bukti" className="w-full max-h-40 object-contain rounded-md border border-border bg-white" data-testid="walkin-proof-preview" />
+                  <button type="button" onClick={() => setProof(null)} data-testid="walkin-proof-remove"
+                    className="mt-1.5 text-[11px] text-[#EF4444] underline">Ganti foto</button>
+                </div>
+              ) : (
+                <label data-testid="walkin-proof-upload"
+                  className="flex flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-[#B26A1E]/40 bg-white py-4 cursor-pointer hover:border-[#B26A1E]">
+                  {uploadingProof ? <Loader2 className="h-5 w-5 animate-spin text-[#B26A1E]" /> : <UploadCloud className="h-5 w-5 text-[#B26A1E]" />}
+                  <span className="text-[11px] font-medium text-[#7A241F]">{uploadingProof ? "Memproses..." : "Ambil / Upload Foto"}</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadingProof(true);
+                      try { setProof(await compressImage(file)); }
+                      catch { toast.error("Gagal memproses foto"); }
+                      setUploadingProof(false);
+                    }} />
+                </label>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm text-[#7A6A5E]">Total {method === "cash" ? "(pas)" : "(+ kode unik)"}</span>
             <span className="font-serif-display text-2xl text-[#B26A1E]" data-testid="walkin-total">{rupiah(total)}</span>
           </div>
 
-          <Button onClick={submit} disabled={busy || selected.length === 0 || !sessionWalkinOpen} data-testid="walkin-submit"
+          <Button onClick={submit} disabled={busy || selected.length === 0 || !sessionWalkinOpen || !location.trim() || (method !== "cash" && !proof)} data-testid="walkin-submit"
             className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
             {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} Buat Tiket & Check-in
           </Button>

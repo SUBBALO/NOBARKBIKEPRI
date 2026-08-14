@@ -164,6 +164,7 @@ export default function BookingPage() {
     if (!silent) setSeatsLoading(false);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadEvent(); }, []);
   useEffect(() => { if (step === 3 && sessionId) loadSeats(sessionId); }, [step, sessionId]);
   useEffect(() => {
@@ -367,7 +368,7 @@ export default function BookingPage() {
             ) : (
               <>
                 <div className="rounded-xl border border-[#B26A1E]/30 bg-[#F3E9DD]/60 p-3.5 mb-5 text-xs sm:text-sm text-[#5B4636] space-y-1" data-testid="seat-info-box">
-                  <p><span className="inline-block h-3 w-3 rounded-sm bg-[#F9A8D4] mr-1.5 align-middle" /><b>Kursi couple (pink)</b> wajib untuk 2 orang — klik satu, pasangannya ikut terpilih otomatis.</p>
+                  <p><span className="inline-block h-3 w-3 rounded-sm bg-[#F9A8D4] mr-1.5 align-middle" /><b>Kursi Sweetbox (pink)</b> wajib untuk 2 orang — klik satu, pasangannya ikut terpilih otomatis.</p>
                   <p><span className="inline-block h-3 w-3 rounded-sm bg-[#6EE7B7] mr-1.5 align-middle" /><b>Kursi disabilitas (hijau)</b> hanya dijual di lokasi acara — hubungi panitia bila membutuhkan.</p>
                 </div>
                 <SeatMap rows={rows} selected={selected} onToggle={toggleSeat} couples={couples} />

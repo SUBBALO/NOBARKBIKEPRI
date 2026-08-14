@@ -13,7 +13,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, RotateCcw, ShieldAlert,
+  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -636,6 +636,217 @@ function UsersPanel({ currentUser }) {
 }
 
 
+function BendaharaPanel() {
+  const [resp, setResp] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState({});
+  const [exporting, setExporting] = useState(false);
+  const [channel, setChannel] = useState("all");
+  const [seller, setSeller] = useState("all");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("time_desc");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { const { data } = await adminApi.get("/admin/bendahara"); setResp(data); }
+    catch { toast.error("Gagal memuat rekap bendahara"); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const res = await adminApi.get("/admin/bendahara/export", { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = "rekap_bendahara.xlsx"; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error("Gagal export Excel"); }
+    setExporting(false);
+  };
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#2F703E]" /></div>;
+
+  const g = resp?.grand_total || {};
+  const sellers = Array.from(new Set((resp?.orders || []).map((o) => o.seller))).sort();
+  let orders = (resp?.orders || []).filter((o) =>
+    (channel === "all" || o.channel === channel) &&
+    (seller === "all" || o.seller === seller) &&
+    (!search || o.name?.toLowerCase().includes(search.toLowerCase()) || String(o.order_no).includes(search))
+  );
+  orders = [...orders].sort((a, b) => {
+    if (sort === "time_desc") return (b.created_at || "").localeCompare(a.created_at || "");
+    if (sort === "time_asc") return (a.created_at || "").localeCompare(b.created_at || "");
+    if (sort === "amount_desc") return b.amount - a.amount;
+    if (sort === "amount_asc") return a.amount - b.amount;
+    if (sort === "seller") return (a.seller || "").localeCompare(b.seller || "");
+    if (sort === "name") return (a.name || "").localeCompare(b.name || "");
+    return 0;
+  });
+
+  const methodChip = (m) => ({ cash: { t: "Cash", c: "bg-[#2F703E]/15 text-[#255E33]" },
+    qris: { t: "QRIS", c: "bg-[#7A241F]/10 text-[#7A241F]" },
+    transfer: { t: "Transfer", c: "bg-[#B26A1E]/15 text-[#8A3A12]" } }[m] || { t: m, c: "bg-muted" });
+
+  const Stat = ({ label, val, big, color }) => (
+    <div className="rounded-xl border border-border bg-white p-3">
+      <p className="text-[11px] text-[#7A6A5E]">{label}</p>
+      <p className={cn(big ? "font-serif-display text-2xl" : "text-lg font-bold", color)}>{rupiah(val || 0)}</p>
+    </div>
+  );
+
+  return (
+    <div className="no-print" data-testid="bendahara-panel">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div>
+          <h2 className="font-serif-display text-2xl text-[#255E33] flex items-center gap-2"><Banknote className="h-5 w-5" /> Rekap Bendahara — Laporan Keuangan</h2>
+          <p className="text-sm text-[#7A6A5E]">Semua pemasukan terverifikasi: Umum (online) + Panitia (lokasi). Bisa disortir & di-export.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={load} data-testid="bendahara-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
+          <Button onClick={exportExcel} disabled={exporting} data-testid="bendahara-export" className="bg-[#2F703E] hover:bg-[#255E33]">
+            {exporting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />} Export Excel
+          </Button>
+        </div>
+      </div>
+
+      {/* Grand total */}
+      <div className="rounded-2xl border border-[#2F703E]/25 bg-[#2F703E]/[0.05] p-4 mb-5" data-testid="bendahara-grand">
+        <div className="flex items-end justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <p className="text-xs text-[#7A6A5E]">Total Dana Terkumpul (semua)</p>
+            <p className="font-serif-display text-4xl text-[#255E33]" data-testid="bendahara-grand-amount">{rupiah(g.amount)}</p>
+            <p className="text-xs text-[#7A6A5E] mt-0.5">{g.orders || 0} transaksi · {g.tickets || 0} tiket</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-md bg-[#2F703E]/10 text-[#255E33] px-2.5 py-1.5 font-semibold">Cash {rupiah(g.cash)}</span>
+            <span className="rounded-md bg-[#7A241F]/10 text-[#7A241F] px-2.5 py-1.5 font-semibold">QRIS {rupiah(g.qris)}</span>
+            <span className="rounded-md bg-[#B26A1E]/10 text-[#8A3A12] px-2.5 py-1.5 font-semibold">Transfer {rupiah(g.transfer)}</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Stat label="Umum (Online)" val={g.umum_amount} big color="text-[#7A241F]" />
+          <Stat label="Panitia (Lokasi)" val={g.panitia_amount} big color="text-[#B26A1E]" />
+        </div>
+      </div>
+
+      {/* Filter + sort bar */}
+      <div className="flex flex-wrap items-center gap-2 mb-3" data-testid="bendahara-filters">
+        <div className="flex gap-1">
+          {[["all", "Semua"], ["umum", "Umum"], ["panitia", "Panitia"]].map(([k, t]) => (
+            <button key={k} onClick={() => setChannel(k)} data-testid={`bendahara-ch-${k}`}
+              className={cn("px-3 py-1.5 rounded-full text-xs font-medium border",
+                channel === k ? "bg-[#2F703E] text-white border-[#2F703E]" : "bg-white text-[#7A6A5E] border-border")}>{t}</button>
+          ))}
+        </div>
+        <select value={seller} onChange={(e) => setSeller(e.target.value)} data-testid="bendahara-seller-filter"
+          className="text-xs border border-border rounded-lg px-2 py-1.5 bg-white">
+          <option value="all">Semua petugas/sumber</option>
+          {sellers.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value)} data-testid="bendahara-sort"
+          className="text-xs border border-border rounded-lg px-2 py-1.5 bg-white">
+          <option value="time_desc">Terbaru</option>
+          <option value="time_asc">Terlama</option>
+          <option value="amount_desc">Nominal terbesar</option>
+          <option value="amount_asc">Nominal terkecil</option>
+          <option value="seller">Nama petugas (A-Z)</option>
+          <option value="name">Nama pembeli (A-Z)</option>
+        </select>
+        <div className="relative flex-1 min-w-[140px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9CA3AF]" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari nama / no order"
+            data-testid="bendahara-search" className="w-full text-xs border border-border rounded-lg pl-8 pr-2 py-1.5 bg-white" />
+        </div>
+      </div>
+
+      {/* Sortable transactions table */}
+      <div className="rounded-2xl border border-border bg-white overflow-x-auto mb-6" data-testid="bendahara-txn-table">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-[#7A6A5E] text-xs">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Tgl / Jam</th>
+              <th className="px-3 py-2 text-left font-medium">Pembeli</th>
+              <th className="px-3 py-2 text-left font-medium">Kanal</th>
+              <th className="px-3 py-2 text-left font-medium">Petugas/Sumber</th>
+              <th className="px-3 py-2 text-left font-medium">Lokasi</th>
+              <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
+              <th className="px-3 py-2 text-center font-medium">Metode</th>
+              <th className="px-3 py-2 text-right font-medium">Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.length === 0 ? (
+              <tr><td colSpan={8} className="px-3 py-8 text-center text-[#7A6A5E]" data-testid="bendahara-empty">Belum ada transaksi.</td></tr>
+            ) : orders.map((o, i) => {
+              const mc = methodChip(o.method);
+              return (
+                <tr key={i} className="border-t border-border" data-testid={`bendahara-txn-${i}`}>
+                  <td className="px-3 py-2 text-[#7A6A5E] whitespace-nowrap">{o.date}<span className="block text-[10px]">{o.time}</span></td>
+                  <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
+                  <td className="px-3 py-2"><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", o.channel === "panitia" ? "bg-[#B26A1E]/15 text-[#8A3A12]" : "bg-[#7A241F]/10 text-[#7A241F]")}>{o.channel === "panitia" ? "Panitia" : "Umum"}</span></td>
+                  <td className="px-3 py-2 text-[#5B4636]">{o.seller}</td>
+                  <td className="px-3 py-2 text-[#5B4636]">{o.location}</td>
+                  <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{o.session_name} · {o.seats.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.tickets} tkt)</span></td>
+                  <td className="px-3 py-2 text-center"><span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", mc.c)}>{mc.t}</span></td>
+                  <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.amount)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Per tanggal cards */}
+      <h3 className="font-serif-display text-xl text-[#7A241F] mb-3">Ringkasan per Tanggal</h3>
+      <div className="space-y-3">
+        {(resp?.by_date || []).map((day) => {
+          const isOpen = open[day.date] ?? false;
+          return (
+            <div key={day.date} className="rounded-2xl border border-border bg-white p-4" data-testid={`bendahara-day-${day.date}`}>
+              <button onClick={() => setOpen((p) => ({ ...p, [day.date]: !isOpen }))} data-testid={`bendahara-toggle-${day.date}`}
+                className="w-full flex items-center justify-between gap-3 text-left">
+                <div>
+                  <p className="font-serif-display text-lg text-[#7A241F]">{day.date_label}</p>
+                  <p className="text-xs text-[#7A6A5E]">{day.total.orders} transaksi · {day.total.tickets} tiket · Umum {rupiah(day.total.umum_amount)} · Panitia {rupiah(day.total.panitia_amount)}</p>
+                </div>
+                <span className="font-serif-display text-xl text-[#255E33]" data-testid={`bendahara-total-${day.date}`}>{rupiah(day.total.amount)}</span>
+              </button>
+              {isOpen && (
+                <div className="grid md:grid-cols-2 gap-4 mt-3">
+                  <div className="rounded-xl border border-border p-3">
+                    <p className="text-xs font-semibold text-[#7A241F] mb-2">Per Petugas/Sumber</p>
+                    <div className="space-y-1.5">
+                      {day.by_seller.map((s) => (
+                        <div key={s.seller} className="flex items-center justify-between text-xs" data-testid={`bendahara-seller-${day.date}`}>
+                          <span className="text-[#5B4636]">{s.seller} <span className="text-[10px] text-[#7A6A5E]">({s.orders} trx · {s.tickets} tkt)</span></span>
+                          <b className="text-[#255E33]">{rupiah(s.amount)}</b>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border p-3">
+                    <p className="text-xs font-semibold text-[#7A241F] mb-2">Per Lokasi</p>
+                    <div className="space-y-1.5">
+                      {day.by_location.map((l) => (
+                        <div key={l.location} className="flex items-center justify-between text-xs" data-testid={`bendahara-loc-${day.date}`}>
+                          <span className="text-[#5B4636] flex items-center gap-1"><MapPin className="h-3 w-3 text-[#B26A1E]" /> {l.location} <span className="text-[10px] text-[#7A6A5E]">({l.orders} trx)</span></span>
+                          <b className="text-[#255E33]">{rupiah(l.amount)}</b>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function WalkinPanel() {
   return (
     <div className="max-w-xl mx-auto no-print">
@@ -723,6 +934,7 @@ export default function AdminPage() {
   const [deletedOrders, setDeletedOrders] = useState([]);
   const [trashLoading, setTrashLoading] = useState(false);
   const [restoreBusyId, setRestoreBusyId] = useState(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   const load = useCallback(async () => {
     if (!isStaff) { setLoading(false); return; }
@@ -993,15 +1205,10 @@ export default function AdminPage() {
             tab === "payment" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
           <Wallet className="h-4 w-4" /> Verifikasi Pembayaran
         </button>
-        <button data-testid="admin-tab-checkin" onClick={() => setTab("checkin")}
+        <button data-testid="admin-tab-bendahara" onClick={() => setTab("bendahara")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-            tab === "checkin" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
-          <UserCheck className="h-4 w-4" /> Check-in Peserta
-        </button>
-        <button data-testid="admin-tab-walkin" onClick={() => setTab("walkin")}
-          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-            tab === "walkin" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
-          <Store className="h-4 w-4" /> Jual di Tempat
+            tab === "bendahara" ? "bg-[#2F703E] text-white border-[#2F703E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#2F703E]/50")}>
+          <Banknote className="h-4 w-4" /> Bendahara
         </button>
         <button data-testid="admin-tab-logs" onClick={() => setTab("logs")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
@@ -1025,9 +1232,26 @@ export default function AdminPage() {
       </div>
 
       {tab === "payment" && (<>
-      {stats && <SessionFunds stats={stats} />}
-      {stats && <SalesSummary stats={stats} />}
-      {stats && <DailySalesChart stats={stats} />}
+      {stats && (
+        <div className="mb-5 no-print">
+          <button onClick={() => setShowSummary((v) => !v)} data-testid="toggle-summary"
+            className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3 hover:border-[#B26A1E]/50 transition-colors">
+            <span className="flex items-center gap-2 text-sm font-semibold text-[#7A241F]">
+              <Wallet className="h-4 w-4 text-[#B26A1E]" /> Ringkasan & Laporan Penjualan
+              <span className="text-xs font-normal text-[#7A6A5E]">· {stats.verified || 0} terverifikasi · {rupiah(stats.revenue_verified || 0)}</span>
+            </span>
+            <ChevronDown className={cn("h-4 w-4 text-[#7A6A5E] transition-transform", showSummary && "rotate-180")} />
+          </button>
+          {showSummary && (
+            <div className="mt-4">
+              <SessionFunds stats={stats} />
+              <SalesSummary stats={stats} />
+              <DailySalesChart stats={stats} />
+              <p className="text-[11px] text-[#7A6A5E] -mt-2 mb-2">Laporan keuangan lengkap (umum + panitia, bisa export Excel) ada di tab <b>Bendahara</b>.</p>
+            </div>
+          )}
+        </div>
+      )}
       {/* Session control — buka/tutup penjualan per sesi (Super Admin) */}
       {event && (
         <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print" data-testid="session-control-card">
@@ -1080,7 +1304,7 @@ export default function AdminPage() {
             sessionFilter === "all" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/40")}>
           Semua Sesi
         </button>
-        {[1, 2, 3, 4, 5].map((sid) => (
+        {[1, 2, 3, 4].map((sid) => (
           <button key={sid} data-testid={`session-filter-${sid}`} onClick={() => setSessionFilter(sid)}
             className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
               sessionFilter === sid ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/40")}>
@@ -1330,14 +1554,9 @@ export default function AdminPage() {
       </div>
       </>)}
 
-      {tab === "checkin" && (
-        <CheckinPanel orders={orders} query={checkinQuery} setQuery={setCheckinQuery} busyId={busyId}
-          onCheckin={async (o) => { await act(o.id, "checkin"); setCheckinPopup(o); }} />
-      )}
-
       {tab === "logs" && <LogsPanel />}
 
-      {tab === "walkin" && <WalkinPanel />}
+      {tab === "bendahara" && <BendaharaPanel />}
 
       {tab === "users" && isSuper && <UsersPanel currentUser={currentUser} />}
 

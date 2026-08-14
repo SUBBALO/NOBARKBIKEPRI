@@ -23,10 +23,10 @@ export const Footer = () => (
       </div>
     </div>
     <div className="border-t border-black/5">
-      <p className="text-center text-[11px] text-[#9CA3AF] py-3">
+      <p className="text-center text-sm text-[#7A6A5E] py-3.5">
         Developed by{" "}
         <a href="https://instagram.com/alam_tenang" target="_blank" rel="noreferrer"
-          data-testid="footer-credit" className="text-[#9CA3AF] hover:text-[#B26A1E] hover:underline transition-colors">
+          data-testid="footer-credit" className="text-base font-semibold text-[#B26A1E] hover:text-[#7A241F] hover:underline transition-colors">
           Alam Tenang
         </a>
       </p>

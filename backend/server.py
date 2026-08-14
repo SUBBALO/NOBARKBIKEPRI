@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -39,16 +39,18 @@ api_router = APIRouter(prefix="/api")
 REFERENCE_COST = 60000  # biaya pengadaan rata-rata per orang (acuan dana sukarela)
 HOLD_MINUTES = 15  # unpaid orders auto-release seats after this
 MAX_SEATS_PER_ORDER = 6  # batas kursi per pesanan
+MAX_PROOF_BYTES = 8_000_000  # ~6MB gambar (anti-DoS upload publik)
+LOGIN_MAX_FAILS = 5          # gagal login sebelum dikunci
+LOGIN_LOCK_MINUTES = 15      # durasi kunci setelah terlalu banyak gagal
 EVENT_TITLE = 'Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"'
 EVENT_DATE = "Minggu, 13 September 2026"
 EVENT_LOCATION = "CGV Grand Batam"
 
 SESSIONS = [
-    {"id": 1, "name": "Sesi 1", "time": "09.00–10.30 WIB"},
-    {"id": 2, "name": "Sesi 2", "time": "12.30–14.30 WIB"},
-    {"id": 3, "name": "Sesi 3", "time": "15.00–17.00 WIB"},
+    {"id": 1, "name": "Sesi 1", "time": "09.30–11.30 WIB"},
+    {"id": 2, "name": "Sesi 2", "time": "12.00–14.00 WIB"},
+    {"id": 3, "name": "Sesi 3", "time": "14.30–16.30 WIB"},
     {"id": 4, "name": "Sesi 4", "time": "17.00–19.00 WIB"},
-    {"id": 5, "name": "Sesi 5", "time": "19.00–21.00 WIB"},
 ]
 
 def _rng(a: int, b: int):
@@ -121,6 +123,8 @@ class WalkinCreate(BaseModel):
     seats: List[str]
     payment_method: Literal["cash", "qris", "transfer"]
     amount: int = 0  # dana sukarela (total, Rp)
+    proof_image: Optional[str] = None  # wajib untuk qris/transfer (base64 data URL)
+    location: Optional[str] = ""  # lokasi penjualan (wajib untuk walk-in)
 
 
 class AdminLogin(BaseModel):
@@ -236,7 +240,7 @@ def validate_couple_pairs(seats: list):
         if partner and partner not in seat_set:
             raise HTTPException(
                 status_code=400,
-                detail=f"Kursi {seat} adalah kursi couple — wajib dipesan sepasang dengan {partner}",
+                detail=f"Kursi {seat} adalah kursi Sweetbox — wajib dipesan sepasang dengan {partner}",
             )
 
 
@@ -438,6 +442,8 @@ async def create_order(payload: OrderCreate):
         raise HTTPException(status_code=400, detail="Sesi ini belum dibuka panitia")
 
     seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
+    if len(seats) > MAX_SEATS_PER_ORDER:
+        raise HTTPException(status_code=400, detail=f"Maksimal {MAX_SEATS_PER_ORDER} kursi per pemesanan online. Untuk lebih banyak, hubungi panitia.")
     for seat in seats:
         if seat not in ALL_SEAT_LABELS:
             raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
@@ -552,6 +558,8 @@ async def upload_proof(order_id: str, payload: ProofUpload):
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
     if not payload.proof_image.startswith("data:image"):
         raise HTTPException(status_code=400, detail="File bukti harus berupa gambar")
+    if len(payload.proof_image) > MAX_PROOF_BYTES:
+        raise HTTPException(status_code=400, detail="Ukuran gambar bukti terlalu besar (maks ~6MB)")
     # Re-assert/keep seat reservation (handles late upload after auto-expire)
     for seat in o.get("seats", []):
         lid = f"{o['session_id']}:{seat}"
@@ -579,12 +587,33 @@ async def upload_proof(order_id: str, payload: ProofUpload):
 
 
 # ---------------- Admin endpoints ----------------
+def client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @api_router.post("/admin/login")
-async def admin_login(payload: AdminLogin):
+async def admin_login(payload: AdminLogin, request: Request):
     uname = payload.username.strip().lower()
+    ident = f"{client_ip(request)}:{uname}"
+    now = datetime.now(timezone.utc)
+    rec = await db.login_attempts.find_one({"_id": ident})
+    if rec and rec.get("locked_until") and rec["locked_until"].replace(tzinfo=timezone.utc) > now:
+        wait = int((rec["locked_until"].replace(tzinfo=timezone.utc) - now).total_seconds() // 60) + 1
+        raise HTTPException(status_code=429, detail=f"Terlalu banyak percobaan gagal. Coba lagi dalam {wait} menit.")
     u = await db.admin_users.find_one({"username": uname})
     if not u or not verify_password(payload.password, u["password_hash"]):
+        fails = (rec.get("fails", 0) if rec else 0) + 1
+        update = {"fails": fails, "updated_at": now}
+        if fails >= LOGIN_MAX_FAILS:
+            update["locked_until"] = now + timedelta(minutes=LOGIN_LOCK_MINUTES)
+            update["fails"] = 0
+        await db.login_attempts.update_one({"_id": ident}, {"$set": update}, upsert=True)
         raise HTTPException(status_code=401, detail="Username atau password salah")
+    if rec:
+        await db.login_attempts.delete_one({"_id": ident})
     token = create_token(u)
     return {"token": token, "user": public_user(u)}
 
@@ -731,6 +760,167 @@ async def admin_stats(user: dict = Depends(require_staff)):
     return stats
 
 
+_MONTHS_ID = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
+              "Agustus", "September", "Oktober", "November", "Desember"]
+
+
+async def _collect_recap_orders():
+    """Semua pesanan TERVERIFIKASI (umum online + panitia walk-in), diperkaya untuk rekap."""
+    wib = timezone(timedelta(hours=7))
+    docs = await db.orders.find(
+        {"status": "verified", "deleted": {"$ne": True}},
+        {"proof_image": 0},
+    ).sort("created_at", 1).to_list(8000)
+    rows = []
+    for o in docs:
+        try:
+            d = datetime.fromisoformat(o.get("created_at", "")).astimezone(wib)
+        except (ValueError, TypeError):
+            continue
+        session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        is_walkin = bool(o.get("walkin"))
+        rows.append({
+            "date": d.strftime("%Y-%m-%d"),
+            "date_label": f"{d.day} {_MONTHS_ID[d.month]} {d.year}",
+            "time": d.strftime("%H:%M"),
+            "created_at": o.get("created_at"),
+            "order_no": o.get("order_no"), "name": o.get("name"), "phone": o.get("phone", ""),
+            "channel": "panitia" if is_walkin else "umum",
+            "channel_label": "Panitia (Lokasi)" if is_walkin else "Umum (Online)",
+            "seller": (o.get("sold_by") or "-") if is_walkin else "Umum (Online)",
+            "location": (o.get("location") or "(tanpa lokasi)") if is_walkin else "Online",
+            "method": o.get("payment_method"),
+            "tickets": o.get("qty", 0) or 0,
+            "amount": o.get("total_amount", 0) or 0,
+            "seats": o.get("seats", []),
+            "session_id": o["session_id"],
+            "session_name": session["name"] if session else str(o["session_id"]),
+            "verified_by": o.get("verified_by", ""),
+        })
+    return rows
+
+
+def _blank_agg():
+    return {"cash": 0, "qris": 0, "transfer": 0, "amount": 0, "tickets": 0, "orders": 0,
+            "umum_amount": 0, "panitia_amount": 0}
+
+
+def _add_agg(acc, r):
+    m = r.get("method", "cash")
+    amt = r.get("amount", 0) or 0
+    if m in ("cash", "qris", "transfer"):
+        acc[m] += amt
+    acc["amount"] += amt
+    acc["tickets"] += r.get("tickets", 0) or 0
+    acc["orders"] += 1
+    if r.get("channel") == "panitia":
+        acc["panitia_amount"] += amt
+    else:
+        acc["umum_amount"] += amt
+
+
+@api_router.get("/admin/bendahara")
+async def bendahara_recap(user: dict = Depends(require_staff)):
+    """Rekap keuangan LENGKAP: umum (online) + panitia (lokasi), per tanggal, petugas & lokasi & metode."""
+    rows = await _collect_recap_orders()
+    grand = _blank_agg()
+    days = {}
+    for r in rows:
+        _add_agg(grand, r)
+        day = days.setdefault(r["date"], {
+            "date": r["date"], "date_label": r["date_label"],
+            "total": _blank_agg(), "sellers": {}, "locations": {},
+        })
+        _add_agg(day["total"], r)
+        _add_agg(day["sellers"].setdefault(r["seller"], _blank_agg()), r)
+        _add_agg(day["locations"].setdefault(r["location"], _blank_agg()), r)
+
+    by_date = []
+    for key in sorted(days, reverse=True):
+        day = days[key]
+        by_date.append({
+            "date": day["date"], "date_label": day["date_label"], "total": day["total"],
+            "by_seller": [{"seller": k, **v} for k, v in sorted(day["sellers"].items())],
+            "by_location": [{"location": k, **v} for k, v in sorted(day["locations"].items())],
+        })
+    # daftar transaksi (flat, terbaru dulu) untuk tabel yang bisa di-sort di frontend
+    orders = sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True)
+    return {"grand_total": grand, "by_date": by_date, "orders": orders}
+
+
+@api_router.get("/admin/bendahara/export")
+async def export_bendahara(_: bool = Depends(require_staff)):
+    rows = await _collect_recap_orders()
+    wb = Workbook()
+    header_fill = PatternFill("solid", fgColor="255E33")
+
+    def style_header(ws):
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+
+    # Sheet 1: Semua Transaksi (detail)
+    ws = wb.active
+    ws.title = "Semua Transaksi"
+    ws.append(["Tanggal", "Jam", "No. Order", "Nama Pembeli", "No HP", "Kanal", "Petugas/Sumber",
+               "Lokasi", "Sesi", "Kursi", "Jml Tiket", "Metode", "Nominal (Rp)"])
+    style_header(ws)
+    method_label = {"cash": "Cash", "qris": "QRIS", "transfer": "Transfer"}
+    for r in rows:
+        ws.append([
+            r["date"], r["time"], r["order_no"], r["name"], r["phone"], r["channel_label"],
+            r["seller"], r["location"], r["session_name"], ", ".join(r["seats"]),
+            r["tickets"], method_label.get(r["method"], r["method"]), r["amount"],
+        ])
+    for idx, w in enumerate([12, 7, 9, 22, 15, 16, 18, 20, 10, 16, 9, 10, 15], 1):
+        ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
+
+    # Sheet 2: Ringkasan per Tanggal
+    ws2 = wb.create_sheet("Ringkasan per Tanggal")
+    ws2.append(["Tanggal", "Transaksi", "Tiket", "Cash", "QRIS", "Transfer",
+                "Umum (Online)", "Panitia (Lokasi)", "TOTAL"])
+    style_header(ws2)
+    days = {}
+    grand = _blank_agg()
+    for r in rows:
+        _add_agg(grand, r)
+        _add_agg(days.setdefault(r["date"], _blank_agg()), r)
+    for key in sorted(days):
+        a = days[key]
+        ws2.append([key, a["orders"], a["tickets"], a["cash"], a["qris"], a["transfer"],
+                    a["umum_amount"], a["panitia_amount"], a["amount"]])
+    ws2.append(["TOTAL", grand["orders"], grand["tickets"], grand["cash"], grand["qris"],
+                grand["transfer"], grand["umum_amount"], grand["panitia_amount"], grand["amount"]])
+    for cell in ws2[ws2.max_row]:
+        cell.font = Font(bold=True)
+    for idx, w in enumerate([12, 10, 8, 14, 14, 14, 16, 16, 16], 1):
+        ws2.column_dimensions[ws2.cell(row=1, column=idx).column_letter].width = w
+
+    # Sheet 3: Ringkasan per Petugas/Sumber
+    ws3 = wb.create_sheet("Per Petugas")
+    ws3.append(["Petugas/Sumber", "Transaksi", "Tiket", "Cash", "QRIS", "Transfer", "TOTAL"])
+    style_header(ws3)
+    sellers = {}
+    for r in rows:
+        _add_agg(sellers.setdefault(r["seller"], _blank_agg()), r)
+    for k in sorted(sellers):
+        a = sellers[k]
+        ws3.append([k, a["orders"], a["tickets"], a["cash"], a["qris"], a["transfer"], a["amount"]])
+    for idx, w in enumerate([20, 10, 8, 14, 14, 14, 16], 1):
+        ws3.column_dimensions[ws3.cell(row=1, column=idx).column_letter].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"rekap-bendahara-{datetime.now().strftime('%Y%m%d-%H%M')}.xlsx"
+    return StreamingResponse(
+        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+
 @api_router.post("/admin/orders/{order_id}/verify")
 async def verify_order(order_id: str, user: dict = Depends(require_staff)):
     o = await db.orders.find_one({"id": order_id})
@@ -868,6 +1058,17 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
     walkin_s = await get_walkin_sessions()
     if payload.session_id not in walkin_s:
         raise HTTPException(status_code=400, detail="Sesi ini belum dibuka untuk penjualan panitia di lokasi. Minta Super Admin membukanya.")
+    proof = (payload.proof_image or "").strip() or None
+    if payload.payment_method in ("qris", "transfer"):
+        if not proof or not proof.startswith("data:image"):
+            raise HTTPException(status_code=400, detail="Untuk QRIS/Transfer wajib upload foto bukti pembayaran.")
+        if len(proof) > MAX_PROOF_BYTES:
+            raise HTTPException(status_code=400, detail="Ukuran gambar bukti terlalu besar (maks ~6MB)")
+    else:
+        proof = None  # cash tidak perlu bukti
+    location = (payload.location or "").strip()
+    if not location:
+        raise HTTPException(status_code=400, detail="Lokasi penjualan wajib diisi")
     seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
     if not seats:
         raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
@@ -912,15 +1113,16 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
         "session_id": payload.session_id, "seats": claimed, "qty": qty,
         "base_amount": base, "unique_code": code, "total_amount": total,
         "payment_method": payload.payment_method, "status": "verified",
-        "proof_image": None, "checked_in": True, "checked_in_at": now_iso(),
+        "proof_image": proof, "checked_in": True, "checked_in_at": now_iso(),
         "checked_in_by": actor, "checked_in_by_username": user.get("username"),
         "verified_by": actor,
         "walkin": True, "sold_by": actor,
+        "location": location,
         "created_at": now_iso(), "updated_at": now_iso(),
     }
     await db.orders.insert_one(order)
     await log_activity(user, "walkin",
-                       f"Walk-in {qty} tiket #{order_no} — {payload.name.strip()} ({payload.payment_method.upper()}), kursi {', '.join(claimed)}",
+                       f"Walk-in {qty} tiket #{order_no} — {payload.name.strip()} ({payload.payment_method.upper()}) @ {location}, kursi {', '.join(claimed)}",
                        order_id)
     return clean(dict(order))
 
@@ -982,7 +1184,7 @@ async def export_orders(_: bool = Depends(require_staff)):
     ws = wb.active
     ws.title = "Peserta"
     headers = ["No", "No. Order", "Kode Pesanan", "Nama", "No HP", "Sesi", "Jam", "Kursi",
-               "Jml Tiket", "Nominal (Rp)", "Kode Unik", "Metode", "Kanal", "Dijual Oleh",
+               "Jml Tiket", "Nominal (Rp)", "Kode Unik", "Metode", "Kanal", "Dijual Oleh", "Lokasi Jual",
                "Diverifikasi Oleh", "Status", "Sudah Hadir", "Waktu Check-in", "Waktu Pesan"]
     ws.append(headers)
     header_fill = PatternFill("solid", fgColor="1E3A5F")
@@ -1020,13 +1222,14 @@ async def export_orders(_: bool = Depends(require_staff)):
             method_label,
             "Panitia (Lokasi)" if o.get("walkin") else "Umum (Online)",
             o.get("sold_by", "") if o.get("walkin") else "",
+            o.get("location", "") if o.get("walkin") else "",
             o.get("verified_by", ""),
             status_label.get(o.get("status"), o.get("status")),
             "Ya" if o.get("checked_in") else "Belum",
             checkin_str,
             created_str,
         ])
-    widths = [5, 9, 12, 24, 16, 10, 12, 18, 9, 14, 9, 10, 15, 16, 16, 16, 11, 18, 18]
+    widths = [5, 9, 12, 24, 16, 10, 12, 18, 9, 14, 9, 10, 15, 16, 18, 16, 11, 18, 18]
     for idx, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
     ws.freeze_panes = "A2"
@@ -1224,7 +1427,7 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1259,6 +1462,30 @@ async def seed_admin_users():
             logger.info("default admin_users seeded")
     except Exception as e:
         logger.error(f"seed admin_users error: {e}")
+
+
+@app.on_event("startup")
+async def ensure_committee_users():
+    """Idempotent: pastikan user panitia 'chelyn' ada (Admin + izin hapus data)."""
+    try:
+        if not await db.admin_users.find_one({"username": "chelyn"}):
+            await db.admin_users.insert_one({
+                "id": str(uuid.uuid4()),
+                "username": "chelyn",
+                "name": "Chelyn",
+                "role": "admin",
+                "can_delete": True,
+                "password_hash": hash_password("Chelyn123456"),
+                "created_at": now_iso(),
+            })
+            logger.info("committee user 'chelyn' ensured")
+    except Exception as e:
+        logger.error(f"ensure chelyn error: {e}")
+    try:
+        # auto-hapus catatan percobaan login lama (>1 hari)
+        await db.login_attempts.create_index("updated_at", expireAfterSeconds=86400)
+    except Exception as e:
+        logger.error(f"login_attempts index error: {e}")
 
 
 @app.on_event("startup")
