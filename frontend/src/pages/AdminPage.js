@@ -955,7 +955,7 @@ export default function AdminPage() {
             sessionFilter === "all" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/40")}>
           Semua Sesi
         </button>
-        {[1, 2, 3, 4].map((sid) => (
+        {[1, 2, 3, 4, 5].map((sid) => (
           <button key={sid} data-testid={`session-filter-${sid}`} onClick={() => setSessionFilter(sid)}
             className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
               sessionFilter === sid ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/40")}>
