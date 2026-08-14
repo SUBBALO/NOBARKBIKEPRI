@@ -1,0 +1,40 @@
+{
+  "summary": "Iterasi 8 — memverifikasi 3 fitur baru: (1) dual switch per sesi Umum vs Panitia, (2) izin can_delete untuk staff non-super, (3) soft delete + Kotak Sampah + restore. Backend pytest 8/8 pass. UI Playwright e2e semua alur lolos.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter8_walkin_trash_perm.py",
+    "/app/test_reports/pytest/iter8.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py restore_order: memakai `taken_seats(session_id)` untuk merilis expired locks, lalu insert lock baru. Bila dua super admin restore paralel ada race kecil (bukan blocker karena super admin sedikit).",
+    "AdminPage.js sudah membedakan public/walkin state secara benar: variabel `isOpen` (public) & `walkinOpen` dipakai untuk warna kartu & label tiap sesi. Border kartu hijau juga muncul saat SALAH SATU sisi terbuka — bagus untuk UX.",
+    "TrashPanel render tunggal — sebelumnya ada duplikat (menurut catatan main agent), sekarang hanya 1 (diverifikasi via query_selector_all length=1).",
+    "Kelola User: switch can_delete untuk non-super hadir; super admin menampilkan pesan statis. Optimistic update + rollback on error sudah tepat."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter8_walkin_trash_perm.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (super), admin2/admin123 (admin), admin3/admin123 (checkin)",
+  "seed_data_creation": "Membuat 1 order walk-in tes (TEST_UI_iter8, Sesi 4, M2, cash Rp60.000). Sudah dihapus via API (soft-delete → berada di trash, aman).",
+  "final_state": "Sudah dikembalikan seperti permintaan: coming_soon=ON, semua Umum (Online) OFF, semua Panitia (Lokasi) OFF. Diverifikasi via GET /api/event.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Field baru di /api/event: setiap sesi punya `walkin_open` bool. Endpoint toggle butuh body {session_id, open, target: 'public'|'walkin'}. Delete sekarang SOFT (set deleted:true) — semua query list/stats/export exclude deleted:true. Endpoint /api/admin/orders/deleted & /restore hanya untuk superadmin (403 utk lain). /api/admin/users/{id}/permission {can_delete:bool} superadmin-only. Walk-in menolak sesi yg tidak ada di walkin_sessions (400). Test file iter8 sudah cek semuanya.",
+  "verified_flows": [
+    "GET /api/event: setiap sesi punya field `walkin_open` bool.",
+    "POST /api/admin/sessions/toggle target=walkin membuka sesi 4 untuk walk-in TANPA membuka public (status public tetap 'closed').",
+    "POST /api/admin/walkin sesi 4 saat walkin CLOSED → 400 'belum dibuka untuk penjualan panitia di lokasi'; saat walkin OPEN → 200 create verified order.",
+    "DELETE /api/admin/orders/{id} (superadmin) → soft delete (deleted:true); order hilang dari GET /api/admin/orders; muncul di GET /api/admin/orders/deleted; POST /restore mengembalikan ke list utama.",
+    "GET /api/admin/orders/deleted & POST /restore untuk admin biasa → 403.",
+    "POST /api/admin/users/{id}/permission {can_delete:true} memberi admin2 izin hapus; delete-nya kini 200; setelah revoke → 403 kembali.",
+    "UI /admin (super admin login): session-control-card menampilkan 5 sesi masing-masing dengan session-open-switch-{id} + session-walkin-switch-{id}. Toggle Panitia sesi 4 → toast 'Sesi 4 DIBUKA untuk Panitia (lokasi)', Umum sesi 4 tetap TUTUP.",
+    "UI Kotak Sampah: tab admin-tab-trash tampil (superadmin only), panel data-testid trash-panel hanya SATU (tidak duplikat), state kosong menampilkan 'Kotak sampah kosong.'",
+    "UI Soft delete flow: klik delete-open-{id8} → dialog muncul berisi kata 'Kotak Sampah', tombol data-testid delete-confirm bertuliskan 'Ya, Hapus' (BUKAN 'Ya, Hapus Permanen'). Setelah confirm → order hilang dari list; muncul di Kotak Sampah sebagai trash-row-{id8}; tombol trash-restore-{id8} mengembalikan ke list utama.",
+    "UI Kelola User: user-candelete-admin2 & user-candelete-admin3 hadir; user-candelete-admin1 (super) TIDAK ada (superadmin baris menampilkan pesan statis).",
+    "UI /walkin: login walkin-login-*; sesi tertutup walk-in tampil '• TUTUP'; klik sesi tertutup memicu walkin-session-closed panel & tidak menampilkan seat-map; setelah super admin membuka walkin sesi 3, label berubah '• BUKA' dan seat map muncul dengan kolom Data Pembeli."
+  ],
+  "rca of the issue": "N/A — tidak ada bug ditemukan. Semua 3 fitur bekerja sesuai spesifikasi. State preview dikembalikan ke coming_soon ON, semua sesi tertutup (public & walkin)."
+}

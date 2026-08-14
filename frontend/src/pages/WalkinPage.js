@@ -8,7 +8,7 @@ import { SeatMap } from "@/components/SeatMap";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw } from "lucide-react";
+import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SESSIONS = [
@@ -84,11 +84,20 @@ export default function WalkinPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [transfer, setTransfer] = useState(null);
+  const [walkinSessions, setWalkinSessions] = useState({});
   const pollRef = useRef(null);
 
-  useEffect(() => {
-    api.get("/event").then(({ data }) => setTransfer(data.transfer)).catch(() => {});
+  const loadEvent = useCallback(async () => {
+    try {
+      const { data } = await api.get("/event");
+      setTransfer(data.transfer);
+      const map = {};
+      (data.sessions || []).forEach((s) => { map[s.id] = !!s.walkin_open; });
+      setWalkinSessions(map);
+    } catch { /* ignore */ }
   }, []);
+
+  useEffect(() => { loadEvent(); }, [loadEvent]);
 
   const loadMap = useCallback(async (sid, showSpinner = false) => {
     if (showSpinner) setLoadingMap(true);
@@ -104,9 +113,9 @@ export default function WalkinPage() {
     setSelected([]);
     loadMap(sessionId, true);
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => loadMap(sessionId, false), 5000);
+    pollRef.current = setInterval(() => { loadMap(sessionId, false); loadEvent(); }, 5000);
     return () => pollRef.current && clearInterval(pollRef.current);
-  }, [authed, sessionId, loadMap]);
+  }, [authed, sessionId, loadMap, loadEvent]);
 
   if (!authed) return <Login onLogin={() => { setUser(getAdminUser()); setAuthed(true); }} />;
 
@@ -133,6 +142,7 @@ export default function WalkinPage() {
   const total = amount;
 
   const submit = async () => {
+    if (!walkinSessions[sessionId]) { toast.error("Sesi ini belum dibuka untuk panitia (lokasi)"); return; }
     if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
     if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
     if (amount <= 0) { toast.error("Isi nominal dana sukarela"); return; }
@@ -153,6 +163,7 @@ export default function WalkinPage() {
 
   const remaining = mapData ? (mapData.capacity - mapData.booked) : null;
   const sold = mapData && remaining <= 0;
+  const sessionWalkinOpen = walkinSessions[sessionId];
 
   return (
     <div className="min-h-screen bg-[#FDFBF7]">
@@ -175,27 +186,44 @@ export default function WalkinPage() {
         <div className="lg:col-span-2 rounded-2xl border border-border bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex flex-wrap gap-2">
-              {SESSIONS.map((s) => (
-                <button key={s.id} data-testid={`walkin-session-${s.id}`} onClick={() => setSessionId(s.id)}
-                  className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                    sessionId === s.id ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
-                  {s.name} · {s.time}
-                </button>
-              ))}
+              {SESSIONS.map((s) => {
+                const isWalkinOpen = walkinSessions[s.id];
+                return (
+                  <button key={s.id} data-testid={`walkin-session-${s.id}`} onClick={() => setSessionId(s.id)}
+                    className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors relative",
+                      sessionId === s.id ? "bg-[#B26A1E] text-white border-[#B26A1E]"
+                        : isWalkinOpen ? "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50"
+                          : "bg-muted/50 text-[#9CA3AF] border-border")}>
+                    {s.name} · {s.time}
+                    <span className={cn("ml-1.5 text-[10px] font-semibold", isWalkinOpen ? (sessionId === s.id ? "text-white/90" : "text-[#255E33]") : "text-[#B26A1E]")}>
+                      {isWalkinOpen ? "• BUKA" : "• TUTUP"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <button onClick={() => loadMap(sessionId, true)} className="inline-flex items-center gap-1 text-xs text-[#7A6A5E] hover:text-[#B26A1E]">
               <RefreshCw className="h-3.5 w-3.5" /> Perbarui
             </button>
           </div>
 
-          {mapData && (
+          {mapData && sessionWalkinOpen && (
             <p className="text-sm mb-3" data-testid="walkin-remaining">
               {sold ? <span className="font-semibold text-[#EF4444]">Kursi sesi ini habis terjual</span>
                 : <>Sisa <b className="text-[#255E33] text-lg">{remaining}</b> kursi · {mapData.booked}/{mapData.capacity} terisi</>}
             </p>
           )}
 
-          {loadingMap ? (
+          {!sessionWalkinOpen ? (
+            <div className="rounded-xl border border-[#B26A1E]/40 bg-[#F3E9DD]/50 p-8 text-center" data-testid="walkin-session-closed">
+              <Store className="h-10 w-10 text-[#B26A1E] mx-auto mb-3" />
+              <p className="font-semibold text-[#7A241F]">Sesi ini belum dibuka untuk penjualan panitia</p>
+              <p className="text-sm text-[#7A6A5E] mt-1 max-w-sm mx-auto">
+                Minta <b>Super Admin</b> membuka sesi ini lewat panel admin
+                (Verifikasi Pembayaran → Buka/Tutup Penjualan per Sesi → saklar <b>Panitia (Lokasi)</b>), lalu pilih sesi ini lagi.
+              </p>
+            </div>
+          ) : loadingMap ? (
             <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#B26A1E]" /></div>
           ) : mapData ? (
             <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} couples={mapData.couples || {}} allowDisability />
@@ -258,7 +286,7 @@ export default function WalkinPage() {
             <span className="font-serif-display text-2xl text-[#B26A1E]" data-testid="walkin-total">{rupiah(total)}</span>
           </div>
 
-          <Button onClick={submit} disabled={busy || selected.length === 0} data-testid="walkin-submit"
+          <Button onClick={submit} disabled={busy || selected.length === 0 || !sessionWalkinOpen} data-testid="walkin-submit"
             className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
             {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} Buat Tiket & Check-in
           </Button>

@@ -13,7 +13,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote,
+  Store, Banknote, RotateCcw, ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -127,6 +127,10 @@ const FILTERS = [
   { k: "pending_payment", t: "Belum Bayar" },
   { k: "rejected", t: "Ditolak" },
 ];
+
+const channelInfo = (o) => o.walkin
+  ? { t: "Panitia · Lokasi", c: "bg-[#B26A1E]/15 text-[#8A3A12]" }
+  : { t: "Umum · Online", c: "bg-[#7A241F]/10 text-[#7A241F]" };
 
 function LoginView({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -285,6 +289,7 @@ function SalesSummary({ stats }) {
   const b = stats?.breakdown;
   if (!b) return null;
   const w = b.walkin, on = b.online;
+  const cashSessions = (stats?.cash_per_session || []).filter((s) => s.revenue > 0);
   const Row = ({ label, data, accent }) => (
     <div className="flex items-center justify-between py-1.5 text-sm">
       <span className={cn("text-[#7A6A5E]", accent && "font-medium text-[#2C1E16]")}>{label}</span>
@@ -313,12 +318,25 @@ function SalesSummary({ stats }) {
           </div>
         </div>
       </div>
-      <div className="mt-4 rounded-xl bg-[#2F703E]/[0.07] border border-[#2F703E]/20 p-4 flex items-center justify-between" data-testid="cash-recap">
-        <div>
-          <p className="text-sm font-semibold text-[#255E33] flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Rekap Kas Cash (walk-in)</p>
-          <p className="text-xs text-[#7A6A5E]">Total uang tunai yang harus ada di tangan bendahara</p>
+      <div className="mt-4 rounded-xl bg-[#2F703E]/[0.07] border border-[#2F703E]/20 p-4" data-testid="cash-recap">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[#255E33] flex items-center gap-1.5"><Banknote className="h-4 w-4" /> Rekap Kas Cash (jualan panitia di lokasi)</p>
+            <p className="text-xs text-[#7A6A5E]">Total uang tunai yang harus ada di tangan bendahara</p>
+          </div>
+          <span className="font-serif-display text-3xl text-[#255E33]" data-testid="cash-total">{rupiah(stats.cash_total || 0)}</span>
         </div>
-        <span className="font-serif-display text-3xl text-[#255E33]" data-testid="cash-total">{rupiah(stats.cash_total || 0)}</span>
+        {cashSessions.length > 0 && (
+          <div className="mt-3 border-t border-dashed border-[#2F703E]/25 pt-2 space-y-1" data-testid="cash-per-session">
+            <p className="text-[11px] font-semibold text-[#255E33] mb-1">Rincian kas cash per sesi:</p>
+            {cashSessions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between text-sm" data-testid={`cash-session-${s.id}`}>
+                <span className="text-[#5B4636]">{s.name} · {s.time} <span className="text-xs text-[#7A6A5E]">({s.tickets} tiket · {s.orders} pembeli)</span></span>
+                <b className="text-[#255E33]">{rupiah(s.revenue)}</b>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -395,6 +413,8 @@ const ACTION_META = {
   walkin: { label: "Jual di Tempat", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
   coming_soon: { label: "Coming Soon", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
   session_toggle: { label: "Buka/Tutup Sesi", c: "bg-[#2F703E]/15 text-[#255E33]" },
+  restore: { label: "Pulihkan Order", c: "bg-[#2F703E]/15 text-[#255E33]" },
+  user_permission: { label: "Izin Hapus", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
 };
 
 function LogsPanel() {
@@ -497,6 +517,16 @@ function UsersPanel({ currentUser }) {
     } catch (err) { toast.error(err?.response?.data?.detail || "Gagal menghapus user"); }
     setBusy(false);
   };
+  const togglePermission = async (u, value) => {
+    setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, can_delete: value } : x));
+    try {
+      await adminApi.post(`/admin/users/${u.id}/permission`, { can_delete: value });
+      toast.success(value ? `${u.name} kini boleh menghapus data` : `Izin hapus ${u.name} dicabut`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Gagal mengubah izin");
+      setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, can_delete: !value } : x));
+    }
+  };
 
   return (
     <div className="grid lg:grid-cols-2 gap-6 no-print">
@@ -548,19 +578,34 @@ function UsersPanel({ currentUser }) {
           <div className="space-y-2" data-testid="users-list">
             {users.map((u) => {
               const rb = ROLE_BADGE[u.role] || { t: u.role, c: "bg-muted" };
+              const isSuperUser = u.role === "superadmin";
               return (
-                <div key={u.id} data-testid={`user-row-${u.username}`} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-[#2C1E16] truncate">{u.name} <span className="text-xs text-[#7A6A5E] font-normal">@{u.username}</span></p>
-                    <span className={cn("inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium", rb.c)}>{rb.t}</span>
+                <div key={u.id} data-testid={`user-row-${u.username}`} className="rounded-xl border border-border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[#2C1E16] truncate">{u.name} <span className="text-xs text-[#7A6A5E] font-normal">@{u.username}</span></p>
+                      <span className={cn("inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium", rb.c)}>{rb.t}</span>
+                    </div>
+                    {u.id === currentUser?.id ? (
+                      <span className="text-[11px] text-[#7A6A5E]">Anda</span>
+                    ) : (
+                      <button onClick={() => setDelTarget(u)} data-testid={`user-delete-${u.username}`}
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                  {u.id === currentUser?.id ? (
-                    <span className="text-[11px] text-[#7A6A5E]">Anda</span>
-                  ) : (
-                    <button onClick={() => setDelTarget(u)} data-testid={`user-delete-${u.username}`}
-                      className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  {!isSuperUser && (
+                    <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg bg-[#FDFBF7] border border-border px-2.5 py-2">
+                      <span className="text-[11px] font-medium text-[#5B4636] flex items-center gap-1.5">
+                        <Trash2 className="h-3.5 w-3.5 text-[#EF4444]" /> Boleh hapus data pesanan
+                      </span>
+                      <Switch checked={!!u.can_delete} onCheckedChange={(v) => togglePermission(u, v)}
+                        data-testid={`user-candelete-${u.username}`} />
+                    </div>
+                  )}
+                  {isSuperUser && (
+                    <p className="mt-2 text-[11px] text-[#7A6A5E]">Super Admin selalu bisa menghapus & memulihkan data.</p>
                   )}
                 </div>
               );
@@ -611,11 +656,49 @@ function WalkinPanel() {
   );
 }
 
+
+function TrashPanel({ orders, loading, onRefresh, onRestore, restoreBusyId }) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] no-print" data-testid="trash-panel">
+      <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+        <div>
+          <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2"><Trash2 className="h-5 w-5 text-[#EF4444]" /> Kotak Sampah</h2>
+          <p className="text-sm text-[#7A6A5E]">Pesanan yang dihapus tersimpan di sini. Super Admin bisa memulihkannya.</p>
+        </div>
+        <Button variant="outline" onClick={onRefresh} data-testid="trash-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
+      </div>
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
+      ) : orders.length === 0 ? (
+        <p className="text-center text-sm text-[#7A6A5E] py-12" data-testid="trash-empty">Kotak sampah kosong.</p>
+      ) : (
+        <div className="space-y-2" data-testid="trash-list">
+          {orders.map((o) => (
+            <div key={o.id} data-testid={`trash-row-${o.id.slice(0, 8)}`}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-[#2C1E16]">{o.name} <span className="font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></p>
+                <p className="text-xs text-[#7A6A5E]">{o.phone} · {o.session?.name} · {o.seats?.join(", ")} · {rupiah(o.total_amount)}</p>
+                {o.deleted_by && <p className="text-[11px] text-[#EF4444]">Dihapus oleh {o.deleted_by} · {fmtTime(o.deleted_at)}</p>}
+              </div>
+              <Button size="sm" onClick={() => onRestore(o)} disabled={restoreBusyId === o.id}
+                data-testid={`trash-restore-${o.id.slice(0, 8)}`} className="bg-[#2F703E] hover:bg-[#255E33]">
+                {restoreBusyId === o.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <RotateCcw className="h-4 w-4 mr-1.5" />} Pulihkan
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
   const [currentUser, setCurrentUser] = useState(getAdminUser());
   const isSuper = currentUser?.role === "superadmin";
   const isStaff = currentUser?.role === "superadmin" || currentUser?.role === "admin";
+  const canDelete = isSuper || !!currentUser?.can_delete;
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState(null);
   const [event, setEvent] = useState(null);
@@ -637,6 +720,9 @@ export default function AdminPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deletedOrders, setDeletedOrders] = useState([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [restoreBusyId, setRestoreBusyId] = useState(null);
 
   const load = useCallback(async () => {
     if (!isStaff) { setLoading(false); return; }
@@ -669,13 +755,34 @@ export default function AdminPage() {
     setBusyId(null);
   };
 
-  const toggleSessionOpen = async (sid, open) => {
+  const toggleSessionOpen = async (sid, open, target = "public") => {
     try {
-      await adminApi.post("/admin/sessions/toggle", { session_id: sid, open });
-      toast.success(open ? `Sesi ${sid} DIBUKA untuk penjualan` : `Sesi ${sid} DITUTUP`);
+      await adminApi.post("/admin/sessions/toggle", { session_id: sid, open, target });
+      const who = target === "walkin" ? "Panitia (lokasi)" : "Umum (online)";
+      toast.success(open ? `Sesi ${sid} DIBUKA untuk ${who}` : `Sesi ${sid} DITUTUP untuk ${who}`);
       await load();
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal mengubah sesi"); }
   };
+
+  const loadTrash = useCallback(async () => {
+    setTrashLoading(true);
+    try { const { data } = await adminApi.get("/admin/orders/deleted"); setDeletedOrders(data); }
+    catch { toast.error("Gagal memuat kotak sampah"); }
+    setTrashLoading(false);
+  }, []);
+
+  const restoreOrder = async (o) => {
+    setRestoreBusyId(o.id);
+    try {
+      await adminApi.post(`/admin/orders/${o.id}/restore`);
+      toast.success(`Pesanan #${o.order_no} dipulihkan`);
+      await loadTrash();
+      await load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal memulihkan pesanan"); }
+    setRestoreBusyId(null);
+  };
+
+  useEffect(() => { if (authed && isSuper && tab === "trash") loadTrash(); }, [authed, isSuper, tab, loadTrash]);
 
   const toggleComingSoon = async () => {
     const enable = !event?.coming_soon;
@@ -693,7 +800,7 @@ export default function AdminPage() {
     setDeleteBusy(true);
     try {
       await adminApi.delete(`/admin/orders/${deleteTarget.id}`);
-      toast.success(`Pesanan #${deleteTarget.order_no} dihapus permanen`);
+      toast.success(`Pesanan #${deleteTarget.order_no} dipindah ke Kotak Sampah`);
       setDeleteTarget(null);
       setSelectedIds((p) => p.filter((x) => x !== deleteTarget.id));
       await load();
@@ -908,6 +1015,13 @@ export default function AdminPage() {
             <Users className="h-4 w-4" /> Kelola User
           </button>
         )}
+        {isSuper && (
+          <button data-testid="admin-tab-trash" onClick={() => setTab("trash")}
+            className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+              tab === "trash" ? "bg-[#EF4444] text-white border-[#EF4444]" : "bg-white text-[#7A6A5E] border-border hover:border-[#EF4444]/50")}>
+            <Trash2 className="h-4 w-4" /> Kotak Sampah
+          </button>
+        )}
       </div>
 
       {tab === "payment" && (<>
@@ -919,27 +1033,38 @@ export default function AdminPage() {
         <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print" data-testid="session-control-card">
           <p className="text-sm font-medium text-[#7A241F] mb-1 flex items-center gap-2"><Users className="h-4 w-4" /> Buka/Tutup Penjualan per Sesi</p>
           <p className="text-[11px] text-[#7A6A5E] mb-3">
-            {isSuper ? "Sesi TUTUP tidak bisa dipesan pembeli online. Geser untuk membuka." : "Hanya Super Admin yang dapat membuka/menutup sesi."}
+            {isSuper
+              ? "Tiap sesi punya 2 saklar terpisah: Umum (pembeli online di web) & Panitia (jual di lokasi via /walkin). Sesi bisa dibuka untuk panitia saja tanpa dibuka untuk umum."
+              : "Hanya Super Admin yang dapat membuka/menutup sesi."}
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {event.sessions.map((s) => {
               const isOpen = s.status === "open" || s.status === "full";
+              const walkinOpen = !!s.walkin_open;
               return (
                 <div key={s.id} data-testid={`admin-session-${s.id}`}
-                  className={cn("rounded-xl border p-3 flex items-center justify-between gap-2",
-                    isOpen ? "border-[#2F703E]/40 bg-[#2F703E]/[0.06]" : "border-border bg-muted/30")}>
-                  <div className="min-w-0">
+                  className={cn("rounded-xl border p-3",
+                    (isOpen || walkinOpen) ? "border-[#2F703E]/40 bg-[#2F703E]/[0.05]" : "border-border bg-muted/30")}>
+                  <div className="min-w-0 mb-2.5">
                     <p className="text-sm font-semibold text-[#2C1E16]">{s.name} <span className="font-normal text-[#7A6A5E]">· {s.time}</span></p>
-                    <p className="text-[11px] text-[#7A6A5E]">{s.booked}/{s.capacity} terisi ·
-                      <span className={cn("font-semibold ml-1", isOpen ? "text-[#255E33]" : "text-[#7A6A5E]")}>
-                        {s.status === "full" ? "PENUH" : isOpen ? "DIBUKA" : "TUTUP"}
-                      </span>
-                    </p>
+                    <p className="text-[11px] text-[#7A6A5E]">{s.booked}/{s.capacity} terisi{s.status === "full" ? " · PENUH" : ""}</p>
                   </div>
-                  {isSuper && (
-                    <Switch checked={isOpen} onCheckedChange={(v) => toggleSessionOpen(s.id, v)}
-                      data-testid={`session-open-switch-${s.id}`} />
-                  )}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-white border border-border px-2.5 py-1.5">
+                      <span className="text-[11px] font-medium text-[#2C1E16]">
+                        Umum (Online) · <span className={cn("font-semibold", isOpen ? "text-[#255E33]" : "text-[#7A6A5E]")}>{isOpen ? "BUKA" : "TUTUP"}</span>
+                      </span>
+                      <Switch checked={isOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "public")}
+                        data-testid={`session-open-switch-${s.id}`} />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-white border border-border px-2.5 py-1.5">
+                      <span className="text-[11px] font-medium text-[#2C1E16]">
+                        Panitia (Lokasi) · <span className={cn("font-semibold", walkinOpen ? "text-[#8A3A12]" : "text-[#7A6A5E]")}>{walkinOpen ? "BUKA" : "TUTUP"}</span>
+                      </span>
+                      <Switch checked={walkinOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "walkin")}
+                        data-testid={`session-walkin-switch-${s.id}`} />
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -1035,8 +1160,19 @@ export default function AdminPage() {
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#7A6A5E]">
                     <span>{fmtTime(o.created_at)}</span>
                     <span className="text-[#2C1E16]">{o.session?.name} · {o.seats.join(", ")}</span>
+                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", channelInfo(o).c)} data-testid={`channel-${o.id.slice(0, 8)}`}>{channelInfo(o).t}</span>
                     <span className="font-semibold text-[#7A241F] text-sm ml-auto">{rupiah(o.total_amount)}</span>
                   </div>
+                  {(o.walkin && o.sold_by) || o.verified_by ? (
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+                      {o.walkin && o.sold_by && (
+                        <span className="text-[#8A3A12]">Dijual: <b>{o.sold_by}</b>{o.payment_method === "cash" ? " (Cash)" : ""}</span>
+                      )}
+                      {o.verified_by && o.status === "verified" && (
+                        <span className="text-[#255E33]">Diverifikasi: <b>{o.verified_by}</b></span>
+                      )}
+                    </div>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {o.status === "waiting_verification" ? (
                       <Button size="sm" onClick={() => openProof(o)} className="h-8 bg-[#B26A1E] hover:bg-[#8A3A12] text-xs">
@@ -1064,7 +1200,7 @@ export default function AdminPage() {
                         <MessageCircle className="h-3.5 w-3.5 mr-1" /> Ingatkan Upload
                       </Button>
                     ) : null}
-                    {isSuper && (
+                    {canDelete && (
                       <button onClick={() => setDeleteTarget(o)} title="Hapus pesanan"
                         className="ml-auto inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
                         <Trash2 className="h-4 w-4" />
@@ -1091,7 +1227,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-center">Verifikasi</th>
                   <th className="px-4 py-3 font-medium text-center">Kirim Pesan</th>
-                  {isSuper && <th className="px-4 py-3 font-medium text-center">Hapus</th>}
+                  {canDelete && <th className="px-4 py-3 font-medium text-center">Hapus</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -1116,6 +1252,13 @@ export default function AdminPage() {
                       <td className="px-4 py-3">
                         <p>{o.session?.name}</p>
                         <p className="text-xs text-[#7A6A5E]">{o.seats.join(", ")}</p>
+                        <span className={cn("inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium", channelInfo(o).c)}
+                          data-testid={`channel-${o.id.slice(0, 8)}`}>{channelInfo(o).t}</span>
+                        {o.walkin && o.sold_by && (
+                          <p className="text-[10px] text-[#8A3A12] mt-0.5" data-testid={`soldby-${o.id.slice(0, 8)}`}>
+                            Dijual oleh <b>{o.sold_by}</b>{o.payment_method === "cash" ? " (Cash)" : ""}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-semibold text-[#7A241F]">{rupiah(o.total_amount)}</td>
                       <td className="px-4 py-3">
@@ -1167,7 +1310,7 @@ export default function AdminPage() {
                         )}
                       </td>
                       {/* Hapus */}
-                      {isSuper && (
+                      {canDelete && (
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => setDeleteTarget(o)} data-testid={`delete-open-${o.id.slice(0, 8)}`}
                             title="Hapus pesanan"
@@ -1197,6 +1340,11 @@ export default function AdminPage() {
       {tab === "walkin" && <WalkinPanel />}
 
       {tab === "users" && isSuper && <UsersPanel currentUser={currentUser} />}
+
+      {tab === "trash" && isSuper && (
+        <TrashPanel orders={deletedOrders} loading={trashLoading} onRefresh={loadTrash}
+          onRestore={restoreOrder} restoreBusyId={restoreBusyId} />
+      )}
 
       {/* Proof viewer */}
       <Dialog open={!!proofView} onOpenChange={() => setProofView(null)}>
@@ -1306,8 +1454,8 @@ export default function AdminPage() {
           {deleteTarget && (
             <div className="text-sm space-y-3">
               <p className="text-[#7A6A5E]">
-                Pesanan berikut akan <b className="text-[#EF4444]">dihapus permanen</b> dan
-                <b> tidak bisa dikembalikan</b>.
+                Pesanan berikut akan dipindah ke <b className="text-[#EF4444]">Kotak Sampah</b> dan kursinya dilepas.
+                Super Admin masih bisa <b>memulihkannya</b> bila salah hapus.
               </p>
               <div className="rounded-lg border border-border bg-muted/30 p-3">
                 <p className="font-semibold text-[#2C1E16]">{deleteTarget.name} <span className="font-mono text-xs text-[#7A6A5E]">#{deleteTarget.order_no}</span></p>
@@ -1322,7 +1470,7 @@ export default function AdminPage() {
             </Button>
             <Button onClick={doDelete} disabled={deleteBusy} data-testid="delete-confirm"
               className="flex-1 bg-[#EF4444] hover:bg-[#DC2626]">
-              {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />} Ya, Hapus Permanen
+              {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />} Ya, Hapus
             </Button>
           </DialogFooter>
         </DialogContent>

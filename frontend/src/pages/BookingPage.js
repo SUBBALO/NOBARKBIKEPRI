@@ -234,7 +234,7 @@ export default function BookingPage() {
             <UploadCloud className="h-5 w-5 text-[#7A241F]" />
           </span>
           <div className="min-w-0">
-            <p className="font-semibold text-[#7A241F] text-sm sm:text-base">Sudah bayar tapi lupa upload bukti?</p>
+            <p className="font-semibold text-[#7A241F] text-sm sm:text-base">Sudah berdana tapi lupa upload bukti?</p>
             <p className="text-xs text-[#7A6A5E]">Cari pesanan dengan nomor HP Anda, lalu upload buktinya di sini.</p>
           </div>
         </div>
@@ -413,18 +413,11 @@ export default function BookingPage() {
                 </h3>
                 <p className="text-xs text-[#7A6A5E] mt-1.5">
                   Biaya pengadaan rata-rata <b>{rupiah(REF_COST)}/orang</b>.
-                  Acuan untuk {selected.length} tiket: <b className="text-[#7A241F]">{rupiah(refTotal)}</b> — nominal tetap bebas sesuai kerelaan.
+                  Acuan untuk {selected.length} tiket: <b className="text-[#7A241F]">{rupiah(refTotal)}</b>.
                 </p>
-                <div className="flex flex-wrap items-center gap-2 mt-3">
-                  <button type="button" data-testid="donation-use-reference"
-                    onClick={() => setAmountText(String(refTotal))}
-                    className={cn("text-xs font-semibold rounded-full px-4 py-2 border transition-colors",
-                      amount === refTotal
-                        ? "bg-[#B26A1E] text-white border-[#B26A1E]"
-                        : "bg-white text-[#7A241F] border-[#B26A1E]/40 hover:border-[#B26A1E]")}>
-                    Pakai nominal acuan ({rupiah(refTotal)})
-                  </button>
-                </div>
+                <p className="text-base sm:text-lg font-semibold text-[#7A241F] mt-2 leading-snug" data-testid="donation-free-note">
+                  Nominal tetap <span className="text-[#B26A1E]">bebas</span> sesuai kerelaan Anda 🙏
+                </p>
                 <Label htmlFor="donation" className="text-xs text-[#5B4636] mt-4 block">Nominal dana sukarela (Rp)</Label>
                 <div className="relative mt-1.5">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>

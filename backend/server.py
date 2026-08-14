@@ -133,6 +133,11 @@ class UserCreate(BaseModel):
     password: str
     name: Optional[str] = ""
     role: Literal["superadmin", "admin", "checkin"] = "checkin"
+    can_delete: bool = False
+
+
+class UserPermission(BaseModel):
+    can_delete: bool
 
 
 class SetActiveSession(BaseModel):
@@ -142,6 +147,7 @@ class SetActiveSession(BaseModel):
 class SessionToggle(BaseModel):
     session_id: int
     open: bool
+    target: Literal["public", "walkin"] = "public"
 
 
 class SetComingSoon(BaseModel):
@@ -250,6 +256,12 @@ async def get_open_sessions():
     return set(cfg.get("open_sessions", []))
 
 
+async def get_walkin_sessions():
+    """Sesi yang boleh dijual PANITIA di lokasi (walk-in). Terpisah dari sesi umum/online."""
+    cfg = await get_config()
+    return set(cfg.get("walkin_sessions", []))
+
+
 def mask_name(name: str) -> str:
     parts = (name or "").strip().split()
     out = []
@@ -315,6 +327,7 @@ def create_token(user: dict) -> str:
 def public_user(u: dict) -> dict:
     return {"id": u["id"], "username": u["username"], "name": u.get("name", ""),
             "role": u["role"], "role_label": ROLE_LABELS.get(u["role"], u["role"]),
+            "can_delete": bool(u.get("can_delete", False)) or u["role"] == "superadmin",
             "created_at": u.get("created_at")}
 
 
@@ -343,7 +356,8 @@ async def get_current_user(x_admin_token: Optional[str] = Header(None)):
     u = await db.admin_users.find_one({"id": payload.get("sub")})
     if not u:
         raise HTTPException(status_code=401, detail="Akun tidak ditemukan")
-    return {"id": u["id"], "username": u["username"], "name": u.get("name", ""), "role": u["role"]}
+    return {"id": u["id"], "username": u["username"], "name": u.get("name", ""),
+            "role": u["role"], "can_delete": bool(u.get("can_delete", False))}
 
 
 def require_roles(*roles):
@@ -368,10 +382,13 @@ async def root():
 @api_router.get("/event")
 async def event_info():
     open_s = await get_open_sessions()
+    walkin_s = await get_walkin_sessions()
     sessions = []
     for s in SESSIONS:
         status, count = await session_status(s["id"], open_s)
-        sessions.append({**s, "status": status, "booked": count, "capacity": SEATS_PER_SESSION})
+        sessions.append({**s, "status": status, "booked": count,
+                         "capacity": SEATS_PER_SESSION,
+                         "walkin_open": s["id"] in walkin_s})
     return {
         "title": EVENT_TITLE,
         "date": EVENT_DATE,
@@ -491,7 +508,7 @@ async def lookup_orders(phone: str):
     if len(p) < 6:
         raise HTTPException(status_code=400, detail="Masukkan nomor HP yang valid")
     docs = await db.orders.find(
-        {"status": {"$ne": "rejected"}}, {"proof_image": 0}
+        {"status": {"$ne": "rejected"}, "deleted": {"$ne": True}}, {"proof_image": 0}
     ).sort("created_at", -1).to_list(3000)
     result = []
     for o in docs:
@@ -580,7 +597,7 @@ async def admin_me(user: dict = Depends(get_current_user)):
 
 @api_router.get("/admin/orders")
 async def admin_orders(user: dict = Depends(require_staff), status: Optional[str] = None):
-    match = {}
+    match = {"deleted": {"$ne": True}}
     if status:
         match["status"] = status
     pipeline = []
@@ -614,7 +631,7 @@ async def get_proof_image(order_id: str, user: dict = Depends(require_staff)):
 
 @api_router.get("/admin/stats")
 async def admin_stats(user: dict = Depends(require_staff)):
-    pipeline = [{"$group": {
+    pipeline = [{"$match": {"deleted": {"$ne": True}}}, {"$group": {
         "_id": "$status",
         "count": {"$sum": 1},
         "revenue": {"$sum": "$base_amount"},
@@ -638,7 +655,7 @@ async def admin_stats(user: dict = Depends(require_staff)):
               "qris": {"orders": 0, "tickets": 0, "revenue": 0},
               "transfer": {"orders": 0, "tickets": 0, "revenue": 0}}
     pipeline2 = [
-        {"$match": {"status": "verified"}},
+        {"$match": {"status": "verified", "deleted": {"$ne": True}}},
         {"$group": {
             "_id": {"walkin": {"$ifNull": ["$walkin", False]}, "method": "$payment_method"},
             "orders": {"$sum": 1},
@@ -664,7 +681,7 @@ async def admin_stats(user: dict = Depends(require_staff)):
     # Rekap dana per sesi (order terverifikasi)
     sess_agg = {}
     async for g in db.orders.aggregate([
-        {"$match": {"status": "verified"}},
+        {"$match": {"status": "verified", "deleted": {"$ne": True}}},
         {"$group": {"_id": "$session_id", "orders": {"$sum": 1},
                     "tickets": {"$sum": "$qty"}, "revenue": {"$sum": "$base_amount"}}},
     ]):
@@ -676,11 +693,27 @@ async def admin_stats(user: dict = Depends(require_staff)):
         "revenue": sess_agg.get(s["id"], {}).get("revenue", 0) or 0,
     } for s in SESSIONS]
 
+    # Rekap KAS CASH walk-in per sesi (jualan panitia di lokasi sebelum hari-H)
+    cash_sess = {}
+    async for g in db.orders.aggregate([
+        {"$match": {"status": "verified", "walkin": True, "payment_method": "cash",
+                    "deleted": {"$ne": True}}},
+        {"$group": {"_id": "$session_id", "orders": {"$sum": 1},
+                    "tickets": {"$sum": "$qty"}, "revenue": {"$sum": "$base_amount"}}},
+    ]):
+        cash_sess[g["_id"]] = g
+    stats["cash_per_session"] = [{
+        "id": s["id"], "name": s["name"], "time": s["time"],
+        "orders": cash_sess.get(s["id"], {}).get("orders", 0),
+        "tickets": cash_sess.get(s["id"], {}).get("tickets", 0),
+        "revenue": cash_sess.get(s["id"], {}).get("revenue", 0) or 0,
+    } for s in SESSIONS]
+
     # Riwayat pembelian per hari (WIB)
     wib = timezone(timedelta(hours=7))
     daily = {}
     async for o in db.orders.find(
-        {"status": {"$nin": ["expired", "rejected"]}},
+        {"status": {"$nin": ["expired", "rejected"]}, "deleted": {"$ne": True}},
         {"created_at": 1, "qty": 1, "status": 1, "base_amount": 1},
     ):
         try:
@@ -724,14 +757,59 @@ async def reject_order(order_id: str, user: dict = Depends(require_staff)):
 
 
 @api_router.delete("/admin/orders/{order_id}")
-async def delete_order(order_id: str, user: dict = Depends(require_roles("superadmin"))):
+async def delete_order(order_id: str, user: dict = Depends(get_current_user)):
+    if not (user["role"] == "superadmin" or user.get("can_delete")):
+        raise HTTPException(status_code=403, detail="Akun Anda tidak diizinkan menghapus data")
     o = await db.orders.find_one({"id": order_id})
-    if not o:
+    if not o or o.get("deleted"):
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
-    await db.orders.delete_one({"id": order_id})
+    actor = user.get("name") or user.get("username")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "deleted": True, "deleted_at": now_iso(), "deleted_by": actor, "updated_at": now_iso()}})
     await db.seat_locks.delete_many({"order_id": order_id})  # free the seats
-    await log_activity(user, "delete", f"Hapus permanen pesanan #{o.get('order_no')} — {o.get('name')} ({o.get('phone')})", order_id)
+    await log_activity(user, "delete", f"Hapus pesanan #{o.get('order_no')} — {o.get('name')} ({o.get('phone')})", order_id)
     return {"deleted": True, "id": order_id}
+
+
+@api_router.get("/admin/orders/deleted")
+async def list_deleted_orders(user: dict = Depends(require_super)):
+    docs = await db.orders.find({"deleted": True}, {"proof_image": 0}).sort("deleted_at", -1).to_list(1000)
+    result = []
+    for o in docs:
+        session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        o = clean(o)
+        o["session"] = session
+        o["has_proof"] = False
+        result.append(o)
+    return result
+
+
+@api_router.post("/admin/orders/{order_id}/restore")
+async def restore_order(order_id: str, user: dict = Depends(require_super)):
+    o = await db.orders.find_one({"id": order_id})
+    if not o or not o.get("deleted"):
+        raise HTTPException(status_code=404, detail="Pesanan terhapus tidak ditemukan")
+    # Re-claim seats only for orders that still hold seats (active statuses)
+    if o.get("status") in ("pending_payment", "waiting_verification", "verified"):
+        await taken_seats(o["session_id"])  # release expired first
+        claimed = []
+        for seat in o.get("seats", []):
+            lid = f"{o['session_id']}:{seat}"
+            try:
+                await db.seat_locks.insert_one({
+                    "_id": lid, "session_id": o["session_id"], "seat": seat,
+                    "order_id": order_id, "expires_at": None,
+                })
+                claimed.append(seat)
+            except DuplicateKeyError:
+                if claimed:
+                    await db.seat_locks.delete_many({"_id": {"$in": [f"{o['session_id']}:{s}" for s in claimed]}})
+                raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah dipesan peserta lain — pesanan ini tidak bisa dipulihkan.")
+    await db.orders.update_one({"id": order_id},
+                               {"$set": {"deleted": False, "updated_at": now_iso()},
+                                "$unset": {"deleted_at": "", "deleted_by": ""}})
+    await log_activity(user, "restore", f"Pulihkan pesanan #{o.get('order_no')} — {o.get('name')}", order_id)
+    return clean(await db.orders.find_one({"id": order_id}))
 
 
 @api_router.post("/admin/orders/bulk")
@@ -787,6 +865,9 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
         raise HTTPException(status_code=400, detail="Nama wajib diisi")
     if payload.session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
+    walkin_s = await get_walkin_sessions()
+    if payload.session_id not in walkin_s:
+        raise HTTPException(status_code=400, detail="Sesi ini belum dibuka untuk penjualan panitia di lokasi. Minta Super Admin membukanya.")
     seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
     if not seats:
         raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
@@ -849,16 +930,18 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
 async def toggle_session_open(payload: SessionToggle, user: dict = Depends(require_roles("superadmin"))):
     if payload.session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
+    key = "walkin_sessions" if payload.target == "walkin" else "open_sessions"
+    label = "Panitia (Lokasi)" if payload.target == "walkin" else "Umum (Online)"
     cfg = await get_config()
-    open_s = set(cfg.get("open_sessions", []))
+    open_s = set(cfg.get(key, []))
     if payload.open:
         open_s.add(payload.session_id)
     else:
         open_s.discard(payload.session_id)
-    await db.config.update_one({"_id": "config"}, {"$set": {"open_sessions": sorted(open_s)}}, upsert=True)
+    await db.config.update_one({"_id": "config"}, {"$set": {key: sorted(open_s)}}, upsert=True)
     await log_activity(user, "session_toggle",
-                       f"{'Membuka' if payload.open else 'Menutup'} penjualan Sesi {payload.session_id}")
-    return {"open_sessions": sorted(open_s)}
+                       f"{'Membuka' if payload.open else 'Menutup'} Sesi {payload.session_id} untuk {label}")
+    return {key: sorted(open_s)}
 
 
 @api_router.post("/admin/coming-soon")
@@ -872,7 +955,7 @@ async def set_coming_soon(payload: SetComingSoon, user: dict = Depends(require_r
 
 @api_router.get("/admin/participants")
 async def list_participants(user: dict = Depends(require_any)):
-    docs = await db.orders.find({"status": "verified"}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
+    docs = await db.orders.find({"status": "verified", "deleted": {"$ne": True}}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
     result = []
     for o in docs:
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
@@ -894,12 +977,13 @@ async def export_orders(_: bool = Depends(require_staff)):
         "rejected": "Ditolak",
         "expired": "Kadaluarsa",
     }
-    orders = await db.orders.find({}, {"proof_image": 0}).sort([("session_id", 1), ("created_at", 1)]).to_list(5000)
+    orders = await db.orders.find({"deleted": {"$ne": True}}, {"proof_image": 0}).sort([("session_id", 1), ("created_at", 1)]).to_list(5000)
     wb = Workbook()
     ws = wb.active
     ws.title = "Peserta"
     headers = ["No", "No. Order", "Kode Pesanan", "Nama", "No HP", "Sesi", "Jam", "Kursi",
-               "Jml Tiket", "Nominal (Rp)", "Kode Unik", "Metode", "Status", "Sudah Hadir", "Waktu Check-in", "Waktu Pesan"]
+               "Jml Tiket", "Nominal (Rp)", "Kode Unik", "Metode", "Kanal", "Dijual Oleh",
+               "Diverifikasi Oleh", "Status", "Sudah Hadir", "Waktu Check-in", "Waktu Pesan"]
     ws.append(headers)
     header_fill = PatternFill("solid", fgColor="1E3A5F")
     for cell in ws[1]:
@@ -920,6 +1004,7 @@ async def export_orders(_: bool = Depends(require_staff)):
                 checkin_str = datetime.fromisoformat(o["checked_in_at"]).strftime("%d/%m/%Y %H:%M")
             except Exception:
                 checkin_str = o["checked_in_at"]
+        method_label = {"qris": "QRIS", "transfer": "Transfer", "cash": "Cash"}.get(o.get("payment_method"), "Transfer")
         ws.append([
             i,
             o.get("order_no", ""),
@@ -932,13 +1017,16 @@ async def export_orders(_: bool = Depends(require_staff)):
             o.get("qty", 0),
             o.get("total_amount", 0),
             o.get("unique_code", ""),
-            "QRIS" if o.get("payment_method") == "qris" else "Transfer",
+            method_label,
+            "Panitia (Lokasi)" if o.get("walkin") else "Umum (Online)",
+            o.get("sold_by", "") if o.get("walkin") else "",
+            o.get("verified_by", ""),
             status_label.get(o.get("status"), o.get("status")),
             "Ya" if o.get("checked_in") else "Belum",
             checkin_str,
             created_str,
         ])
-    widths = [5, 9, 12, 24, 16, 10, 12, 18, 9, 14, 9, 10, 16, 11, 18, 18]
+    widths = [5, 9, 12, 24, 16, 10, 12, 18, 9, 14, 9, 10, 15, 16, 16, 16, 11, 18, 18]
     for idx, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
     ws.freeze_panes = "A2"
@@ -1029,12 +1117,25 @@ async def create_user(payload: UserCreate, user: dict = Depends(require_super)):
         "username": uname,
         "name": payload.name or uname,
         "role": payload.role,
+        "can_delete": payload.can_delete,
         "password_hash": hash_password(payload.password),
         "created_at": now_iso(),
     }
     await db.admin_users.insert_one(doc)
     await log_activity(user, "user_create", f"Buat user '{uname}' ({ROLE_LABELS.get(payload.role, payload.role)})", doc["id"])
     return public_user(doc)
+
+
+@api_router.post("/admin/users/{user_id}/permission")
+async def set_user_permission(user_id: str, payload: UserPermission, user: dict = Depends(require_super)):
+    target = await db.admin_users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    await db.admin_users.update_one({"id": user_id}, {"$set": {"can_delete": payload.can_delete}})
+    await log_activity(user, "user_permission",
+                       f"{'Memberi' if payload.can_delete else 'Mencabut'} izin hapus data untuk '{target['username']}'", user_id)
+    updated = await db.admin_users.find_one({"id": user_id})
+    return public_user(updated)
 
 
 @api_router.delete("/admin/users/{user_id}")
@@ -1062,6 +1163,7 @@ async def list_logs(user: dict = Depends(require_staff), limit: int = 300):
 
 ACTION_LABEL_ID = {
     "delete": "Hapus Order",
+    "restore": "Pulihkan Order",
     "verify": "Verifikasi",
     "reject": "Tolak",
     "bulk_verify": "Verifikasi Massal",
@@ -1165,7 +1267,7 @@ async def backfill_seat_locks():
     Runs on every startup and is idempotent (unique _id per session:seat)."""
     try:
         active_statuses = ["pending_payment", "waiting_verification", "verified"]
-        async for o in db.orders.find({"status": {"$in": active_statuses}}):
+        async for o in db.orders.find({"status": {"$in": active_statuses}, "deleted": {"$ne": True}}):
             exp = None
             if o["status"] == "pending_payment":
                 try:
