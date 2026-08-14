@@ -64,7 +64,7 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
               <span className="font-semibold text-[#7A6A5E] text-center"
                 style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
               {row.blocks.map((block, bi) => (
-                <div key={bi} className="flex" style={{ columnGap: gap }}>
+                <div key={`${row.row}-b${bi}`} className="flex" style={{ columnGap: gap }}>
                   {block.map((seat) => {
                     const isSel = selected.includes(seat.label);
                     const st = isSel ? "selected" : seat.status;

@@ -871,7 +871,7 @@ function BendaharaPanel() {
             ) : orders.map((o, i) => {
               const mc = methodChip(o.method);
               return (
-                <tr key={i} className="border-t border-border" data-testid={`bendahara-txn-${i}`}>
+                <tr key={o.order_no ?? i} className="border-t border-border" data-testid={`bendahara-txn-${i}`}>
                   <td className="px-3 py-2 text-[#7A6A5E] whitespace-nowrap">{o.date}<span className="block text-[10px]">{o.time}</span></td>
                   <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
                   <td className="px-3 py-2"><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", o.channel === "panitia" ? "bg-[#B26A1E]/15 text-[#8A3A12]" : "bg-[#7A241F]/10 text-[#7A241F]")}>{o.channel === "panitia" ? "Panitia" : "Umum"}</span></td>
@@ -1007,7 +1007,7 @@ function VIPPanel() {
   const loadMap = useCallback(async (sid, showLoad) => {
     if (showLoad) setLoadingMap(true);
     try { const { data } = await adminApi.get(`/sessions/${sid}/seats`); setMapData(data); }
-    catch { /* ignore */ }
+    catch (e) { console.error("Gagal memuat peta kursi VIP:", e); }
     setLoadingMap(false);
   }, []);
 
@@ -1239,7 +1239,7 @@ export default function AdminPage() {
   const sendAndMarkWA = async (o) => {
     sendWA(o);
     try { await adminApi.post(`/admin/orders/${o.id}/wa-sent`); await load(); }
-    catch { /* ignore */ }
+    catch (e) { console.error("Gagal menandai WA terkirim:", e); }
   };
 
   const adminUpload = (o) => {

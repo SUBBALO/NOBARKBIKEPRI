@@ -123,7 +123,7 @@ export default function WalkinPage() {
       const map = {};
       (data.sessions || []).forEach((s) => { map[s.id] = !!s.walkin_open; });
       setWalkinSessions(map);
-    } catch { /* ignore */ }
+    } catch (e) { console.error("Gagal memuat status sesi:", e); }
   }, []);
 
   useEffect(() => { loadEvent(); }, [loadEvent]);
@@ -133,7 +133,7 @@ export default function WalkinPage() {
     try {
       const { data } = await api.get(`/sessions/${sid}/seats`);
       setMapData(data);
-    } catch { /* ignore transient */ }
+    } catch (e) { console.error("Gagal memuat peta kursi:", e); }
     if (showSpinner) setLoadingMap(false);
   }, []);
 

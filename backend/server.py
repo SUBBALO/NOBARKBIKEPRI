@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 import os
 import io
 import logging
-import random
+import secrets
 import uuid
 import bcrypt
 import jwt
@@ -295,7 +295,7 @@ def mask_name(name: str) -> str:
 
 async def gen_order_no():
     for _ in range(80):
-        n = random.randint(1000, 9999)
+        n = secrets.randbelow(9000) + 1000
         exists = await db.orders.count_documents({"order_no": n}, limit=1)
         if not exists:
             return n
@@ -306,7 +306,7 @@ async def gen_order_no():
 
 async def gen_unique_total(base: int):
     for pool in (list(range(11, 100)), list(range(100, 1000))):
-        random.shuffle(pool)
+        secrets.SystemRandom().shuffle(pool)
         for c in pool:
             exists = await db.orders.count_documents(
                 {"total_amount": base + c, "status": {"$ne": "rejected"}}, limit=1
