@@ -1,0 +1,26 @@
+{
+  "summary": "Verified bug fix for POST /api/admin/sessions/toggle (decorator restored). Backend: 9/9 pytest passed. Endpoint returns 200 for both target=public and target=walkin (previously 404). GET /api/event correctly reflects status='open' after public toggle and walkin_open=true after walkin toggle, and reverts after close. admin2 (non-super) correctly gets 403. VIP regression: POST /api/admin/vip requires name (400 if empty), requires seats (400 if empty), rejects operator seats A11 (400), and successfully creates VIP order on L2 (session 2) with total_amount=0, vip=true, checked_in=false, status=verified, seats locked (duplicate lock -> 409). Bendahara regression: GET /api/admin/bendahara returns 200 with grand_total/by_date/orders; VIP order appears with channel='vip'. Frontend /admin (admin1): session-control-card renders 4 small session cards; toggling Umum & Panitia switches for S2/S4 shows success toast 'Sesi X DIBUKA/DITUTUP untuk Umum/Panitia (…)' with NO 'not found' error; switch aria-checked state flips correctly. VIP tab: select session 2, pick seat L2 via seatmap, fill name, submit -> success dialog vip-result appears with order #4334.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter11_toggle_vip.py",
+    "/app/test_reports/pytest/iter11.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminPage.js has grown to ~1960 lines — still exceeds the <700-line guideline. Recommend splitting VIPPanel, BendaharaPanel, UsersPanel, TrashPanel into separate modules.",
+    "server.py toggle_session_open (L1221) has no explicit type validation for target values other than the model's Literal (SessionToggle); OK, but consider returning both open_sessions & walkin_sessions for FE consistency instead of only the touched key.",
+    "No permanent purge endpoint for orders exists (delete = soft-delete only); trash accumulates over time and cleanup requires direct DB access. Consider adding /api/admin/orders/{id}/purge for superadmin."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter11_toggle_vip.py (new)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (super), admin2/admin123 (admin), chelyn/Chelyn123456",
+  "seed_data_creation": "Created TEST_VIP orders (backend test on L2/L3 S2, and one via UI on L2 S2 with order #4334). All hard-deleted from MongoDB + seat_locks freed after tests. Session toggles opened during tests were closed at the end.",
+  "final_state": "Preview restored: coming_soon=ON; all 4 sessions closed for both public (open_sessions=[]) and walkin (walkin_sessions=[]). No lingering TEST_ data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug fix confirmed: POST /api/admin/sessions/toggle decorator is present at server.py L1221 and returns 200. Route model SessionToggle uses Literal['public','walkin'] for target. Frontend toggle switches (data-testid session-open-switch-{id} and session-walkin-switch-{id}) call toggleSessionOpen at AdminPage.js L1186 which POSTs to /api/admin/sessions/toggle and shows toasts. VIP flow uses SeatMap component with data-testid='seat-{label}' selector; vip-submit disabled when name empty or no seats.",
+  "rca of the issue": "Original bug: while adding VIP endpoint (@api_router.post('/admin/vip') at L1170), the developer accidentally removed the decorator @api_router.post('/admin/sessions/toggle') from toggle_session_open causing FastAPI to not register the route (404 Not Found). Fix: decorator restored at L1221. Reproduction: POST /api/admin/sessions/toggle used to return 404. Now returns 200 with correct behavior. Verified via pytest test_toggle_public_open_close_session1 and UI toggle in AdminPage session-control-card."
+}

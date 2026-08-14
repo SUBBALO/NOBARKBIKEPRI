@@ -1216,6 +1216,9 @@ async def vip_order(payload: VIPCreate, user: dict = Depends(require_staff)):
                        f"Tiket VIP {len(claimed)} kursi #{order_no} — {payload.name.strip()}, kursi {', '.join(claimed)}",
                        order_id)
     return clean(dict(order))
+
+
+@api_router.post("/admin/sessions/toggle")
 async def toggle_session_open(payload: SessionToggle, user: dict = Depends(require_roles("superadmin"))):
     if payload.session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
