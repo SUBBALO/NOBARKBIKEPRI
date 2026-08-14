@@ -150,15 +150,15 @@ export default function OrderStatusPage() {
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">Kontribusi</dt><dd className="font-medium">Dana Sukarela</dd></div>
           </dl>
           <div className="mt-5 rounded-xl bg-[#7A241F] text-white p-5">
-            <p className="text-xs text-white/70">Total yang harus dibayar (nominal PAS)</p>
+            <p className="text-xs text-white/70">Transfer PERSIS sejumlah ini (jumlah penuh)</p>
             <div className="flex items-center justify-between mt-1">
               <span className="font-serif-display text-3xl" data-testid="order-total">{rupiah(order.total_amount)}</span>
               <button onClick={copyTotal} data-testid="btn-copy-total" className="text-white/80 hover:text-white transition-colors">
                 <Copy className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-[11px] text-[#E4C57E] mt-2">
-              3 digit terakhir ({order.unique_code}) adalah kode unik. Bayar TEPAT sejumlah ini agar mudah kami cek di mutasi.
+            <p className="text-[11px] text-[#E4C57E] mt-2 font-semibold">
+              ⚠️ Transfer <b>{rupiah(order.total_amount)}</b> — jumlah PENUH, bukan cuma 3 angka terakhir ({order.unique_code}). Angka {order.unique_code} itu kode unik yang menempel di total, jangan dipisah atau dibulatkan agar pembayaran bisa kami cek.
             </p>
           </div>
         </motion.div>
@@ -216,7 +216,7 @@ export default function OrderStatusPage() {
                     className="mt-3 inline-flex items-center gap-1.5 text-sm text-[#B26A1E] hover:underline" data-testid="btn-download-qris">
                     <Download className="h-4 w-4" /> Simpan gambar QRIS
                   </a>
-                  <p className="text-xs text-[#7A6A5E] mt-2">Scan QRIS lalu bayar nominal PAS {rupiah(order.total_amount)}.</p>
+                  <p className="text-xs text-[#7A6A5E] mt-2">Scan QRIS lalu bayar <b>jumlah penuh {rupiah(order.total_amount)}</b> (jangan cuma kode uniknya).</p>
                 </TabsContent>
                 <TabsContent value="transfer" className="pt-4">
                   <p className="text-sm font-medium text-[#7A241F] mb-2">Transfer ke Rekening <b>PD MBI Kepri</b></p>
@@ -248,13 +248,13 @@ export default function OrderStatusPage() {
 
                   {/* Nominal transfer - ditonjolkan */}
                   <div className="mt-3 rounded-xl bg-[#7A241F] text-white px-4 py-3">
-                    <p className="text-xs text-white/70">Nominal Transfer (harus PAS)</p>
+                    <p className="text-xs text-white/70">Nominal Transfer (jumlah PENUH & PAS)</p>
                     <div className="flex items-center justify-between">
                       <span className="font-serif-display text-3xl tracking-tight" data-testid="transfer-amount">{rupiah(order.total_amount)}</span>
                       <button onClick={() => { navigator.clipboard.writeText(String(order.total_amount)); toast.success("Nominal disalin"); }}
                         data-testid="btn-copy-transfer-total" className="text-white/80 hover:text-white"><Copy className="h-5 w-5" /></button>
                     </div>
-                    <p className="text-[11px] text-[#E4C57E] mt-0.5">3 digit terakhir ({order.unique_code}) adalah kode unik — bayar TEPAT sejumlah ini.</p>
+                    <p className="text-[11px] text-[#E4C57E] mt-0.5">Transfer <b>{rupiah(order.total_amount)}</b> penuh — angka {order.unique_code} di belakang itu kode unik yang menempel, jangan dipisah/dibulatkan.</p>
                   </div>
                 </TabsContent>
               </Tabs>
