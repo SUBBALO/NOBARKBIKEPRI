@@ -66,3 +66,7 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - SESI MANUAL + 5 SESI: SESSIONS = 5 sesi (09.00-10.30, 12.30-14.30, 15.00-17.00, 17.00-19.00, 19.00-21.00 WIB; hardcode juga di WalkinPage.js). TIDAK ada buka otomatis — config `open_sessions` (default [] = semua TUTUP). Hanya SUPERADMIN via POST /api/admin/sessions/toggle (log action session_toggle); boleh banyak sesi terbuka bersamaan. Switch per sesi di panel admin (session-open-switch-N; admin biasa lihat saja). create_order menolak sesi tutup; walk-in TIDAK terikat status sesi. Endpoint lama /admin/active-session DIHAPUS.
 - Info box kursi couple & disabilitas (seat-info-box) di step Pilih Kursi.
 - Testing iteration_7: backend 9/9 + frontend 100% pass. Kondisi preview dikembalikan: coming_soon ON, semua sesi tutup.
+- HAPUS PESANAN kini KHUSUS SUPERADMIN: DELETE /api/admin/orders/{id} pakai require_roles("superadmin"); tombol & kolom Hapus disembunyikan untuk admin biasa (isSuper). Dites: admin2 403 + tombol hilang, admin1 sukses.
+- VERIFIED_BY: verifikasi/tolak pembayaran menyimpan verified_by (nama petugas); walk-in juga set verified_by. Panel admin menampilkan "oleh {nama}" di bawah "Payment OK" (kartu mobile + tabel). Hanya terisi untuk verifikasi baru.
+- Filter sesi daftar pesanan diperbaiki: kini Sesi 1-5 (sebelumnya hardcode 1-4).
+- PRODUKSI: custom domain https://kbikepri.com (user sudah redeploy).

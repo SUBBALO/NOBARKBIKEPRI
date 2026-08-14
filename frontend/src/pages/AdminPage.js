@@ -1044,8 +1044,9 @@ export default function AdminPage() {
                       </Button>
                     ) : o.status === "verified" ? (
                       <button onClick={() => o.has_proof && openProof(o)}
-                        className="inline-flex items-center gap-1 text-[#255E33] text-xs font-medium">
-                        <CheckCircle2 className="h-4 w-4" /> Payment OK
+                        className="inline-flex flex-col items-start text-[#255E33] text-xs font-medium">
+                        <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Payment OK</span>
+                        {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}</span>}
                       </button>
                     ) : (o.status === "pending_payment" || o.status === "expired") ? (
                       <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
@@ -1063,10 +1064,12 @@ export default function AdminPage() {
                         <MessageCircle className="h-3.5 w-3.5 mr-1" /> Ingatkan Upload
                       </Button>
                     ) : null}
-                    <button onClick={() => setDeleteTarget(o)} title="Hapus pesanan"
-                      className="ml-auto inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {isSuper && (
+                      <button onClick={() => setDeleteTarget(o)} title="Hapus pesanan"
+                        className="ml-auto inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1088,7 +1091,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium text-center">Verifikasi</th>
                   <th className="px-4 py-3 font-medium text-center">Kirim Pesan</th>
-                  <th className="px-4 py-3 font-medium text-center">Hapus</th>
+                  {isSuper && <th className="px-4 py-3 font-medium text-center">Hapus</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -1127,8 +1130,9 @@ export default function AdminPage() {
                           </Button>
                         ) : o.status === "verified" ? (
                           <button onClick={() => o.has_proof && openProof(o)} data-testid={`verify-done-${o.id.slice(0, 8)}`}
-                            className="inline-flex items-center gap-1 text-[#255E33] text-xs font-medium">
-                            <CheckCircle2 className="h-4 w-4" /> Payment OK
+                            className="inline-flex flex-col items-center text-[#255E33] text-xs font-medium">
+                            <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Payment OK</span>
+                            {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}</span>}
                           </button>
                         ) : o.status === "pending_payment" ? (
                           <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
@@ -1163,13 +1167,15 @@ export default function AdminPage() {
                         )}
                       </td>
                       {/* Hapus */}
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => setDeleteTarget(o)} data-testid={`delete-open-${o.id.slice(0, 8)}`}
-                          title="Hapus pesanan"
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
+                      {isSuper && (
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => setDeleteTarget(o)} data-testid={`delete-open-${o.id.slice(0, 8)}`}
+                            title="Hapus pesanan"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

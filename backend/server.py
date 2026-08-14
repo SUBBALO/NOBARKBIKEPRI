@@ -703,7 +703,9 @@ async def verify_order(order_id: str, user: dict = Depends(require_staff)):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
-    await db.orders.update_one({"id": order_id}, {"$set": {"status": "verified", "updated_at": now_iso()}})
+    actor = user.get("name") or user.get("username")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "status": "verified", "verified_by": actor, "updated_at": now_iso()}})
     await log_activity(user, "verify", f"Verifikasi pembayaran #{o.get('order_no')} — {o.get('name')}", order_id)
     return clean(await db.orders.find_one({"id": order_id}))
 
@@ -713,14 +715,16 @@ async def reject_order(order_id: str, user: dict = Depends(require_staff)):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
-    await db.orders.update_one({"id": order_id}, {"$set": {"status": "rejected", "updated_at": now_iso()}})
+    actor = user.get("name") or user.get("username")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "status": "rejected", "verified_by": actor, "updated_at": now_iso()}})
     await db.seat_locks.delete_many({"order_id": order_id})  # free the seats
     await log_activity(user, "reject", f"Tolak pesanan #{o.get('order_no')} — {o.get('name')}", order_id)
     return clean(await db.orders.find_one({"id": order_id}))
 
 
 @api_router.delete("/admin/orders/{order_id}")
-async def delete_order(order_id: str, user: dict = Depends(require_staff)):
+async def delete_order(order_id: str, user: dict = Depends(require_roles("superadmin"))):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
@@ -829,6 +833,7 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
         "payment_method": payload.payment_method, "status": "verified",
         "proof_image": None, "checked_in": True, "checked_in_at": now_iso(),
         "checked_in_by": actor, "checked_in_by_username": user.get("username"),
+        "verified_by": actor,
         "walkin": True, "sold_by": actor,
         "created_at": now_iso(), "updated_at": now_iso(),
     }
