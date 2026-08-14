@@ -1005,6 +1005,7 @@ export default function AdminPage() {
   const [proofImage, setProofImage] = useState(null);
   const [proofLoading, setProofLoading] = useState(false);
   const [dialogVerified, setDialogVerified] = useState(false);
+  const [verifyAmount, setVerifyAmount] = useState("");
   const [printOrder, setPrintOrder] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [tab, setTab] = useState("payment");
@@ -1132,6 +1133,7 @@ export default function AdminPage() {
 
   const openProof = async (o) => {
     setProofView(o); setProofImage(null); setProofLoading(true); setDialogVerified(false);
+    setVerifyAmount(String(o.total_amount || ""));
     try {
       const { data } = await adminApi.get(`/admin/orders/${o.id}/proof-image`);
       setProofImage(data.proof_image);
@@ -1141,10 +1143,12 @@ export default function AdminPage() {
 
   const verifyInDialog = async () => {
     if (!proofView) return;
+    const amt = parseInt(verifyAmount, 10);
+    if (!amt || amt <= 0) { toast.error("Isi nominal yang masuk"); return; }
     setBusyId(proofView.id);
     try {
-      await adminApi.post(`/admin/orders/${proofView.id}/verify`);
-      toast.success("Pesanan diverifikasi");
+      await adminApi.post(`/admin/orders/${proofView.id}/verify`, { amount: amt });
+      toast.success(amt !== proofView.total_amount ? `Diverifikasi — nominal disesuaikan ke ${rupiah(amt)}` : "Pesanan diverifikasi");
       setDialogVerified(true);
       await load();
     } catch { toast.error("Gagal verifikasi"); }
@@ -1685,15 +1689,31 @@ export default function AdminPage() {
                   </Button>
                 </div>
               ) : proofView.status === "waiting_verification" ? (
-                <div className="flex gap-2 mt-4">
-                  <Button onClick={verifyInDialog} disabled={busyId === proofView.id} data-testid="dialog-verify"
-                    className="flex-1 bg-[#2F703E] hover:bg-[#255E33]">
-                    {busyId === proofView.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Payment Masuk
-                  </Button>
-                  <Button variant="outline" onClick={() => { act(proofView.id, "reject"); setProofView(null); }}
-                    data-testid="dialog-reject" className="flex-1 text-[#EF4444] border-[#EF4444]/40">
-                    <XCircle className="h-4 w-4 mr-1.5" /> Tolak
-                  </Button>
+                <div className="mt-4">
+                  <div className="rounded-lg bg-[#F3E9DD]/60 border border-[#B26A1E]/30 p-3 mb-3">
+                    <label className="text-xs font-semibold text-[#7A241F] block mb-1">Nominal yang benar-benar masuk (sesuai slip TT)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                      <Input data-testid="verify-amount-input" inputMode="numeric"
+                        value={verifyAmount ? Number(verifyAmount).toLocaleString("id-ID") : ""}
+                        onChange={(e) => setVerifyAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                        className="pl-9 h-11 text-base font-semibold bg-white" />
+                    </div>
+                    <p className="text-[11px] text-[#7A6A5E] mt-1">
+                      Diminta sistem: {rupiah(proofView.total_amount)} (kode unik {proofView.unique_code}).
+                      Ubah kalau jumlah transfer beda — yang tercatat di rekap = nominal ini.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={verifyInDialog} disabled={busyId === proofView.id} data-testid="dialog-verify"
+                      className="flex-1 bg-[#2F703E] hover:bg-[#255E33]">
+                      {busyId === proofView.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Payment Masuk
+                    </Button>
+                    <Button variant="outline" onClick={() => { act(proofView.id, "reject"); setProofView(null); }}
+                      data-testid="dialog-reject" className="flex-1 text-[#EF4444] border-[#EF4444]/40">
+                      <XCircle className="h-4 w-4 mr-1.5" /> Tolak
+                    </Button>
+                  </div>
                 </div>
               ) : proofView.status === "verified" ? (
                 <Button onClick={() => sendAndMarkWA(proofView)} data-testid="dialog-send-wa-2"

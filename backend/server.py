@@ -148,6 +148,10 @@ class PasswordReset(BaseModel):
     new_password: str
 
 
+class VerifyPayload(BaseModel):
+    amount: Optional[int] = None  # nominal aktual yang masuk (dari slip TT), opsional
+
+
 class SetActiveSession(BaseModel):
     session_id: int
 
@@ -936,14 +940,20 @@ async def export_bendahara(_: bool = Depends(require_staff),
 
 
 @api_router.post("/admin/orders/{order_id}/verify")
-async def verify_order(order_id: str, user: dict = Depends(require_staff)):
+async def verify_order(order_id: str, payload: VerifyPayload = VerifyPayload(), user: dict = Depends(require_staff)):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
     actor = user.get("name") or user.get("username")
-    await db.orders.update_one({"id": order_id}, {"$set": {
-        "status": "verified", "verified_by": actor, "updated_at": now_iso()}})
-    await log_activity(user, "verify", f"Verifikasi pembayaran #{o.get('order_no')} — {o.get('name')}", order_id)
+    fields = {"status": "verified", "verified_by": actor, "updated_at": now_iso()}
+    note = f"Verifikasi pembayaran #{o.get('order_no')} — {o.get('name')}"
+    if payload.amount is not None and payload.amount > 0 and payload.amount != o.get("total_amount"):
+        old_total = o.get("total_amount")
+        fields.update({"total_amount": payload.amount, "base_amount": payload.amount,
+                       "amount_adjusted": True, "original_total": old_total})
+        note += f" — nominal disesuaikan Rp{old_total:,} → Rp{payload.amount:,}".replace(",", ".")
+    await db.orders.update_one({"id": order_id}, {"$set": fields})
+    await log_activity(user, "verify", note, order_id)
     return clean(await db.orders.find_one({"id": order_id}))
 
 
