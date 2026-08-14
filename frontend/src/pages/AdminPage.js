@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { adminApi, api, ADMIN_TOKEN_KEY, getAdminUser, setAdminSession, clearAdminSession, rupiah, LOGOS } from "@/lib/apiClient";
+import { SeatMap } from "@/components/SeatMap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound,
+  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -128,7 +129,9 @@ const FILTERS = [
   { k: "rejected", t: "Ditolak" },
 ];
 
-const channelInfo = (o) => o.walkin
+const channelInfo = (o) => o.vip
+  ? { t: "VIP · Undangan", c: "bg-[#7A241F]/15 text-[#7A241F]" }
+  : o.walkin
   ? { t: "Panitia · Lokasi", c: "bg-[#B26A1E]/15 text-[#8A3A12]" }
   : { t: "Umum · Online", c: "bg-[#7A241F]/10 text-[#7A241F]" };
 
@@ -990,6 +993,132 @@ function TrashPanel({ orders, loading, onRefresh, onRestore, restoreBusyId }) {
   );
 }
 
+function VIPPanel() {
+  const [sessionId, setSessionId] = useState(1);
+  const [mapData, setMapData] = useState(null);
+  const [loadingMap, setLoadingMap] = useState(true);
+  const [selected, setSelected] = useState([]);
+  const [name, setName] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const pollRef = useRef(null);
+
+  const loadMap = useCallback(async (sid, showLoad) => {
+    if (showLoad) setLoadingMap(true);
+    try { const { data } = await adminApi.get(`/sessions/${sid}/seats`); setMapData(data); }
+    catch { /* ignore */ }
+    setLoadingMap(false);
+  }, []);
+
+  useEffect(() => {
+    setSelected([]);
+    loadMap(sessionId, true);
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => loadMap(sessionId, false), 6000);
+    return () => pollRef.current && clearInterval(pollRef.current);
+  }, [sessionId, loadMap]);
+
+  const couples = mapData?.couples || {};
+  const toggle = (seat) => {
+    setSelected((prev) => {
+      const partner = couples[seat];
+      if (prev.includes(seat)) return prev.filter((s) => s !== seat && s !== partner);
+      const add = partner ? [seat, partner] : [seat];
+      return [...new Set([...prev, ...add])];
+    });
+  };
+
+  const submit = async () => {
+    if (!name.trim()) { toast.error("Isi nama tamu VIP"); return; }
+    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    setBusy(true);
+    try {
+      const { data } = await adminApi.post("/admin/vip", { name, session_id: sessionId, seats: selected, note });
+      setResult(data);
+      setName(""); setNote(""); setSelected([]);
+      loadMap(sessionId, false);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal membuat tiket VIP"); loadMap(sessionId, false); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="no-print" data-testid="vip-panel">
+      <div className="rounded-2xl border border-[#7A241F]/20 bg-gradient-to-br from-[#7A241F]/[0.06] to-transparent p-4 mb-4">
+        <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2"><Crown className="h-5 w-5 text-[#B26A1E]" /> Pesan Tiket VIP (Tamu Undangan)</h2>
+        <p className="text-sm text-[#7A6A5E]">Pilih kursi untuk tamu VIP di sesi mana pun (gratis, kursi langsung dikunci). Tamu tetap check-in di lokasi saat datang.</p>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_320px] gap-4">
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {SESSIONS_STATIC.map((s) => (
+              <button key={s.id} data-testid={`vip-session-${s.id}`} onClick={() => setSessionId(s.id)}
+                className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+                  sessionId === s.id ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
+                {s.name} · {s.time}
+              </button>
+            ))}
+          </div>
+          {mapData && (
+            <p className="text-sm mb-3" data-testid="vip-remaining">
+              Sisa <b className="text-[#255E33]">{mapData.capacity - mapData.booked}</b> kursi · {mapData.booked}/{mapData.capacity} terisi
+            </p>
+          )}
+          {loadingMap ? (
+            <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#B26A1E]" /></div>
+          ) : mapData ? (
+            <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} couples={couples} allowDisability />
+          ) : (
+            <p className="text-center text-sm text-[#7A6A5E] py-16">Gagal memuat peta kursi.</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-white p-4 h-fit lg:sticky lg:top-4">
+          <Label htmlFor="vipname">Nama Tamu VIP <span className="text-[#EF4444]">*</span></Label>
+          <Input id="vipname" data-testid="vip-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="mis. Bapak Budi (Donatur)" className="mt-1.5 mb-3" />
+          <Label htmlFor="vipnote">Catatan <span className="text-[#9CA3AF]">(opsional)</span></Label>
+          <Input id="vipnote" data-testid="vip-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="mis. tamu undangan panitia" className="mt-1.5 mb-3" />
+          <div className="rounded-lg bg-muted/40 p-2.5 mb-3">
+            <p className="text-xs text-[#7A6A5E]">Kursi dipilih:</p>
+            <p className="text-sm font-semibold text-[#7A241F]" data-testid="vip-selected">{selected.length ? selected.join(", ") : "— belum ada —"}</p>
+          </div>
+          <Button onClick={submit} disabled={busy || selected.length === 0 || !name.trim()} data-testid="vip-submit"
+            className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
+            {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Crown className="h-5 w-5 mr-1.5" />} Kunci Kursi VIP
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={!!result} onOpenChange={() => setResult(null)}>
+        <DialogContent data-testid="vip-result" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-12 w-12 rounded-full bg-[#B26A1E]/15 flex items-center justify-center mb-2"><Crown className="h-6 w-6 text-[#B26A1E]" /></div>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Tiket VIP Dibuat!</DialogTitle>
+          </DialogHeader>
+          {result && (
+            <div className="space-y-1.5 text-sm">
+              <p><span className="text-[#7A6A5E]">Nama:</span> <b>{result.name}</b></p>
+              <p><span className="text-[#7A6A5E]">No. Order:</span> <b className="font-mono">#{result.order_no}</b></p>
+              <p><span className="text-[#7A6A5E]">Sesi:</span> <b>{SESSIONS_STATIC.find((s) => s.id === result.session_id)?.name}</b></p>
+              <p><span className="text-[#7A6A5E]">Kursi:</span> <b>{result.seats?.join(", ")}</b></p>
+              <p className="text-xs text-[#7A6A5E] pt-1">Kursi sudah dikunci. Tamu check-in di lokasi saat datang.</p>
+            </div>
+          )}
+          <Button onClick={() => setResult(null)} className="w-full bg-[#7A241F] hover:bg-[#5E1B17] mt-2" data-testid="vip-result-close">Selesai</Button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+const SESSIONS_STATIC = [
+  { id: 1, name: "Sesi 1", time: "09.30–11.30" },
+  { id: 2, name: "Sesi 2", time: "12.00–14.00" },
+  { id: 3, name: "Sesi 3", time: "14.30–16.30" },
+  { id: 4, name: "Sesi 4", time: "17.00–19.00" },
+];
+
 export default function AdminPage() {
   const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
   const [currentUser, setCurrentUser] = useState(getAdminUser());
@@ -1299,6 +1428,11 @@ export default function AdminPage() {
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
             tab === "bendahara" ? "bg-[#2F703E] text-white border-[#2F703E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#2F703E]/50")}>
           <Banknote className="h-4 w-4" /> Bendahara
+        </button>
+        <button data-testid="admin-tab-vip" onClick={() => setTab("vip")}
+          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+            tab === "vip" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/60")}>
+          <Crown className="h-4 w-4" /> Tiket VIP
         </button>
         <button data-testid="admin-tab-logs" onClick={() => setTab("logs")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
@@ -1640,6 +1774,8 @@ export default function AdminPage() {
       {tab === "logs" && <LogsPanel />}
 
       {tab === "bendahara" && <BendaharaPanel />}
+
+      {tab === "vip" && <VIPPanel />}
 
       {tab === "users" && isSuper && <UsersPanel currentUser={currentUser} />}
 

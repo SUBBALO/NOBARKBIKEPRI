@@ -152,6 +152,13 @@ class VerifyPayload(BaseModel):
     amount: Optional[int] = None  # nominal aktual yang masuk (dari slip TT), opsional
 
 
+class VIPCreate(BaseModel):
+    name: str
+    session_id: int
+    seats: List[str]
+    note: Optional[str] = ""
+
+
 class SetActiveSession(BaseModel):
     session_id: int
 
@@ -793,16 +800,24 @@ async def _collect_recap_orders(date_from: str = None, date_to: str = None):
             continue
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
         is_walkin = bool(o.get("walkin"))
+        is_vip = bool(o.get("vip"))
+        if is_vip:
+            channel, channel_label, seller, location = "vip", "VIP (Undangan)", "VIP (Undangan)", "VIP"
+        elif is_walkin:
+            channel, channel_label, seller = "panitia", "Panitia (Lokasi)", (o.get("sold_by") or "-")
+            location = o.get("location") or "(tanpa lokasi)"
+        else:
+            channel, channel_label, seller, location = "umum", "Umum (Online)", "Umum (Online)", "Online"
         rows.append({
             "date": d.strftime("%Y-%m-%d"),
             "date_label": f"{d.day} {_MONTHS_ID[d.month]} {d.year}",
             "time": d.strftime("%H:%M"),
             "created_at": o.get("created_at"),
             "order_no": o.get("order_no"), "name": o.get("name"), "phone": o.get("phone", ""),
-            "channel": "panitia" if is_walkin else "umum",
-            "channel_label": "Panitia (Lokasi)" if is_walkin else "Umum (Online)",
-            "seller": (o.get("sold_by") or "-") if is_walkin else "Umum (Online)",
-            "location": (o.get("location") or "(tanpa lokasi)") if is_walkin else "Online",
+            "channel": channel,
+            "channel_label": channel_label,
+            "seller": seller,
+            "location": location,
             "method": o.get("payment_method"),
             "tickets": o.get("qty", 0) or 0,
             "amount": o.get("total_amount", 0) or 0,
@@ -1152,7 +1167,55 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
 
 
 
-@api_router.post("/admin/sessions/toggle")
+@api_router.post("/admin/vip")
+async def vip_order(payload: VIPCreate, user: dict = Depends(require_staff)):
+    """Pesan tiket VIP (tamu undangan) — gratis, kunci kursi di semua sesi, check-in menyusul."""
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Isi nama tamu VIP")
+    if payload.session_id not in [s["id"] for s in SESSIONS]:
+        raise HTTPException(status_code=400, detail="Sesi tidak valid")
+    seats = list(dict.fromkeys(payload.seats))
+    if not seats:
+        raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
+    for seat in seats:
+        if seat not in ALL_SEAT_LABELS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
+        if seat in RESERVED_SEATS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} khusus operator, tidak bisa dipilih")
+
+    await taken_seats(payload.session_id)  # release expired locks first
+    order_id = str(uuid.uuid4())
+    claimed = []
+    for seat in seats:
+        try:
+            await db.seat_locks.insert_one({
+                "_id": f"{payload.session_id}:{seat}", "session_id": payload.session_id,
+                "seat": seat, "order_id": order_id, "expires_at": None,
+            })
+            claimed.append(seat)
+        except DuplicateKeyError:
+            if claimed:
+                await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
+            raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah terisi. Pilih kursi lain.")
+
+    actor = user.get("name") or user.get("username")
+    order_no = await gen_order_no()
+    order = {
+        "id": order_id, "order_no": order_no,
+        "name": payload.name.strip(), "phone": "",
+        "session_id": payload.session_id, "seats": claimed, "qty": len(claimed),
+        "base_amount": 0, "unique_code": 0, "total_amount": 0,
+        "payment_method": "vip", "status": "verified",
+        "proof_image": None, "checked_in": False,
+        "verified_by": actor, "vip": True, "sold_by": actor,
+        "note": (payload.note or "").strip(),
+        "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.orders.insert_one(order)
+    await log_activity(user, "vip",
+                       f"Tiket VIP {len(claimed)} kursi #{order_no} — {payload.name.strip()}, kursi {', '.join(claimed)}",
+                       order_id)
+    return clean(dict(order))
 async def toggle_session_open(payload: SessionToggle, user: dict = Depends(require_roles("superadmin"))):
     if payload.session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
