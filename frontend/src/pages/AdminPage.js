@@ -13,7 +13,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown,
+  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -527,6 +527,19 @@ function UsersPanel({ currentUser }) {
       setUsers((prev) => prev.map((x) => x.id === u.id ? { ...x, can_delete: !value } : x));
     }
   };
+  const [pwTarget, setPwTarget] = useState(null);
+  const [newPw, setNewPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const doResetPw = async () => {
+    if (newPw.trim().length < 6) { toast.error("Password minimal 6 karakter"); return; }
+    setBusy(true);
+    try {
+      await adminApi.post(`/admin/users/${pwTarget.id}/reset-password`, { new_password: newPw.trim() });
+      toast.success(`Password "${pwTarget.username}" berhasil direset`);
+      setPwTarget(null); setNewPw(""); setShowPw(false);
+    } catch (err) { toast.error(err?.response?.data?.detail || "Gagal reset password"); }
+    setBusy(false);
+  };
 
   return (
     <div className="grid lg:grid-cols-2 gap-6 no-print">
@@ -586,14 +599,20 @@ function UsersPanel({ currentUser }) {
                       <p className="font-semibold text-[#2C1E16] truncate">{u.name} <span className="text-xs text-[#7A6A5E] font-normal">@{u.username}</span></p>
                       <span className={cn("inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium", rb.c)}>{rb.t}</span>
                     </div>
-                    {u.id === currentUser?.id ? (
-                      <span className="text-[11px] text-[#7A6A5E]">Anda</span>
-                    ) : (
-                      <button onClick={() => setDelTarget(u)} data-testid={`user-delete-${u.username}`}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10">
-                        <Trash2 className="h-4 w-4" />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => { setPwTarget(u); setNewPw(""); setShowPw(false); }} data-testid={`user-resetpw-${u.username}`}
+                        title="Reset password" className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#B26A1E] hover:bg-[#B26A1E]/10 text-xs font-medium">
+                        <KeyRound className="h-3.5 w-3.5" /> Reset PW
                       </button>
-                    )}
+                      {u.id === currentUser?.id ? (
+                        <span className="text-[11px] text-[#7A6A5E]">Anda</span>
+                      ) : (
+                        <button onClick={() => setDelTarget(u)} data-testid={`user-delete-${u.username}`}
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {!isSuperUser && (
                     <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg bg-[#FDFBF7] border border-border px-2.5 py-2">
@@ -631,6 +650,35 @@ function UsersPanel({ currentUser }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!pwTarget} onOpenChange={() => !busy && (setPwTarget(null), setNewPw(""))}>
+        <DialogContent data-testid="user-resetpw-dialog" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#B26A1E]/15 flex items-center justify-center mb-2"><KeyRound className="h-5 w-5 text-[#B26A1E]" /></div>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Reset Password</DialogTitle>
+          </DialogHeader>
+          {pwTarget && (
+            <div className="space-y-3">
+              <p className="text-sm text-[#7A6A5E]">Buat password baru untuk <b className="text-[#2C1E16]">{pwTarget.name} (@{pwTarget.username})</b>. Password lama tidak berlaku lagi.</p>
+              <div>
+                <Label htmlFor="newpw">Password Baru</Label>
+                <div className="relative mt-1.5">
+                  <Input id="newpw" data-testid="user-resetpw-input" type={showPw ? "text" : "password"}
+                    value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Minimal 6 karakter" className="pr-16" autoComplete="new-password" />
+                  <button type="button" onClick={() => setShowPw((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[#B26A1E]">{showPw ? "Sembunyi" : "Lihat"}</button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => { setPwTarget(null); setNewPw(""); }} disabled={busy} className="flex-1" data-testid="user-resetpw-cancel">Batal</Button>
+            <Button onClick={doResetPw} disabled={busy || newPw.trim().length < 6} className="flex-1 bg-[#B26A1E] hover:bg-[#9A5716]" data-testid="user-resetpw-confirm">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <KeyRound className="h-4 w-4 mr-1.5" />} Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -645,19 +693,28 @@ function BendaharaPanel() {
   const [seller, setSeller] = useState("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("time_desc");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const { data } = await adminApi.get("/admin/bendahara"); setResp(data); }
-    catch { toast.error("Gagal memuat rekap bendahara"); }
+    try {
+      const params = {};
+      if (dateFrom) params.from = dateFrom;
+      if (dateTo) params.to = dateTo;
+      const { data } = await adminApi.get("/admin/bendahara", { params });
+      setResp(data);
+    } catch { toast.error("Gagal memuat rekap bendahara"); }
     setLoading(false);
-  }, []);
+  }, [dateFrom, dateTo]);
   useEffect(() => { load(); }, [load]);
 
   const exportExcel = async () => {
     setExporting(true);
     try {
-      const res = await adminApi.get("/admin/bendahara/export", { responseType: "blob" });
+      const params = { responseType: "blob" };
+      if (dateFrom || dateTo) params.params = { ...(dateFrom && { from: dateFrom }), ...(dateTo && { to: dateTo }) };
+      const res = await adminApi.get("/admin/bendahara/export", params);
       const url = URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement("a");
       a.href = url; a.download = "rekap_bendahara.xlsx"; a.click();
@@ -709,6 +766,35 @@ function BendaharaPanel() {
             {exporting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />} Export Excel
           </Button>
         </div>
+      </div>
+
+      {/* Date range filter */}
+      <div className="rounded-xl border border-border bg-white p-3 mb-4 flex flex-wrap items-end gap-3" data-testid="bendahara-daterange">
+        <div>
+          <label className="text-[11px] text-[#7A6A5E] block mb-1">Dari tanggal</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+            data-testid="bendahara-date-from" className="text-sm border border-border rounded-lg px-2.5 py-1.5 bg-white" />
+        </div>
+        <div>
+          <label className="text-[11px] text-[#7A6A5E] block mb-1">Sampai tanggal</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+            data-testid="bendahara-date-to" className="text-sm border border-border rounded-lg px-2.5 py-1.5 bg-white" />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <button onClick={() => { const t = new Date().toISOString().slice(0, 10); setDateFrom(t); setDateTo(t); }}
+            data-testid="bendahara-preset-today" className="text-xs rounded-full px-3 py-1.5 border border-border bg-white text-[#7A6A5E] hover:border-[#2F703E]/50">Hari ini</button>
+          <button onClick={() => { setDateFrom("2026-09-13"); setDateTo("2026-09-13"); }}
+            data-testid="bendahara-preset-event" className="text-xs rounded-full px-3 py-1.5 border border-border bg-white text-[#7A6A5E] hover:border-[#2F703E]/50">Hari Acara (13 Sep)</button>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+              data-testid="bendahara-preset-all" className="text-xs rounded-full px-3 py-1.5 border border-[#B26A1E]/40 bg-white text-[#7A241F] hover:border-[#B26A1E]">Semua tanggal ✕</button>
+          )}
+        </div>
+        {(dateFrom || dateTo) && (
+          <span className="text-[11px] text-[#255E33] font-medium ml-auto" data-testid="bendahara-daterange-info">
+            Menampilkan {dateFrom || "awal"} s/d {dateTo || "akhir"}
+          </span>
+        )}
       </div>
 
       {/* Grand total */}
@@ -1254,45 +1340,38 @@ export default function AdminPage() {
       )}
       {/* Session control — buka/tutup penjualan per sesi (Super Admin) */}
       {event && (
-        <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print" data-testid="session-control-card">
-          <p className="text-sm font-medium text-[#7A241F] mb-1 flex items-center gap-2"><Users className="h-4 w-4" /> Buka/Tutup Penjualan per Sesi</p>
-          <p className="text-[11px] text-[#7A6A5E] mb-3">
-            {isSuper
-              ? "Tiap sesi punya 2 saklar terpisah: Umum (pembeli online di web) & Panitia (jual di lokasi via /walkin). Sesi bisa dibuka untuk panitia saja tanpa dibuka untuk umum."
-              : "Hanya Super Admin yang dapat membuka/menutup sesi."}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        <div className="rounded-xl border border-border bg-white p-3 mb-4 no-print" data-testid="session-control-card">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-sm font-medium text-[#7A241F] flex items-center gap-2"><Users className="h-4 w-4" /> Buka/Tutup Penjualan per Sesi</p>
+            <span className="text-[10px] text-[#7A6A5E] hidden sm:flex items-center gap-3">
+              <span>Umum = online web</span><span>Panitia = jual di lokasi</span>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {event.sessions.map((s) => {
               const isOpen = s.status === "open" || s.status === "full";
               const walkinOpen = !!s.walkin_open;
               return (
                 <div key={s.id} data-testid={`admin-session-${s.id}`}
-                  className={cn("rounded-xl border p-3",
-                    (isOpen || walkinOpen) ? "border-[#2F703E]/40 bg-[#2F703E]/[0.05]" : "border-border bg-muted/30")}>
-                  <div className="min-w-0 mb-2.5">
-                    <p className="text-sm font-semibold text-[#2C1E16]">{s.name} <span className="font-normal text-[#7A6A5E]">· {s.time}</span></p>
-                    <p className="text-[11px] text-[#7A6A5E]">{s.booked}/{s.capacity} terisi{s.status === "full" ? " · PENUH" : ""}</p>
+                  className={cn("rounded-lg border p-2",
+                    (isOpen || walkinOpen) ? "border-[#2F703E]/40 bg-[#2F703E]/[0.05]" : "border-border bg-muted/20")}>
+                  <p className="text-xs font-semibold text-[#2C1E16] leading-tight">{s.name}</p>
+                  <p className="text-[10px] text-[#7A6A5E] mb-1.5">{s.time.replace(" WIB", "")} · {s.booked}/{s.capacity}</p>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={cn("text-[10px] font-semibold", isOpen ? "text-[#255E33]" : "text-[#9CA3AF]")}>Umum</span>
+                    <Switch checked={isOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "public")}
+                      className="scale-90" data-testid={`session-open-switch-${s.id}`} />
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2 rounded-lg bg-white border border-border px-2.5 py-1.5">
-                      <span className="text-[11px] font-medium text-[#2C1E16]">
-                        Umum (Online) · <span className={cn("font-semibold", isOpen ? "text-[#255E33]" : "text-[#7A6A5E]")}>{isOpen ? "BUKA" : "TUTUP"}</span>
-                      </span>
-                      <Switch checked={isOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "public")}
-                        data-testid={`session-open-switch-${s.id}`} />
-                    </div>
-                    <div className="flex items-center justify-between gap-2 rounded-lg bg-white border border-border px-2.5 py-1.5">
-                      <span className="text-[11px] font-medium text-[#2C1E16]">
-                        Panitia (Lokasi) · <span className={cn("font-semibold", walkinOpen ? "text-[#8A3A12]" : "text-[#7A6A5E]")}>{walkinOpen ? "BUKA" : "TUTUP"}</span>
-                      </span>
-                      <Switch checked={walkinOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "walkin")}
-                        data-testid={`session-walkin-switch-${s.id}`} />
-                    </div>
+                  <div className="flex items-center justify-between gap-1 mt-0.5">
+                    <span className={cn("text-[10px] font-semibold", walkinOpen ? "text-[#8A3A12]" : "text-[#9CA3AF]")}>Panitia</span>
+                    <Switch checked={walkinOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "walkin")}
+                      className="scale-90" data-testid={`session-walkin-switch-${s.id}`} />
                   </div>
                 </div>
               );
             })}
           </div>
+          {!isSuper && <p className="text-[10px] text-[#7A6A5E] mt-1.5">Hanya Super Admin yang dapat membuka/menutup sesi.</p>}
         </div>
       )}
 

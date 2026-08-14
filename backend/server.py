@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request, Query
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -142,6 +142,10 @@ class UserCreate(BaseModel):
 
 class UserPermission(BaseModel):
     can_delete: bool
+
+
+class PasswordReset(BaseModel):
+    new_password: str
 
 
 class SetActiveSession(BaseModel):
@@ -764,8 +768,9 @@ _MONTHS_ID = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli"
               "Agustus", "September", "Oktober", "November", "Desember"]
 
 
-async def _collect_recap_orders():
-    """Semua pesanan TERVERIFIKASI (umum online + panitia walk-in), diperkaya untuk rekap."""
+async def _collect_recap_orders(date_from: str = None, date_to: str = None):
+    """Semua pesanan TERVERIFIKASI (umum online + panitia walk-in), diperkaya untuk rekap.
+    Opsional filter rentang tanggal WIB (YYYY-MM-DD, inklusif)."""
     wib = timezone(timedelta(hours=7))
     docs = await db.orders.find(
         {"status": "verified", "deleted": {"$ne": True}},
@@ -776,6 +781,11 @@ async def _collect_recap_orders():
         try:
             d = datetime.fromisoformat(o.get("created_at", "")).astimezone(wib)
         except (ValueError, TypeError):
+            continue
+        key = d.strftime("%Y-%m-%d")
+        if date_from and key < date_from:
+            continue
+        if date_to and key > date_to:
             continue
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
         is_walkin = bool(o.get("walkin"))
@@ -820,9 +830,11 @@ def _add_agg(acc, r):
 
 
 @api_router.get("/admin/bendahara")
-async def bendahara_recap(user: dict = Depends(require_staff)):
+async def bendahara_recap(user: dict = Depends(require_staff),
+                          date_from: str = Query(None, alias="from"),
+                          date_to: str = Query(None, alias="to")):
     """Rekap keuangan LENGKAP: umum (online) + panitia (lokasi), per tanggal, petugas & lokasi & metode."""
-    rows = await _collect_recap_orders()
+    rows = await _collect_recap_orders(date_from, date_to)
     grand = _blank_agg()
     days = {}
     for r in rows:
@@ -849,8 +861,10 @@ async def bendahara_recap(user: dict = Depends(require_staff)):
 
 
 @api_router.get("/admin/bendahara/export")
-async def export_bendahara(_: bool = Depends(require_staff)):
-    rows = await _collect_recap_orders()
+async def export_bendahara(_: bool = Depends(require_staff),
+                           date_from: str = Query(None, alias="from"),
+                           date_to: str = Query(None, alias="to")):
+    rows = await _collect_recap_orders(date_from, date_to)
     wb = Workbook()
     header_fill = PatternFill("solid", fgColor="255E33")
 
@@ -1339,6 +1353,21 @@ async def set_user_permission(user_id: str, payload: UserPermission, user: dict 
                        f"{'Memberi' if payload.can_delete else 'Mencabut'} izin hapus data untuk '{target['username']}'", user_id)
     updated = await db.admin_users.find_one({"id": user_id})
     return public_user(updated)
+
+
+@api_router.post("/admin/users/{user_id}/reset-password")
+async def reset_user_password(user_id: str, payload: PasswordReset, user: dict = Depends(require_super)):
+    target = await db.admin_users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    pw = (payload.new_password or "").strip()
+    if len(pw) < 6:
+        raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
+    await db.admin_users.update_one({"id": user_id}, {"$set": {"password_hash": hash_password(pw)}})
+    # bebaskan kunci brute-force untuk user ini (semua IP) agar bisa login ulang
+    await db.login_attempts.delete_many({"_id": {"$regex": f":{target['username']}$"}})
+    await log_activity(user, "reset_password", f"Reset password untuk '{target['username']}'", user_id)
+    return {"reset": True, "id": user_id}
 
 
 @api_router.delete("/admin/users/{user_id}")
