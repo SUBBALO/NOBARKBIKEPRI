@@ -118,10 +118,11 @@ export default function WalkinPage() {
     );
   }
 
-  const toggle = (label) => {
+  const toggle = (label, partner = null) => {
     setSelected((p) => {
-      if (p.includes(label)) return p.filter((x) => x !== label);
-      return [...p, label];
+      const pair = partner ? [label, partner] : [label];
+      if (p.includes(label)) return p.filter((x) => !pair.includes(x));
+      return [...p.filter((x) => !pair.includes(x)), ...pair];
     });
   };
 
@@ -192,7 +193,7 @@ export default function WalkinPage() {
           {loadingMap ? (
             <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#B26A1E]" /></div>
           ) : mapData ? (
-            <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} />
+            <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} couples={mapData.couples || {}} allowDisability />
           ) : (
             <p className="text-center text-sm text-[#7A6A5E] py-16">Gagal memuat peta kursi.</p>
           )}

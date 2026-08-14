@@ -125,6 +125,7 @@ export default function BookingPage() {
   const [event, setEvent] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [rows, setRows] = useState([]);
+  const [couples, setCouples] = useState({});
   const [seatsLoading, setSeatsLoading] = useState(false);
   const [selected, setSelected] = useState([]);
   const [method, setMethod] = useState("qris");
@@ -145,8 +146,9 @@ export default function BookingPage() {
     try {
       const { data } = await api.get(`/sessions/${id}/seats`);
       setRows(data.rows);
+      setCouples(data.couples || {});
       const bookedSet = new Set(
-        data.rows.flatMap((r) => r.seats.filter((s) => s.status === "booked").map((s) => s.label))
+        data.rows.flatMap((r) => r.blocks.flat().filter((s) => s.status === "booked").map((s) => s.label))
       );
       setSelected((prev) => {
         const kept = prev.filter((l) => !bookedSet.has(l));
@@ -169,10 +171,14 @@ export default function BookingPage() {
     return () => clearInterval(t);
   }, [step, sessionId]);
 
-  const toggleSeat = (label) => {
-    setSelected((prev) =>
-      prev.includes(label) ? prev.filter((s) => s !== label) : [...prev, label]
-    );
+  const toggleSeat = (label, partner = null) => {
+    setSelected((prev) => {
+      const pair = partner ? [label, partner] : [label];
+      if (prev.includes(label)) {
+        return prev.filter((s) => !pair.includes(s));
+      }
+      return [...prev.filter((s) => !pair.includes(s)), ...pair];
+    });
   };
 
   const next = () => {
@@ -356,7 +362,7 @@ export default function BookingPage() {
             {seatsLoading ? (
               <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
             ) : (
-              <SeatMap rows={rows} selected={selected} onToggle={toggleSeat} />
+              <SeatMap rows={rows} selected={selected} onToggle={toggleSeat} couples={couples} />
             )}
           </div>
         )}

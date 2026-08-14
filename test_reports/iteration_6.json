@@ -1,0 +1,24 @@
+{
+  "summary": "Tested new CINEMA 4 seat layout with couple pairs, operator-reserved seats, K row without K9, and 207 capacity. Backend: 7/7 pytest passed (structure, single-couple rejection, reserved rejection, K9 invalid, couple+regular success, walk-in single-couple rejection, walk-in couple-pair success with verified+checked_in). Frontend: e2e booking flow works — Session 1 click jumps directly to seat picker; row order M(top)->A(bottom); K9 does not render; A11/A12 disabled and displayed in dark (operator); clicking couple A4 auto-selects A3, clicking again removes both; couple B10+B9 + regular C6 order successfully created and order page shows all 3 seats. Zoom in/out buttons work. Mobile 390px: 'Geser untuk lihat semua kursi' hint visible, body has NO horizontal overflow (scrollW==clientW), scroll is contained inside seatmap-scroll (658 vs 324). Walk-in page /walkin: admin1 login works, displays new seatmap and correct capacity 'Sisa 199 kursi · 8/207 terisi'. Admin stats endpoint returns per_session with revenue and daily entries.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_seatmap_couples.py",
+    "/app/test_reports/pytest/iter6_seatmap.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/server.py: is_coming_soon() defaults to True when key missing. If someone deletes the config doc, sales silently close. Consider explicit init in seed startup.",
+    "SeatMap.js: 'reserved' seats show tooltip only; consider a subtle label 'OP' inside for clarity (minor UX)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_seatmap_couples.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (superadmin) via POST /api/admin/login -> X-Admin-Token header",
+  "seed_data_creation": "Created ~5 test orders during testing; all cleaned up via DELETE /api/admin/orders/{id}. Preserved pre-existing data (F9,E10,D9,B8,B7,A10,A8,A7).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Coming Soon is currently OFF to allow booking tests — main agent will re-enable. New seat layout: 12 rows (M,L,K,J,H,G,F,E,D,C,B,A), 207 seats, 15 couple pairs (30 entries in couples map), A11/A12 reserved for operator, K9 does not exist. Booking flow now skips 'Lanjut' button on session step — session card click auto-advances to step 3.",
+  "rca of the issue": "N/A — no bugs found"
+}

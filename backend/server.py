@@ -50,10 +50,46 @@ SESSIONS = [
     {"id": 4, "name": "Sesi 4", "time": "19:00 WIB"},
 ]
 
-SEAT_ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"]
-SEATS_PER_ROW = 10
-SEATS_PER_SESSION = len(SEAT_ROWS) * SEATS_PER_ROW  # 100
-ALL_SEAT_LABELS = {f"{r}{i}" for r in SEAT_ROWS for i in range(1, SEATS_PER_ROW + 1)}
+def _rng(a: int, b: int):
+    """Descending seat numbers a..b (visual left-to-right, no 1 at right)."""
+    return list(range(a, b - 1, -1))
+
+
+# Denah asli CINEMA 4 (REGULER) CGV Grand Batam — nomor 1 di kanan.
+# Blocks = kelompok kursi dipisah gang (aisle).
+SEAT_LAYOUT = [
+    {"row": "M", "blocks": [[21, 20], _rng(18, 6), [4, 3, 2, 1]]},
+    {"row": "L", "blocks": [[21, 20], _rng(18, 6), [4, 3, 2, 1]]},
+    {"row": "K", "blocks": [[21, 20], [18, 17, 16, 15, 14, 13, 12, 11, 10, 8, 7, 6], [4, 3]]},
+    {"row": "J", "blocks": [[21, 20], _rng(18, 6), [4, 3]]},
+    {"row": "H", "blocks": [[21, 20], _rng(18, 6), [4, 3]]},
+    {"row": "G", "blocks": [[21, 20], _rng(18, 6), [4, 3]]},
+    {"row": "F", "blocks": [[21, 20], _rng(18, 6), [4, 3]]},
+    {"row": "E", "blocks": [[21, 20], _rng(18, 6), [4, 3]]},
+    {"row": "D", "blocks": [[21, 20], _rng(18, 6), [4, 3]]},
+    {"row": "C", "blocks": [[21, 20], _rng(18, 6), [4, 3]]},
+    {"row": "B", "blocks": [[21, 20], _rng(16, 7), [4, 3, 2, 1]]},
+    {"row": "A", "blocks": [[20, 19, 18, 17], _rng(16, 5), [4, 3, 2, 1]]},
+]
+
+# Kursi couple (pink) — wajib dibeli sepasang
+COUPLE_PAIRS = [
+    ("B16", "B15"), ("B14", "B13"), ("B12", "B11"), ("B10", "B9"), ("B8", "B7"),
+    ("A20", "A19"), ("A18", "A17"), ("A16", "A15"), ("A14", "A13"), ("A12", "A11"),
+    ("A10", "A9"), ("A8", "A7"), ("A6", "A5"), ("A4", "A3"), ("A2", "A1"),
+]
+COUPLE_PARTNER = {}
+for _a, _b in COUPLE_PAIRS:
+    COUPLE_PARTNER[_a] = _b
+    COUPLE_PARTNER[_b] = _a
+
+ALL_SEAT_LABELS = {f"{r['row']}{n}" for r in SEAT_LAYOUT for blk in r["blocks"] for n in blk}
+
+# Kursi khusus operator — tidak bisa dipesan di semua sesi
+RESERVED_SEATS = {"A11", "A12"}
+# Kursi disabilitas — hanya bisa dibeli di lokasi (walk-in), tidak bisa online
+DISABILITY_SEATS = {"K10", "K8"}
+SEATS_PER_SESSION = len(ALL_SEAT_LABELS) - len(RESERVED_SEATS)  # 207
 
 TRANSFER_INFO = {
     "bank": "BCA",
@@ -150,13 +186,44 @@ async def taken_seats(session_id: int):
 def build_seat_map(taken: set):
     """Pilihan kursi bebas: semua kursi yang belum dipesan bisa dipilih."""
     rows = []
-    for r in SEAT_ROWS:
-        seats = []
-        for i in range(1, SEATS_PER_ROW + 1):
-            l = f"{r}{i}"
-            seats.append({"label": l, "status": "booked" if l in taken else "available"})
-        rows.append({"row": r, "unlocked": True, "seats": seats})
+    for r in SEAT_LAYOUT:
+        blocks = []
+        for blk in r["blocks"]:
+            block_seats = []
+            for n in blk:
+                l = f"{r['row']}{n}"
+                if l in RESERVED_SEATS:
+                    status = "reserved"
+                elif l in taken:
+                    status = "booked"
+                else:
+                    status = "available"
+                block_seats.append({
+                    "label": l,
+                    "status": status,
+                    "couple": l in COUPLE_PARTNER,
+                    "disability": l in DISABILITY_SEATS,
+                })
+            blocks.append(block_seats)
+        rows.append({"row": r["row"], "unlocked": True, "blocks": blocks})
     return rows
+
+
+def validate_couple_pairs(seats: list):
+    """Kursi operator tidak bisa dipesan; kursi couple (pink) wajib sepasang."""
+    seat_set = set(seats)
+    for seat in seats:
+        if seat in RESERVED_SEATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Kursi {seat} khusus operator dan tidak bisa dipesan",
+            )
+        partner = COUPLE_PARTNER.get(seat)
+        if partner and partner not in seat_set:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Kursi {seat} adalah kursi couple — wajib dipesan sepasang dengan {partner}",
+            )
 
 
 async def session_status(session_id: int, active_session: int):
@@ -336,6 +403,7 @@ async def get_seats(session_id: int):
         "rows": build_seat_map(taken),
         "booked": count,
         "capacity": SEATS_PER_SESSION,
+        "couples": COUPLE_PARTNER,
     }
 
 
@@ -356,6 +424,13 @@ async def create_order(payload: OrderCreate):
     for seat in seats:
         if seat not in ALL_SEAT_LABELS:
             raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
+    validate_couple_pairs(seats)
+    for seat in seats:
+        if seat in DISABILITY_SEATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Kursi {seat} khusus penyandang disabilitas — pembelian hanya di lokasi (walk-in)",
+            )
 
     # Release any expired locks first so freed seats are claimable
     await taken_seats(payload.session_id)
@@ -715,6 +790,7 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
     for seat in seats:
         if seat not in ALL_SEAT_LABELS:
             raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
+    validate_couple_pairs(seats)
 
     await taken_seats(payload.session_id)  # release expired locks first
 
