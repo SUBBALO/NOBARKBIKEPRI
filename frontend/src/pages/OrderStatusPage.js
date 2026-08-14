@@ -146,7 +146,8 @@ export default function OrderStatusPage() {
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">No. HP</dt><dd className="font-medium">{order.phone}</dd></div>
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">Sesi</dt><dd className="font-medium">{order.session?.name} · {order.session?.time}</dd></div>
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">Kursi</dt><dd className="font-medium text-right">{order.seats.join(", ")}</dd></div>
-            <div className="flex justify-between"><dt className="text-[#7A6A5E]">Jumlah tiket</dt><dd className="font-medium">{order.qty} × {rupiah(order.unit_price)}</dd></div>
+            <div className="flex justify-between"><dt className="text-[#7A6A5E]">Jumlah tiket</dt><dd className="font-medium">{order.qty} kursi</dd></div>
+            <div className="flex justify-between"><dt className="text-[#7A6A5E]">Kontribusi</dt><dd className="font-medium">Dana Sukarela</dd></div>
           </dl>
           <div className="mt-5 rounded-xl bg-[#7A241F] text-white p-5">
             <p className="text-xs text-white/70">Total yang harus dibayar (nominal PAS)</p>

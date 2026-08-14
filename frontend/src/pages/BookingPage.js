@@ -13,7 +13,7 @@ import {
 import {
   ArrowLeft, ArrowRight, User, Clock, Armchair, QrCode, Landmark,
   Lock, CheckCircle2, AlertTriangle, Loader2, CalendarDays,
-  UploadCloud,
+  UploadCloud, HandHeart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,16 +24,16 @@ const STEPS = [
   { n: 4, label: "Pembayaran", icon: QrCode },
 ];
 
-const PRICE = 50000;
+const REF_COST = 60000; // biaya pengadaan rata-rata per orang (acuan dana sukarela)
 const POSTER_URL = "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/h7ivo2nv_POSTER.webp";
 
 const SessionCard = ({ s, active, selected, onSelect }) => {
   const disabled = s.status !== "open";
   const badge = {
     open: { t: "Dibuka", c: "bg-[#2F703E]/15 text-[#255E33]" },
-    locked: { t: "Terkunci", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
+    locked: { t: "Belum Dibuka", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
     full: { t: "Penuh", c: "bg-[#EF4444]/15 text-[#EF4444]" },
-    closed: { t: "Selesai", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
+    closed: { t: "Belum Dibuka", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
   }[s.status];
   const remaining = Math.max(0, (s.capacity || 0) - (s.booked || 0));
   const pct = s.capacity ? Math.min(100, Math.round((s.booked / s.capacity) * 100)) : 0;
@@ -129,6 +129,7 @@ export default function BookingPage() {
   const [seatsLoading, setSeatsLoading] = useState(false);
   const [selected, setSelected] = useState([]);
   const [method, setMethod] = useState("qris");
+  const [amountText, setAmountText] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -192,13 +193,15 @@ export default function BookingPage() {
   };
   const back = () => setStep((s) => Math.max(1, s - 1));
 
-  const total = selected.length * PRICE;
+  const amount = parseInt(amountText || "0", 10) || 0;
+  const refTotal = selected.length * REF_COST;
+  const total = amount;
 
   const submit = async () => {
     setSubmitting(true);
     try {
       const { data } = await api.post("/orders", {
-        name, phone, session_id: sessionId, seats: selected, payment_method: method,
+        name, phone, session_id: sessionId, seats: selected, payment_method: method, amount,
       });
       toast.success("Pesanan dibuat! Segera lakukan pembayaran.");
       nav(`/order/${data.id}`);
@@ -262,7 +265,7 @@ export default function BookingPage() {
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-4">
               <span className="inline-flex items-center gap-2 bg-[#B26A1E] text-white text-sm font-semibold px-4 py-2 rounded-full">
-                Tiket {rupiah(PRICE)} / kursi
+                Kontribusi Tiket: Dana Sukarela
               </span>
               <span className="text-xs text-white/70">QRIS atau Transfer BCA</span>
             </div>
@@ -331,7 +334,7 @@ export default function BookingPage() {
           <div>
             <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Pilih Sesi</h2>
             <p className="text-sm text-[#7A6A5E] mb-6">
-              Tekan sesi yang dibuka untuk langsung memilih kursi. Sesi berikutnya terbuka otomatis saat sesi berjalan penuh.
+              Tekan sesi yang dibuka untuk langsung memilih kursi. Sesi dibuka bertahap oleh panitia.
             </p>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {event?.sessions?.map((s) => (
@@ -362,7 +365,13 @@ export default function BookingPage() {
             {seatsLoading ? (
               <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
             ) : (
-              <SeatMap rows={rows} selected={selected} onToggle={toggleSeat} couples={couples} />
+              <>
+                <div className="rounded-xl border border-[#B26A1E]/30 bg-[#F3E9DD]/60 p-3.5 mb-5 text-xs sm:text-sm text-[#5B4636] space-y-1" data-testid="seat-info-box">
+                  <p><span className="inline-block h-3 w-3 rounded-sm bg-[#F9A8D4] mr-1.5 align-middle" /><b>Kursi couple (pink)</b> wajib untuk 2 orang — klik satu, pasangannya ikut terpilih otomatis.</p>
+                  <p><span className="inline-block h-3 w-3 rounded-sm bg-[#6EE7B7] mr-1.5 align-middle" /><b>Kursi disabilitas (hijau)</b> hanya dijual di lokasi acara — hubungi panitia bila membutuhkan.</p>
+                </div>
+                <SeatMap rows={rows} selected={selected} onToggle={toggleSeat} couples={couples} />
+              </>
             )}
           </div>
         )}
@@ -396,6 +405,35 @@ export default function BookingPage() {
                   );
                 })}
               </div>
+
+              {/* Dana Sukarela */}
+              <div className="mt-6 rounded-xl border border-[#B26A1E]/40 bg-[#F3E9DD]/50 p-5" data-testid="donation-card">
+                <h3 className="font-semibold text-[#7A241F] flex items-center gap-2">
+                  <HandHeart className="h-5 w-5 text-[#B26A1E]" /> Kontribusi Tiket: Dana Sukarela
+                </h3>
+                <p className="text-xs text-[#7A6A5E] mt-1.5">
+                  Biaya pengadaan rata-rata <b>{rupiah(REF_COST)}/orang</b>.
+                  Acuan untuk {selected.length} tiket: <b className="text-[#7A241F]">{rupiah(refTotal)}</b> — nominal tetap bebas sesuai kerelaan.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  <button type="button" data-testid="donation-use-reference"
+                    onClick={() => setAmountText(String(refTotal))}
+                    className={cn("text-xs font-semibold rounded-full px-4 py-2 border transition-colors",
+                      amount === refTotal
+                        ? "bg-[#B26A1E] text-white border-[#B26A1E]"
+                        : "bg-white text-[#7A241F] border-[#B26A1E]/40 hover:border-[#B26A1E]")}>
+                    Pakai nominal acuan ({rupiah(refTotal)})
+                  </button>
+                </div>
+                <Label htmlFor="donation" className="text-xs text-[#5B4636] mt-4 block">Nominal dana sukarela (Rp)</Label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                  <Input id="donation" data-testid="donation-input" inputMode="numeric"
+                    value={amount ? amount.toLocaleString("id-ID") : ""}
+                    onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="0" className="pl-10 h-12 text-lg font-semibold bg-white" />
+                </div>
+              </div>
             </div>
             <div className="rounded-xl border border-border bg-[#FDFBF7] p-6">
               <h3 className="font-semibold text-[#7A241F] mb-4">Ringkasan Pesanan</h3>
@@ -404,7 +442,8 @@ export default function BookingPage() {
                 <div className="flex justify-between"><dt className="text-[#7A6A5E]">No. HP</dt><dd className="font-medium">{phone}</dd></div>
                 <div className="flex justify-between"><dt className="text-[#7A6A5E]">Sesi</dt><dd className="font-medium">{activeSession?.name} · {activeSession?.time}</dd></div>
                 <div className="flex justify-between"><dt className="text-[#7A6A5E]">Kursi</dt><dd className="font-medium text-right">{selected.join(", ")}</dd></div>
-                <div className="flex justify-between"><dt className="text-[#7A6A5E]">Jumlah</dt><dd className="font-medium">{selected.length} × {rupiah(PRICE)}</dd></div>
+                <div className="flex justify-between"><dt className="text-[#7A6A5E]">Jumlah tiket</dt><dd className="font-medium">{selected.length} kursi</dd></div>
+                <div className="flex justify-between"><dt className="text-[#7A6A5E]">Dana sukarela</dt><dd className="font-medium">{rupiah(amount)}</dd></div>
               </dl>
               <div className="border-t border-border mt-4 pt-4 flex justify-between items-center">
                 <span className="text-[#7A6A5E]">Total</span>
@@ -430,7 +469,11 @@ export default function BookingPage() {
               Lanjut <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           ) : (
-            <Button data-testid="btn-confirm-open" onClick={() => setConfirmOpen(true)}
+            <Button data-testid="btn-confirm-open"
+              onClick={() => {
+                if (amount <= 0) { toast.error("Isi nominal dana sukarela terlebih dahulu"); return; }
+                setConfirmOpen(true);
+              }}
               className="bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full px-6">
               Konfirmasi Pesanan <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>

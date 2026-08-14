@@ -1,0 +1,35 @@
+{
+  "summary": "Iterasi 7 — memverifikasi fitur baru DANA SUKARELA (donasi, tanpa harga tetap) + SESI MANUAL (buka/tutup oleh Super Admin). Backend pytest 9/9 pass. Frontend e2e: booking, admin session control (super vs admin biasa), dan walkin lolos semua.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_donation_sessions.py",
+    "/app/test_reports/pytest/iter7_donation.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py sudah rapi. Catatan kecil: OrderCreate.amount default 0 lalu divalidasi (>0) — bisa lebih idiomatik dengan Pydantic Field(gt=0), tapi tidak blocking.",
+    "AdminPage.js baris ~919: kartu 'Buka/Tutup Penjualan per Sesi' tetap tampil untuk admin biasa (tanpa switch) dengan pesan 'Hanya Super Admin ...' — bagus. Tidak ada isu.",
+    "WalkinPage: bila submit ditolak karena amount kosong, backend sudah membebaskan seat lock; frontend memuat ulang seat map sehingga UX konsisten."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter7_donation_sessions.py (new)"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (super), admin2/admin123 (admin), admin3/admin123 (checkin)",
+  "seed_data_creation": "Membuat 2 order tes (TEST_UI_Playwright online Sesi 2 Rp80.049; TEST_Walkin_UI cash Sesi 3 Rp60.000). Kedua order sudah dihapus via DELETE /api/admin/orders/{id}. Order lama (F9,E10,D9,B8,B7,A10,A8,A7 di Sesi 1) TIDAK disentuh.",
+  "final_state": "Sesi 2 & 5 = OPEN, Sesi 1/3/4 = CLOSED. Coming Soon status tidak diubah (biarkan OFF sesuai instruksi).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Field OrderCreate wajib punya `amount` > 0. Untuk uji /api/orders, sesi harus dibuka dulu via POST /api/admin/sessions/toggle {session_id, open:true} sebagai superadmin. /api/admin/walkin JUGA butuh amount>0 tapi TIDAK terikat status buka sesi (bisa jual sesi tutup). Cash = kode 0, total=base; QRIS/transfer +unique_code 11..999. Reference cost = Rp60.000 (konstanta di server.py REFERENCE_COST). Untuk state cleanup: sesi 2 & 5 open.",
+  "verified_flows": [
+    "GET /api/event: pricing='donation', reference_cost=60000, 5 sesi dengan waktu baru, status ikuti open_sessions.",
+    "POST /api/orders: 400 saat sesi tutup ('Sesi ini belum dibuka panitia'); 400 saat amount=0 atau missing ('Isi nominal dana sukarela'); 200 dengan amount=75000 di sesi 2 → base=75000, total=75000+unique (11..999), GET /api/orders/{id} mengonfirmasi persistensi.",
+    "POST /api/admin/sessions/toggle: 403 untuk admin biasa & checkin; 200 untuk superadmin (open & close); log action 'session_toggle' tercatat & tampil di /api/admin/logs.",
+    "POST /api/admin/walkin: 400 saat amount=0, seat lock direlease (retry berikutnya sukses); cash amount=100000 → unique_code=0 total=100000; qris amount=60000 → +unique; walkin sukses meskipun sesi 4 CLOSED.",
+    "Frontend booking: 5 kartu sesi, Sesi 2 & 5 tampil 'kursi tersisa' (open), Sesi 1/3/4 disabled/'Belum Dibuka'. Klik Sesi 2 auto-lanjut ke pilih kursi; seat-info-box (couple + disabilitas) tampil. Donation-card di step 4: tombol donation-use-reference mengisi input=60.000 dan summary total Rp 60.000; empty amount + Konfirmasi memicu toast; setelah isi 80.000 submit sukses → /order/{id} menampilkan 'Jumlah tiket: 1 kursi' & 'Kontribusi: Dana Sukarela' + total Rp 80.049.",
+    "Panel admin (admin1 super): session-control-card menampilkan 5 switch (initial state benar: sesi 2 & 5 checked). Toggle switch sesi 1 ON→OFF berfungsi + toast 'Sesi 1 DITUTUP'. Grafik harian + kartu 'Dana Terkumpul per Sesi' (5 kartu) + Ringkasan Penjualan online/walkin tampil.",
+    "Panel admin (admin2): session-control-card tampil TANPA switch, pesan 'Hanya Super Admin yang dapat membuka/menutup sesi.'",
+    "/walkin: 5 tombol sesi dengan jam baru; empty amount → toast; walkin-use-reference mengisi 60.000; submit cash sesi 3 (tutup) sukses; dialog walkin-result-dialog menampilkan 'SESI 3 · 15.00–17.00 WIB' + 'M21' + Nominal Rp 60.000.",
+    "Regresi ringan: peta kursi CINEMA 4 tetap tampil, capacity 207 konsisten (24/207 setelah walkin di sesi 3 sebelum cleanup), Rekap Kas Cash walk-in ditampilkan."
+  ],
+  "rca of the issue": "N/A — tidak ada bug ditemukan."
+}

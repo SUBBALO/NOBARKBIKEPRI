@@ -36,7 +36,7 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 # ---------------- Event configuration ----------------
-TICKET_PRICE = 50000
+REFERENCE_COST = 60000  # biaya pengadaan rata-rata per orang (acuan dana sukarela)
 HOLD_MINUTES = 15  # unpaid orders auto-release seats after this
 MAX_SEATS_PER_ORDER = 6  # batas kursi per pesanan
 EVENT_TITLE = 'Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara"'
@@ -44,10 +44,11 @@ EVENT_DATE = "Minggu, 13 September 2026"
 EVENT_LOCATION = "CGV Grand Batam"
 
 SESSIONS = [
-    {"id": 1, "name": "Sesi 1", "time": "13:00 WIB"},
-    {"id": 2, "name": "Sesi 2", "time": "15:00 WIB"},
-    {"id": 3, "name": "Sesi 3", "time": "17:00 WIB"},
-    {"id": 4, "name": "Sesi 4", "time": "19:00 WIB"},
+    {"id": 1, "name": "Sesi 1", "time": "09.00–10.30 WIB"},
+    {"id": 2, "name": "Sesi 2", "time": "12.30–14.30 WIB"},
+    {"id": 3, "name": "Sesi 3", "time": "15.00–17.00 WIB"},
+    {"id": 4, "name": "Sesi 4", "time": "17.00–19.00 WIB"},
+    {"id": 5, "name": "Sesi 5", "time": "19.00–21.00 WIB"},
 ]
 
 def _rng(a: int, b: int):
@@ -106,6 +107,7 @@ class OrderCreate(BaseModel):
     session_id: int
     seats: List[str]
     payment_method: Literal["qris", "transfer"]
+    amount: int = 0  # dana sukarela (total, Rp)
 
 
 class ProofUpload(BaseModel):
@@ -118,6 +120,7 @@ class WalkinCreate(BaseModel):
     session_id: int
     seats: List[str]
     payment_method: Literal["cash", "qris", "transfer"]
+    amount: int = 0  # dana sukarela (total, Rp)
 
 
 class AdminLogin(BaseModel):
@@ -134,6 +137,11 @@ class UserCreate(BaseModel):
 
 class SetActiveSession(BaseModel):
     session_id: int
+
+
+class SessionToggle(BaseModel):
+    session_id: int
+    open: bool
 
 
 class SetComingSoon(BaseModel):
@@ -226,33 +234,20 @@ def validate_couple_pairs(seats: list):
             )
 
 
-async def session_status(session_id: int, active_session: int):
+async def session_status(session_id: int, open_sessions: set):
     taken = await taken_seats(session_id)
     is_full = len(taken) >= SEATS_PER_SESSION
-    if session_id < active_session:
-        status = "closed"
-    elif session_id == active_session:
+    if session_id in open_sessions:
         status = "full" if is_full else "open"
     else:
-        status = "locked"
+        status = "closed"
     return status, len(taken)
 
 
-async def resolve_active_session():
-    """Active session = the first (lowest id) session that still has free seats.
-    Fills Sesi 1 first, then 2, etc. — no reliance on a stale/manual pointer."""
-    active = None
-    for s in SESSIONS:
-        taken = await taken_seats(s["id"])
-        if len(taken) < SEATS_PER_SESSION:
-            active = s["id"]
-            break
-    if active is None:
-        active = len(SESSIONS)
+async def get_open_sessions():
+    """Sesi dibuka MANUAL oleh Super Admin. Default: semua tutup."""
     cfg = await get_config()
-    if active != cfg.get("active_session"):
-        await db.config.update_one({"_id": "config"}, {"$set": {"active_session": active}}, upsert=True)
-    return active
+    return set(cfg.get("open_sessions", []))
 
 
 def mask_name(name: str) -> str:
@@ -372,18 +367,18 @@ async def root():
 
 @api_router.get("/event")
 async def event_info():
-    active = await resolve_active_session()
+    open_s = await get_open_sessions()
     sessions = []
     for s in SESSIONS:
-        status, count = await session_status(s["id"], active)
+        status, count = await session_status(s["id"], open_s)
         sessions.append({**s, "status": status, "booked": count, "capacity": SEATS_PER_SESSION})
     return {
         "title": EVENT_TITLE,
         "date": EVENT_DATE,
         "location": EVENT_LOCATION,
-        "ticket_price": TICKET_PRICE,
+        "pricing": "donation",
+        "reference_cost": REFERENCE_COST,
         "hold_minutes": HOLD_MINUTES,
-        "active_session": active,
         "sessions": sessions,
         "transfer": TRANSFER_INFO,
         "coming_soon": await is_coming_soon(),
@@ -394,8 +389,8 @@ async def event_info():
 async def get_seats(session_id: int):
     if session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=404, detail="Sesi tidak ditemukan")
-    active = await resolve_active_session()
-    status, count = await session_status(session_id, active)
+    open_s = await get_open_sessions()
+    status, count = await session_status(session_id, open_s)
     taken = await taken_seats(session_id)
     return {
         "session_id": session_id,
@@ -415,10 +410,15 @@ async def create_order(payload: OrderCreate):
         raise HTTPException(status_code=400, detail="Nama dan nomor HP wajib diisi")
     if not payload.seats:
         raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
+    amount = int(payload.amount or 0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Isi nominal dana sukarela terlebih dahulu")
+    if amount > 100_000_000:
+        raise HTTPException(status_code=400, detail="Nominal terlalu besar")
 
-    active = await resolve_active_session()
-    if payload.session_id != active:
-        raise HTTPException(status_code=400, detail="Sesi ini belum/tidak dibuka untuk pemesanan")
+    open_s = await get_open_sessions()
+    if payload.session_id not in open_s:
+        raise HTTPException(status_code=400, detail="Sesi ini belum dibuka panitia")
 
     seats = list(dict.fromkeys(payload.seats))  # dedupe, keep order
     for seat in seats:
@@ -436,7 +436,7 @@ async def create_order(payload: OrderCreate):
     await taken_seats(payload.session_id)
 
     qty = len(seats)
-    base = qty * TICKET_PRICE
+    base = amount
     code, total = await gen_unique_total(base)
     order_no = await gen_order_no()
     order_id = str(uuid.uuid4())
@@ -469,7 +469,6 @@ async def create_order(payload: OrderCreate):
         "session_id": payload.session_id,
         "seats": seats,
         "qty": qty,
-        "unit_price": TICKET_PRICE,
         "base_amount": base,
         "unique_code": code,
         "total_amount": total,
@@ -810,7 +809,13 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
 
     qty = len(claimed)
     order_no = await gen_order_no()
-    base = qty * TICKET_PRICE
+    base = int(payload.amount or 0)
+    if base <= 0:
+        await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
+        raise HTTPException(status_code=400, detail="Isi nominal dana sukarela terlebih dahulu")
+    if base > 100_000_000:
+        await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
+        raise HTTPException(status_code=400, detail="Nominal terlalu besar")
     if payload.payment_method == "cash":
         code, total = 0, base
     else:
@@ -820,7 +825,7 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
         "id": order_id, "order_no": order_no,
         "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
         "session_id": payload.session_id, "seats": claimed, "qty": qty,
-        "unit_price": TICKET_PRICE, "base_amount": base, "unique_code": code, "total_amount": total,
+        "base_amount": base, "unique_code": code, "total_amount": total,
         "payment_method": payload.payment_method, "status": "verified",
         "proof_image": None, "checked_in": True, "checked_in_at": now_iso(),
         "checked_in_by": actor, "checked_in_by_username": user.get("username"),
@@ -835,12 +840,20 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff
 
 
 
-@api_router.post("/admin/active-session")
-async def set_active_session(payload: SetActiveSession, user: dict = Depends(require_staff)):
+@api_router.post("/admin/sessions/toggle")
+async def toggle_session_open(payload: SessionToggle, user: dict = Depends(require_roles("superadmin"))):
     if payload.session_id not in [s["id"] for s in SESSIONS]:
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
-    await db.config.update_one({"_id": "config"}, {"$set": {"active_session": payload.session_id}}, upsert=True)
-    return {"active_session": payload.session_id}
+    cfg = await get_config()
+    open_s = set(cfg.get("open_sessions", []))
+    if payload.open:
+        open_s.add(payload.session_id)
+    else:
+        open_s.discard(payload.session_id)
+    await db.config.update_one({"_id": "config"}, {"$set": {"open_sessions": sorted(open_s)}}, upsert=True)
+    await log_activity(user, "session_toggle",
+                       f"{'Membuka' if payload.open else 'Menutup'} penjualan Sesi {payload.session_id}")
+    return {"open_sessions": sorted(open_s)}
 
 
 @api_router.post("/admin/coming-soon")
@@ -1052,6 +1065,8 @@ ACTION_LABEL_ID = {
     "user_create": "Buat User",
     "user_delete": "Hapus User",
     "walkin": "Walk-in (Jual di Tempat)",
+    "coming_soon": "Mode Coming Soon",
+    "session_toggle": "Buka/Tutup Sesi",
 }
 
 

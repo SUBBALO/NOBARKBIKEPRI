@@ -55,7 +55,14 @@ iteration_3.json: 100% pass (19/19 backend + frontend flows) untuk auth/role/log
 Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/app, terpotong di muka saat Deploy; redeploy update gratis dalam periode aktif; app tetap live walau workspace terblokir selama periode terbayar.
 
 ## Backlog / Future (P1)
-- Refaktor Pre-order (bayar tanpa pilih kursi → pilih kursi saat check-in) — DITUNDA, belum dikonfirmasi user.
-- Batas kapasitas per sesi (mis. 200 tiket) untuk pre-order.
-- Live board /board seat map auto-refresh saat check-in.
-- (Opsional) hapus/nonaktifkan "Kontrol Sesi" manual di admin karena sesi kini otomatis sekuensial.
+- Angka preset tombol cepat nominal dana sukarela — user bilang "nanti sy br bahas".
+- Ganti nama akun admin1/2/3 dengan nama panitia asli.
+- Struk mini cetak untuk walk-in.
+- Monitor kehadiran per sesi auto-refresh (/board).
+- Refaktor Pre-order (bayar tanpa pilih kursi) — TIDAK RELEVAN lagi: denah asli sudah dipasang; anggap batal kecuali user minta.
+
+## Update Terbaru (Agu 2026, sesi ini)
+- DANA SUKARELA: harga tetap Rp50.000 DIHAPUS. Pembeli isi nominal TOTAL sendiri (bebas >0, maks 100jt). Acuan REFERENCE_COST Rp60.000/orang + tombol "Pakai nominal acuan" (qty×60rb) di step Pembayaran (donation-card) & /walkin (walkin-amount, walkin-use-reference). QRIS/transfer + kode unik; cash pas. OrderCreate/WalkinCreate punya field amount; unit_price tidak disimpan lagi. OrderStatusPage: "Jumlah tiket: N kursi" + "Kontribusi: Dana Sukarela".
+- SESI MANUAL + 5 SESI: SESSIONS = 5 sesi (09.00-10.30, 12.30-14.30, 15.00-17.00, 17.00-19.00, 19.00-21.00 WIB; hardcode juga di WalkinPage.js). TIDAK ada buka otomatis — config `open_sessions` (default [] = semua TUTUP). Hanya SUPERADMIN via POST /api/admin/sessions/toggle (log action session_toggle); boleh banyak sesi terbuka bersamaan. Switch per sesi di panel admin (session-open-switch-N; admin biasa lihat saja). create_order menolak sesi tutup; walk-in TIDAK terikat status sesi. Endpoint lama /admin/active-session DIHAPUS.
+- Info box kursi couple & disabilitas (seat-info-box) di step Pilih Kursi.
+- Testing iteration_7: backend 9/9 + frontend 100% pass. Kondisi preview dikembalikan: coming_soon ON, semua sesi tutup.

@@ -12,17 +12,18 @@ import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, Refre
 import { cn } from "@/lib/utils";
 
 const SESSIONS = [
-  { id: 1, name: "Sesi 1", time: "13:00 WIB" },
-  { id: 2, name: "Sesi 2", time: "15:00 WIB" },
-  { id: 3, name: "Sesi 3", time: "17:00 WIB" },
-  { id: 4, name: "Sesi 4", time: "19:00 WIB" },
+  { id: 1, name: "Sesi 1", time: "09.00–10.30 WIB" },
+  { id: 2, name: "Sesi 2", time: "12.30–14.30 WIB" },
+  { id: 3, name: "Sesi 3", time: "15.00–17.00 WIB" },
+  { id: 4, name: "Sesi 4", time: "17.00–19.00 WIB" },
+  { id: 5, name: "Sesi 5", time: "19.00–21.00 WIB" },
 ];
 const PAY = [
   { k: "cash", t: "Cash", icon: Banknote },
   { k: "qris", t: "QRIS", icon: QrCode },
   { k: "transfer", t: "Transfer", icon: Landmark },
 ];
-const PRICE = 50000;
+const REF_COST = 60000;
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -79,6 +80,7 @@ export default function WalkinPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState("cash");
+  const [amountText, setAmountText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [transfer, setTransfer] = useState(null);
@@ -126,18 +128,21 @@ export default function WalkinPage() {
     });
   };
 
-  const total = selected.length * PRICE;
+  const amount = parseInt(amountText || "0", 10) || 0;
+  const refTotal = selected.length * REF_COST;
+  const total = amount;
 
   const submit = async () => {
     if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
     if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    if (amount <= 0) { toast.error("Isi nominal dana sukarela"); return; }
     setBusy(true);
     try {
       const { data } = await adminApi.post("/admin/walkin", {
-        name, phone, session_id: sessionId, seats: selected, payment_method: method,
+        name, phone, session_id: sessionId, seats: selected, payment_method: method, amount,
       });
       setResult(data);
-      setName(""); setPhone(""); setSelected([]);
+      setName(""); setPhone(""); setSelected([]); setAmountText("");
       loadMap(sessionId, false);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Gagal membuat tiket");
@@ -228,6 +233,24 @@ export default function WalkinPage() {
             <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="walkin-selected-seats">
               {selected.length === 0 ? <span className="text-xs text-[#9CA3AF]">Belum ada kursi dipilih</span>
                 : selected.map((s) => <span key={s} className="px-2.5 py-1 rounded-md bg-[#B26A1E]/10 text-[#8A3A12] text-sm font-bold">{s}</span>)}
+            </div>
+          </div>
+          <div className="rounded-lg border border-[#B26A1E]/30 bg-[#F3E9DD]/50 p-3 mb-3">
+            <p className="text-xs font-semibold text-[#7A241F]">Dana Sukarela</p>
+            <p className="text-[11px] text-[#7A6A5E]">Acuan {selected.length || 0} tiket × Rp60.000 = <b>{rupiah(refTotal)}</b></p>
+            <div className="flex gap-2 mt-2">
+              <button type="button" data-testid="walkin-use-reference" onClick={() => setAmountText(String(refTotal))}
+                disabled={selected.length === 0}
+                className="text-[11px] font-semibold rounded-full px-3 py-1.5 border border-[#B26A1E]/40 text-[#7A241F] bg-white hover:border-[#B26A1E] disabled:opacity-40">
+                Pakai acuan
+              </button>
+            </div>
+            <div className="relative mt-2">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+              <Input data-testid="walkin-amount" inputMode="numeric"
+                value={amount ? amount.toLocaleString("id-ID") : ""}
+                onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="0" className="pl-9 h-11 text-base font-semibold bg-white" />
             </div>
           </div>
           <div className="flex items-center justify-between mb-4">

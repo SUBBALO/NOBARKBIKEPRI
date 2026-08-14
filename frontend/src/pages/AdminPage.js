@@ -393,6 +393,8 @@ const ACTION_META = {
   user_create: { label: "Buat User", c: "bg-[#7A241F]/15 text-[#7A241F]" },
   user_delete: { label: "Hapus User", c: "bg-[#EF4444]/15 text-[#EF4444]" },
   walkin: { label: "Jual di Tempat", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  coming_soon: { label: "Coming Soon", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]" },
+  session_toggle: { label: "Buka/Tutup Sesi", c: "bg-[#2F703E]/15 text-[#255E33]" },
 };
 
 function LogsPanel() {
@@ -667,9 +669,12 @@ export default function AdminPage() {
     setBusyId(null);
   };
 
-  const setActiveSession = async (sid) => {
-    try { await adminApi.post("/admin/active-session", { session_id: sid }); toast.success(`Sesi aktif: ${sid}`); await load(); }
-    catch { toast.error("Gagal ubah sesi"); }
+  const toggleSessionOpen = async (sid, open) => {
+    try {
+      await adminApi.post("/admin/sessions/toggle", { session_id: sid, open });
+      toast.success(open ? `Sesi ${sid} DIBUKA untuk penjualan` : `Sesi ${sid} DITUTUP`);
+      await load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal mengubah sesi"); }
   };
 
   const toggleComingSoon = async () => {
@@ -909,18 +914,35 @@ export default function AdminPage() {
       {stats && <SessionFunds stats={stats} />}
       {stats && <SalesSummary stats={stats} />}
       {stats && <DailySalesChart stats={stats} />}
-      {/* Session control */}
+      {/* Session control — buka/tutup penjualan per sesi (Super Admin) */}
       {event && (
-        <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print">
-          <p className="text-sm font-medium text-[#7A241F] mb-2 flex items-center gap-2"><Users className="h-4 w-4" /> Kontrol Sesi (aktif: Sesi {event.active_session})</p>
-          <div className="flex flex-wrap gap-2">
-            {event.sessions.map((s) => (
-              <button key={s.id} data-testid={`admin-session-${s.id}`} onClick={() => setActiveSession(s.id)}
-                className={cn("px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                  event.active_session === s.id ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
-                {s.name} · {s.booked}/{s.capacity}
-              </button>
-            ))}
+        <div className="rounded-xl border border-border bg-white p-4 mb-6 no-print" data-testid="session-control-card">
+          <p className="text-sm font-medium text-[#7A241F] mb-1 flex items-center gap-2"><Users className="h-4 w-4" /> Buka/Tutup Penjualan per Sesi</p>
+          <p className="text-[11px] text-[#7A6A5E] mb-3">
+            {isSuper ? "Sesi TUTUP tidak bisa dipesan pembeli online. Geser untuk membuka." : "Hanya Super Admin yang dapat membuka/menutup sesi."}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+            {event.sessions.map((s) => {
+              const isOpen = s.status === "open" || s.status === "full";
+              return (
+                <div key={s.id} data-testid={`admin-session-${s.id}`}
+                  className={cn("rounded-xl border p-3 flex items-center justify-between gap-2",
+                    isOpen ? "border-[#2F703E]/40 bg-[#2F703E]/[0.06]" : "border-border bg-muted/30")}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#2C1E16]">{s.name} <span className="font-normal text-[#7A6A5E]">· {s.time}</span></p>
+                    <p className="text-[11px] text-[#7A6A5E]">{s.booked}/{s.capacity} terisi ·
+                      <span className={cn("font-semibold ml-1", isOpen ? "text-[#255E33]" : "text-[#7A6A5E]")}>
+                        {s.status === "full" ? "PENUH" : isOpen ? "DIBUKA" : "TUTUP"}
+                      </span>
+                    </p>
+                  </div>
+                  {isSuper && (
+                    <Switch checked={isOpen} onCheckedChange={(v) => toggleSessionOpen(s.id, v)}
+                      data-testid={`session-open-switch-${s.id}`} />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
