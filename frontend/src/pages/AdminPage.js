@@ -788,7 +788,7 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
-      <div className="flex items-center justify-between mb-6 no-print">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 no-print">
         <div>
           <h1 className="font-serif-display text-3xl text-[#7A241F]">Panel Admin</h1>
           <p className="text-sm text-[#7A6A5E] flex items-center gap-2">
@@ -800,12 +800,12 @@ export default function AdminPage() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportExcel} disabled={exporting} data-testid="btn-export">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={exportExcel} disabled={exporting} data-testid="btn-export">
             {exporting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />} Export Excel
           </Button>
-          <Button variant="outline" onClick={load} data-testid="btn-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
-          <Button variant="ghost" onClick={logout} data-testid="btn-logout" className="text-[#EF4444]"><LogOut className="h-4 w-4 mr-1.5" /> Keluar</Button>
+          <Button variant="outline" size="sm" onClick={load} data-testid="btn-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
+          <Button variant="ghost" size="sm" onClick={logout} data-testid="btn-logout" className="text-[#EF4444]"><LogOut className="h-4 w-4 mr-1.5" /> Keluar</Button>
         </div>
       </div>
 
@@ -964,7 +964,68 @@ export default function AdminPage() {
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center text-sm text-[#7A6A5E]">Tidak ada pesanan yang cocok.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile: card list */}
+          <div className="md:hidden divide-y divide-border" data-testid="orders-cards">
+            {filtered.map((o) => {
+              const dstat = orderProgress(o);
+              return (
+                <div key={o.id} className="p-4" data-testid={`order-card-${o.id.slice(0, 8)}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      {o.status === "waiting_verification" && (
+                        <input type="checkbox" checked={selectedIds.includes(o.id)} onChange={() => toggleSelect(o.id)}
+                          className="accent-[#7A241F] h-4 w-4 mt-1 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-medium text-[#2C1E16]">{o.name} <span className="font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></p>
+                        <p className="text-xs text-[#7A6A5E]">{o.phone}</p>
+                      </div>
+                    </div>
+                    <span className={cn("shrink-0 text-[11px] px-2 py-0.5 rounded-full font-medium", dstat.c)}>{dstat.t}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#7A6A5E]">
+                    <span>{fmtTime(o.created_at)}</span>
+                    <span className="text-[#2C1E16]">{o.session?.name} · {o.seats.join(", ")}</span>
+                    <span className="font-semibold text-[#7A241F] text-sm ml-auto">{rupiah(o.total_amount)}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {o.status === "waiting_verification" ? (
+                      <Button size="sm" onClick={() => openProof(o)} className="h-8 bg-[#B26A1E] hover:bg-[#8A3A12] text-xs">
+                        <Eye className="h-3.5 w-3.5 mr-1" /> Cek Bukti
+                      </Button>
+                    ) : o.status === "verified" ? (
+                      <button onClick={() => o.has_proof && openProof(o)}
+                        className="inline-flex items-center gap-1 text-[#255E33] text-xs font-medium">
+                        <CheckCircle2 className="h-4 w-4" /> Payment OK
+                      </button>
+                    ) : (o.status === "pending_payment" || o.status === "expired") ? (
+                      <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
+                        className="h-8 text-xs border-[#7A241F]/40 text-[#7A241F]">
+                        {busyId === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <UploadCloud className="h-3.5 w-3.5 mr-1" />} Upload Bukti
+                      </Button>
+                    ) : null}
+                    {o.status === "verified" ? (
+                      <Button size="sm" onClick={() => sendAndMarkWA(o)}
+                        className={cn("h-8 text-xs", o.wa_sent ? "bg-white text-[#255E33] border border-[#2F703E]/50 hover:bg-[#2F703E]/10" : "bg-[#2F703E] hover:bg-[#255E33]")}>
+                        <MessageCircle className="h-3.5 w-3.5 mr-1" /> {o.wa_sent ? "Kirim Ulang" : "Kirim Pesan"}
+                      </Button>
+                    ) : (o.status === "pending_payment" || o.status === "expired") ? (
+                      <Button size="sm" onClick={() => sendReminderWA(o)} className="h-8 text-xs bg-[#B26A1E] hover:bg-[#8A3A12]">
+                        <MessageCircle className="h-3.5 w-3.5 mr-1" /> Ingatkan Upload
+                      </Button>
+                    ) : null}
+                    <button onClick={() => setDeleteTarget(o)} title="Hapus pesanan"
+                      className="ml-auto inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Desktop: table */}
+          <div className="overflow-x-auto hidden md:block">
             <table className="w-full text-sm" data-testid="orders-table">
               <thead className="bg-muted/50 text-left text-xs text-[#7A6A5E]">
                 <tr>
@@ -1067,6 +1128,7 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
       </>)}
