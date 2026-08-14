@@ -100,6 +100,11 @@ class SetActiveSession(BaseModel):
     session_id: int
 
 
+class SetComingSoon(BaseModel):
+    enabled: bool
+
+
+
 class BulkAction(BaseModel):
     ids: List[str]
     action: Literal["verify", "reject"]
@@ -115,6 +120,11 @@ async def get_config():
         cfg = {"_id": "config", "active_session": 1}
         await db.config.insert_one(cfg)
     return cfg
+
+
+async def is_coming_soon():
+    cfg = await get_config()
+    return bool(cfg.get("coming_soon", True))
 
 
 async def taken_seats(session_id: int):
@@ -309,6 +319,7 @@ async def event_info():
         "active_session": active,
         "sessions": sessions,
         "transfer": TRANSFER_INFO,
+        "coming_soon": await is_coming_soon(),
     }
 
 
@@ -330,6 +341,8 @@ async def get_seats(session_id: int):
 
 @api_router.post("/orders")
 async def create_order(payload: OrderCreate):
+    if await is_coming_soon():
+        raise HTTPException(status_code=403, detail="Penjualan tiket belum dibuka")
     if not payload.name.strip() or not payload.phone.strip():
         raise HTTPException(status_code=400, detail="Nama dan nomor HP wajib diisi")
     if not payload.seats:
@@ -398,6 +411,8 @@ async def create_order(payload: OrderCreate):
 
 @api_router.get("/orders/lookup")
 async def lookup_orders(phone: str):
+    if await is_coming_soon():
+        raise HTTPException(status_code=403, detail="Penjualan tiket belum dibuka")
     p = phone.strip().replace(" ", "").replace("-", "")
     if len(p) < 6:
         raise HTTPException(status_code=400, detail="Masukkan nomor HP yang valid")
@@ -735,6 +750,15 @@ async def set_active_session(payload: SetActiveSession, user: dict = Depends(req
         raise HTTPException(status_code=400, detail="Sesi tidak valid")
     await db.config.update_one({"_id": "config"}, {"$set": {"active_session": payload.session_id}}, upsert=True)
     return {"active_session": payload.session_id}
+
+
+@api_router.post("/admin/coming-soon")
+async def set_coming_soon(payload: SetComingSoon, user: dict = Depends(require_roles("superadmin"))):
+    await db.config.update_one({"_id": "config"}, {"$set": {"coming_soon": payload.enabled}}, upsert=True)
+    await log_activity(user, "coming_soon",
+                       "Mengaktifkan mode Coming Soon (penjualan ditutup)" if payload.enabled
+                       else "Membuka penjualan tiket (Coming Soon dimatikan)")
+    return {"coming_soon": payload.enabled}
 
 
 @api_router.get("/admin/participants")

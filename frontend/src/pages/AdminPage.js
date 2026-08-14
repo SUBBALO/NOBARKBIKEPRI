@@ -5,6 +5,7 @@ import { adminApi, api, ADMIN_TOKEN_KEY, getAdminUser, setAdminSession, clearAdm
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -646,6 +647,15 @@ export default function AdminPage() {
     catch { toast.error("Gagal ubah sesi"); }
   };
 
+  const toggleComingSoon = async () => {
+    const enable = !event?.coming_soon;
+    try {
+      await adminApi.post("/admin/coming-soon", { enabled: enable });
+      toast.success(enable ? "Mode Coming Soon AKTIF — halaman depan menampilkan 'Tiket Segera Dibuka'" : "Penjualan tiket DIBUKA — pembeli sudah bisa memesan!");
+      await load();
+    } catch { toast.error("Gagal mengubah mode"); }
+  };
+
   const logout = () => { clearAdminSession(); setCurrentUser(null); setAuthed(false); };
 
   const doDelete = async () => {
@@ -798,6 +808,37 @@ export default function AdminPage() {
           <Button variant="ghost" onClick={logout} data-testid="btn-logout" className="text-[#EF4444]"><LogOut className="h-4 w-4 mr-1.5" /> Keluar</Button>
         </div>
       </div>
+
+      {isSuper && event && (
+        <div className={cn(
+          "flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 sm:p-5 mb-6 no-print transition-colors",
+          event.coming_soon ? "border-[#B26A1E]/50 bg-[#E8D8B6]/40" : "border-[#2F703E]/40 bg-[#2F703E]/[0.06]"
+        )} data-testid="coming-soon-toggle-card">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
+              event.coming_soon ? "bg-[#B26A1E]/15 text-[#8A3A12]" : "bg-[#2F703E]/15 text-[#255E33]")}>
+              {event.coming_soon ? <Clock className="h-5 w-5" /> : <Ticket className="h-5 w-5" />}
+            </span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm sm:text-base text-[#2C1E16]" data-testid="coming-soon-status">
+                {event.coming_soon ? "Mode Coming Soon AKTIF — penjualan tiket ditutup" : "Penjualan tiket DIBUKA"}
+              </p>
+              <p className="text-xs text-[#7A6A5E]">
+                {event.coming_soon
+                  ? "Halaman depan menampilkan \"Tiket Segera Dibuka\". Geser untuk membuka penjualan."
+                  : "Pembeli dapat memesan tiket di halaman depan. Geser untuk kembali ke Coming Soon."}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className={cn("text-xs font-semibold", event.coming_soon ? "text-[#8A3A12]" : "text-[#255E33]")}>
+              {event.coming_soon ? "Coming Soon" : "Penjualan Buka"}
+            </span>
+            <Switch checked={!event.coming_soon} onCheckedChange={toggleComingSoon}
+              data-testid="coming-soon-switch" />
+          </div>
+        </div>
+      )}
 
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6 no-print">

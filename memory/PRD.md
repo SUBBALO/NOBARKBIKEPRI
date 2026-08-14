@@ -33,6 +33,7 @@ Default seed: admin1(superadmin)/admin2(admin)/admin3(checkin), semua password `
 - (Agu 2026) Klik kartu sesi yang dibuka → langsung masuk Pilih Kursi (tanpa tombol Lanjut di step 2).
 - (Agu 2026) Audit Mobile: SeatMap muat penuh di 390px (kursi 24px + gap kecil di mobile, sm: ukuran lama), header "Upload Bukti" selalu bertext, banner subtitle tidak truncate, padding kartu step p-4 di mobile. Step 4 & /upload tanpa horizontal overflow.
 - (Agu 2026) Grafik "Pembelian Tiket per Hari" di panel admin (recharts stacked bar terverifikasi vs belum + tabel harian). Backend: `stats["daily"]` per tanggal WIB {date, orders, tickets, tickets_verified, revenue_verified}, exclude expired/rejected.
+- (Agu 2026) MODE COMING SOON: default ON (config key `coming_soon` tidak ada → dianggap True, aman untuk publish sebelum penjualan dibuka). Halaman depan menampilkan poster + tanggal + badge "Tiket Segera Dibuka"; link & halaman Upload Bukti disembunyikan/diblokir; POST /orders & GET /orders/lookup ditolak 403. Toggle switch di panel admin (khusus superadmin, card di atas dashboard) → POST /api/admin/coming-soon {enabled} (tercatat di log aktivitas). Buka penjualan cukup geser switch, TANPA redeploy.
 
 ## Key APIs
 - POST /api/admin/login {username,password} → {token, user}

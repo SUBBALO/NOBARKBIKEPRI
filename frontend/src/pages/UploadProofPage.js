@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -50,7 +50,12 @@ export default function UploadProofPage() {
   const [orders, setOrders] = useState([]);
   const [transfer, setTransfer] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
+  const [comingSoon, setComingSoon] = useState(null);
   const fileRefs = useRef({});
+
+  useEffect(() => {
+    api.get("/event").then(({ data }) => setComingSoon(!!data.coming_soon)).catch(() => setComingSoon(false));
+  }, []);
 
   const search = async (e) => {
     e?.preventDefault();
@@ -81,6 +86,17 @@ export default function UploadProofPage() {
     }
     setUploadingId(null);
   };
+
+  if (comingSoon) {
+    return (
+      <div className="max-w-xl mx-auto px-4 sm:px-8 py-16 text-center" data-testid="upload-coming-soon">
+        <Clock className="h-10 w-10 text-[#B26A1E] mx-auto mb-4" />
+        <h1 className="font-serif-display text-3xl text-[#7A241F]">Penjualan Belum Dibuka</h1>
+        <p className="text-sm text-[#7A6A5E] mt-2">Tiket segera dibuka. Halaman ini akan aktif setelah penjualan dimulai.</p>
+        <Link to="/"><Button className="mt-6 bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full px-6">Kembali ke Beranda</Button></Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 sm:py-14">

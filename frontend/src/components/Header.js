@@ -1,10 +1,15 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LOGOS } from "@/lib/apiClient";
+import { api, LOGOS } from "@/lib/apiClient";
 import { ShieldCheck, Upload } from "lucide-react";
 
 export const Header = () => {
   const loc = useLocation();
   const onAdmin = loc.pathname.startsWith("/admin");
+  const [comingSoon, setComingSoon] = useState(true);
+  useEffect(() => {
+    api.get("/event").then(({ data }) => setComingSoon(!!data.coming_soon)).catch(() => {});
+  }, [loc.pathname]);
   return (
     <header
       data-testid="site-header"
@@ -22,14 +27,16 @@ export const Header = () => {
           >
             Pesan Tiket
           </Link>
-          <Link
-            to="/upload"
-            data-testid="nav-upload"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-[#7A241F] hover:text-[#B26A1E] transition-colors"
-          >
-            <Upload className="h-4 w-4" />
-            <span>Upload Bukti</span>
-          </Link>
+          {!comingSoon && (
+            <Link
+              to="/upload"
+              data-testid="nav-upload"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#7A241F] hover:text-[#B26A1E] transition-colors"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Upload Bukti</span>
+            </Link>
+          )}
           {onAdmin && (
             <Link
               to="/"

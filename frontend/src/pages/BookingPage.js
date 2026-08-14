@@ -86,6 +86,37 @@ const SessionCard = ({ s, active, selected, onSelect }) => {
   );
 };
 
+const ComingSoonView = ({ event }) => (
+  <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 sm:py-16" data-testid="coming-soon-view">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
+      className="relative overflow-hidden rounded-3xl border border-[#5E1B17] bg-[#7A241F] text-white grain shadow-xl shadow-amber-900/10 text-center p-6 sm:p-12"
+    >
+      <div className="absolute -right-20 -top-16 h-72 w-72 rounded-full bg-[#B26A1E]/30 blur-3xl z-0" />
+      <div className="absolute -left-16 -bottom-20 h-64 w-64 rounded-full bg-[#E4C57E]/20 blur-3xl z-0" />
+      <div className="relative z-10 flex flex-col items-center">
+        <img src={POSTER_URL} alt="Poster Ashin Jinarakkhita" data-testid="coming-soon-poster"
+          className="w-auto max-h-[340px] sm:max-h-[440px] rounded-2xl border border-white/20 shadow-2xl shadow-black/40 bg-white/5" />
+        <span className="mt-6 inline-flex items-center gap-2 text-xs sm:text-sm font-medium bg-white/10 px-4 py-1.5 rounded-full backdrop-blur">
+          <CalendarDays className="h-4 w-4" /> {event?.date || "Minggu, 13 September 2026"} · {event?.location || "CGV Grand Batam"}
+        </span>
+        <p className="font-cursive text-2xl sm:text-3xl text-[#E4C57E] mt-4 leading-none">Nonton Bersama</p>
+        <h1 className="font-serif-display text-3xl sm:text-5xl font-extrabold leading-[1.05] mt-1">
+          ASHIN JINARAKKHITA
+        </h1>
+        <p className="text-sm sm:text-base text-white/85 mt-3 max-w-md">
+          Film dokumenter — Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.
+        </p>
+        <span data-testid="coming-soon-badge"
+          className="mt-6 inline-flex items-center gap-2 bg-[#B26A1E] text-white text-base sm:text-lg font-semibold px-6 py-2.5 rounded-full shadow-lg shadow-black/20">
+          <Clock className="h-5 w-5" /> Tiket Segera Dibuka
+        </span>
+        <p className="text-xs text-white/60 mt-3">Nantikan informasi pembukaan penjualan tiket.</p>
+      </div>
+    </motion.div>
+  </div>
+);
+
 export default function BookingPage() {
   const nav = useNavigate();
   const [step, setStep] = useState(1);
@@ -174,6 +205,15 @@ export default function BookingPage() {
   };
 
   const activeSession = event?.sessions?.find((s) => s.id === sessionId);
+
+  if (!event) {
+    return (
+      <div className="flex justify-center py-32" data-testid="event-loading">
+        <Loader2 className="h-8 w-8 animate-spin text-[#B26A1E]" />
+      </div>
+    );
+  }
+  if (event.coming_soon) return <ComingSoonView event={event} />;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
