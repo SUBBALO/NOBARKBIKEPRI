@@ -227,20 +227,15 @@ export default function BookingPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
-      {/* Top banner: sudah bayar tapi lupa upload bukti */}
+      {/* Top banner: sudah berdana tapi lupa upload bukti */}
       <Link to="/upload" data-testid="link-upload-strip"
-        className="flex items-center justify-between gap-3 rounded-2xl border border-[#B26A1E]/40 bg-[#E8D8B6]/50 p-3.5 sm:p-4 mb-5 hover:bg-[#E8D8B6]/80 hover:-translate-y-0.5 transition-all duration-300">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="h-10 w-10 rounded-lg bg-[#7A241F]/10 flex items-center justify-center shrink-0">
-            <UploadCloud className="h-5 w-5 text-[#7A241F]" />
-          </span>
-          <div className="min-w-0">
-            <p className="font-semibold text-[#7A241F] text-sm sm:text-base">Sudah berdana tapi lupa upload bukti?</p>
-            <p className="text-xs text-[#7A6A5E]">Cari pesanan dengan nomor HP Anda, lalu upload buktinya di sini.</p>
-          </div>
+        className="flex items-center justify-between gap-2 rounded-xl border border-[#B26A1E]/40 bg-[#E8D8B6]/50 px-3 py-2 mb-4 hover:bg-[#E8D8B6]/80 transition-colors">
+        <div className="flex items-center gap-2 min-w-0">
+          <UploadCloud className="h-4 w-4 text-[#7A241F] shrink-0" />
+          <p className="font-semibold text-[#7A241F] text-xs sm:text-sm truncate">Sudah berdana tapi lupa upload bukti?</p>
         </div>
-        <span className="shrink-0 inline-flex items-center gap-1 text-sm font-semibold text-white bg-[#7A241F] px-4 py-2 rounded-full">
-          Upload <ArrowRight className="h-4 w-4" />
+        <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white bg-[#7A241F] px-3 py-1.5 rounded-full">
+          Upload <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </Link>
 

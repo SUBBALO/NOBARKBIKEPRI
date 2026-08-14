@@ -2,7 +2,7 @@ import { CONTACT, LOGOS } from "@/lib/apiClient";
 import { Phone, MessageCircle } from "lucide-react";
 
 export const Footer = () => (
-  <footer data-testid="site-footer" className="mt-16 border-t border-black/5 bg-white/60">
+  <footer data-testid="site-footer" className="mt-8 border-t border-black/5 bg-white/60">
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
       <div className="flex items-center gap-3">
         <img src={LOGOS.kbi} alt="KBI" className="h-9 w-auto object-contain" />
