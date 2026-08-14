@@ -587,6 +587,21 @@ async def admin_stats(user: dict = Depends(require_staff)):
     stats["breakdown"] = {"online": online, "walkin": walkin}
     stats["cash_total"] = walkin["cash"]["revenue"]
 
+    # Rekap dana per sesi (order terverifikasi)
+    sess_agg = {}
+    async for g in db.orders.aggregate([
+        {"$match": {"status": "verified"}},
+        {"$group": {"_id": "$session_id", "orders": {"$sum": 1},
+                    "tickets": {"$sum": "$qty"}, "revenue": {"$sum": "$base_amount"}}},
+    ]):
+        sess_agg[g["_id"]] = g
+    stats["per_session"] = [{
+        "id": s["id"], "name": s["name"], "time": s["time"],
+        "orders": sess_agg.get(s["id"], {}).get("orders", 0),
+        "tickets": sess_agg.get(s["id"], {}).get("tickets", 0),
+        "revenue": sess_agg.get(s["id"], {}).get("revenue", 0) or 0,
+    } for s in SESSIONS]
+
     # Riwayat pembelian per hari (WIB)
     wib = timezone(timedelta(hours=7))
     daily = {}
@@ -833,6 +848,61 @@ async def export_orders(_: bool = Depends(require_staff)):
     for idx, w in enumerate(widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
     ws.freeze_panes = "A2"
+
+    # Sheet Ringkasan: dana per sesi + pembelian per hari
+    ws2 = wb.create_sheet("Ringkasan")
+    bold = Font(bold=True)
+    hdr_font = Font(bold=True, color="FFFFFF")
+
+    ws2.append(["DANA TERKUMPUL PER SESI (terverifikasi)"])
+    ws2["A1"].font = bold
+    ws2.append(["Sesi", "Jam", "Pesanan", "Tiket", "Dana Terkumpul (Rp)"])
+    for cell in ws2[2]:
+        cell.font = hdr_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    verified = [o for o in orders if o.get("status") == "verified"]
+    total_rev = 0
+    for s in SESSIONS:
+        so = [o for o in verified if o["session_id"] == s["id"]]
+        rev = sum(o.get("base_amount", 0) or 0 for o in so)
+        total_rev += rev
+        ws2.append([s["name"], s["time"], len(so), sum(o.get("qty", 0) for o in so), rev])
+    ws2.append(["TOTAL", "", len(verified), sum(o.get("qty", 0) for o in verified), total_rev])
+    for cell in ws2[ws2.max_row]:
+        cell.font = bold
+
+    ws2.append([])
+    r0 = ws2.max_row + 1
+    ws2.append(["PEMBELIAN PER HARI (WIB, tanpa ditolak/kadaluarsa)"])
+    ws2.cell(row=r0, column=1).font = bold
+    ws2.append(["Tanggal", "Pembeli (pesanan)", "Tiket", "Tiket Terverifikasi", "Pendapatan Terverifikasi (Rp)"])
+    for cell in ws2[ws2.max_row]:
+        cell.font = hdr_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    wib = timezone(timedelta(hours=7))
+    daily = {}
+    for o in orders:
+        if o.get("status") in ("expired", "rejected"):
+            continue
+        try:
+            d = datetime.fromisoformat(o["created_at"]).astimezone(wib).strftime("%d/%m/%Y")
+            key = datetime.fromisoformat(o["created_at"]).astimezone(wib).strftime("%Y-%m-%d")
+        except (ValueError, TypeError, KeyError):
+            continue
+        row = daily.setdefault(key, {"label": d, "orders": 0, "tickets": 0, "tv": 0, "rev": 0})
+        row["orders"] += 1
+        row["tickets"] += o.get("qty", 0) or 0
+        if o.get("status") == "verified":
+            row["tv"] += o.get("qty", 0) or 0
+            row["rev"] += o.get("base_amount", 0) or 0
+    for k in sorted(daily):
+        r = daily[k]
+        ws2.append([r["label"], r["orders"], r["tickets"], r["tv"], r["rev"]])
+    for idx, w in enumerate([14, 18, 10, 18, 26], 1):
+        ws2.column_dimensions[ws2.cell(row=2, column=idx).column_letter].width = w
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)

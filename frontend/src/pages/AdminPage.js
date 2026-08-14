@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
+  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
 
 const compressImage = (file) =>
@@ -184,6 +184,29 @@ const StatCard = ({ icon: Icon, label, value, color }) => (
   </div>
 );
 
+function SessionFunds({ stats }) {
+  const ps = stats?.per_session;
+  if (!ps) return null;
+  return (
+    <div className="mb-6 no-print" data-testid="session-funds">
+      <h2 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2 mb-3">
+        <Banknote className="h-5 w-5 text-[#B26A1E]" /> Dana Terkumpul per Sesi
+      </h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {ps.map((s) => (
+          <div key={s.id} className="rounded-2xl border border-border bg-white p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
+            data-testid={`session-fund-${s.id}`}>
+            <p className="text-xs font-semibold text-[#7A6A5E]">{s.name} · {s.time}</p>
+            <p className="font-serif-display text-lg sm:text-2xl text-[#255E33] mt-1">{rupiah(s.revenue)}</p>
+            <p className="text-xs text-[#7A6A5E] mt-0.5">{s.tickets} tiket · {s.orders} pembeli</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 function DailySalesChart({ stats }) {
   const daily = stats?.daily || [];
   if (daily.length === 0) return null;
@@ -208,23 +231,25 @@ function DailySalesChart({ stats }) {
       </div>
       <div className="h-56 sm:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+          <ComposedChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#EDE5D8" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#7A6A5E" }} axisLine={false} tickLine={false} />
             <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#7A6A5E" }} axisLine={false} tickLine={false} />
             <Tooltip
               cursor={{ fill: "rgba(178,106,30,0.06)" }}
               contentStyle={{ borderRadius: 12, border: "1px solid #EDE5D8", fontSize: 12 }}
-              formatter={(v, nm) => [`${v} tiket`, nm]}
+              formatter={(v, nm) => [nm === "Pembeli" ? `${v} pesanan` : `${v} tiket`, nm]}
               labelFormatter={(l, p) => {
                 const row = p?.[0]?.payload;
-                return row ? `${l} · ${row.orders} pesanan · ${rupiah(row.revenue_verified)}` : l;
+                return row ? `${l} · ${row.orders} pembeli · ${rupiah(row.revenue_verified)}` : l;
               }}
             />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="tickets_verified" name="Terverifikasi" stackId="a" fill="#2F703E" radius={[0, 0, 0, 0]} />
             <Bar dataKey="pending" name="Belum verifikasi" stackId="a" fill="#E4C57E" radius={[6, 6, 0, 0]} />
-          </BarChart>
+            <Line dataKey="orders" name="Pembeli" stroke="#7A241F" strokeWidth={2}
+              dot={{ r: 3, fill: "#7A241F" }} type="monotone" />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
       <div className="mt-4 overflow-x-auto">
@@ -232,7 +257,7 @@ function DailySalesChart({ stats }) {
           <thead>
             <tr className="text-left text-xs text-[#7A6A5E] border-b border-border">
               <th className="py-2 pr-3 font-medium">Tanggal</th>
-              <th className="py-2 pr-3 font-medium text-right">Pesanan</th>
+              <th className="py-2 pr-3 font-medium text-right">Pembeli</th>
               <th className="py-2 pr-3 font-medium text-right">Tiket</th>
               <th className="py-2 pr-3 font-medium text-right">Terverifikasi</th>
               <th className="py-2 font-medium text-right">Pendapatan</th>
@@ -881,6 +906,7 @@ export default function AdminPage() {
       </div>
 
       {tab === "payment" && (<>
+      {stats && <SessionFunds stats={stats} />}
       {stats && <SalesSummary stats={stats} />}
       {stats && <DailySalesChart stats={stats} />}
       {/* Session control */}
