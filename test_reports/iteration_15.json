@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 15 verification of phone-normalization batch + regression on masterlist/order-status/admin panel. Backend pytest (test_iter15_phone_normalize.py) 6/6 PASS: (a) POST /api/orders normalizes '81275130165' -> '081275130165' and '6281234567890' -> '081234567890'; (b) invalid '12345' rejected with HTTP 400 detail 'Nomor HP harus diawali 08...'; (c) PUT /api/admin/orders/{id}/phone as superadmin (admin1) updates + normalizes to 08, invalid returns 400; (d) same endpoint returns 403 for regular admin (admin2); (e) /admin/logs contains a 'verify' entry with 'No HP' text. Frontend verified via Playwright: (1) BookingPage: input-phone auto-fixes '81299887766' -> '081299887766' and shows 'Wajib diawali 08...' hint; typing '5123456789' + Lanjut triggers error toast 'Nomor HP wajib diawali 08 (mis. 0812xxxxxxx)'. (2) OrderStatusPage /order/{verified id}: ticket-actions-bar visible with btn-save-ticket (gold) and btn-add-calendar (green); both click without page errors. (3) AdminPage (admin1): btn-masterlist-pembelian visible top-right; opening Masterlist shows 3 tables each with own Export Excel; old masterlist tab not present in tab row. (4) Order list sort priority correct: waiting_verification 'Belum cek payment' first, expired 'Kadaluarsa' middle, verified 'Complete'/'Payment OK' at bottom; only 17 orders in DB (<20) so orders-pagination controls intentionally not rendered per spec. (5) Verified rows show 'oleh Admin 1 · {date time}' attribution (15 occurrences). (6) Clicking 'Cek Bukti' opens Verifikasi Pembayaran dialog exposing btn-edit-phone next to phone; visible=true. (7) Channel labels: no bare 'Umum' text; 'Website'/'Panitia · Lokasi' shown throughout. (8) 'Upload Bukti' only appears as row action button (18x for expired rows), NOT in admin header.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter15_phone_normalize.py",
+    "/app/test_reports/pytest/iter15_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Deployment-readiness: /app/backend/.env stores JWT_SECRET and ADMIN_TOKEN in plaintext (expected in dev). Ensure production overrides via k8s secrets, not committed .env.",
+    "server.py is ~1950 lines — approaching maintainability limit. Consider splitting into routers (auth, orders, admin, walkin, masterlist) before deployment.",
+    "MasterlistPanel description text still reads 'tabel Umum (online + panitia)'; helper label lags the new 'Website' terminology (cosmetic; noted in iter14 too).",
+    "CORS_ORIGINS='*' is safe here because allow_credentials=False and auth uses X-Admin-Token header, but before production explicitly whitelist origin domains.",
+    "Default password 'admin123' is still in effect for admin1/admin2/admin3 — memory/test_credentials.md flags this as PERLU AKSI USER. Enforce password rotation before event day.",
+    "OrderStatusPage save-ticket/add-calendar use client-side blob downloads; toast success is fired even if user cancels the browser Save dialog. Low-severity UX nit."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter15_phone_normalize.py"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (8/8 checks)"},
+  "test_credentials": "admin1/admin123 (superadmin), admin2/admin123 (admin)",
+  "seed_data_creation": "Created 2 test orders with phone-normalization payloads (081275130165, 081234567890) on Sesi 1; auto-cleaned via DELETE /api/admin/orders/{id} in module teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Verified order id fdab5de2-a394-4f62-98b4-4492f0b433c6 (SUSANTO Sesi 3) still valid for /order/{id} tests. Only Sesi 1 is public-open; Sesi 2/3/4 closed. Order Sesi 1 has 14 seats booked; test orders are auto-cleaned after each pytest run. To reproduce phone-normalization edge cases, use payment_method='transfer' (required by OrderCreate). Admin table renders BOTH desktop table rows AND mobile card rows in DOM — Playwright must filter is_visible()==True (index 1 for 'Cek Bukti'); index 0 is the hidden mobile duplicate."
+}

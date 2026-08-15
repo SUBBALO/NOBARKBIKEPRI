@@ -1568,7 +1568,7 @@ function MasterlistPanel() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-serif-display text-2xl text-[#7A241F]">Masterlist Pembelian</h2>
-          <p className="text-sm text-[#7A6A5E]">Daftar semua yang sudah beli — tabel Umum (online + panitia) & tabel VIP terpisah.</p>
+          <p className="text-sm text-[#7A6A5E]">Daftar semua yang sudah beli — tabel VIP, Order Manual, & Website (online + panitia) terpisah, masing-masing bisa di-export Excel.</p>
         </div>
         <div className="relative min-w-[200px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9CA3AF]" />

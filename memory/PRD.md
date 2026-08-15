@@ -122,3 +122,15 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - HEALTH CHECK: deployment_agent = PASS, no blockers (build CI=true lolos, env & CORS OK, no hardcoded secret di production code).
 - CODE REVIEW (non-blocking, TIDAK dikerjakan biar aman menjelang acara): AdminPage.js ~1960 baris & server.py ~1768 baris (bisa dipecah pasca-acara); /api/admin/logs belum paginasi (pertimbangkan TTL/index kalau log membengkak).
 - User perlu REDEPLOY agar semua naik ke kbikepri.com.
+## Update (15 Agu 2026, sesi lanjutan 2) — Order Manual, UI kanal, simpan tiket, No HP 08
+- ORDER MANUAL (tab baru di samping VIP): pilih kursi (bebas), input nama+HP(opsional)+nominal, status Belum/Sudah Bayar; jika Sudah Bayar isi tgl transfer + nominal transfer + bukti(opsional). Editable & bisa hapus & tambah. Masuk Bendahara HANYA jika sudah bayar. Channel "manual" terpisah di Bendahara/Masterlist. Endpoint: GET/POST /admin/manual, PUT /admin/manual/{id}. Seat lock permanen.
+- EDIT NOMINAL VERIFIED: admin 1x (flag amount_edited_once), Super Admin tanpa batas.
+- MASTERLIST: dipindah dari tab jadi tombol khusus "Masterlist Pembelian" (terang) di atas panel; tab lama dihapus. Urutan tabel: VIP, Order Manual, Website(umum). Export per tabel (type=umum|vip|manual).
+- KANAL/LABEL: umum→"Website", panitia→"Panitia", manual→"Manual — oleh {admin}", vip→"VIP". Header "Upload Bukti" disembunyikan di halaman admin; link publik header + judul halaman upload jadi "Cek Pesanan & Unggah Bukti Berdana".
+- VERIFIKASI LIST: sort belum-verif/belum-upload di ATAS, verified di bawah; paginasi 20/halaman; tampil "oleh {verified_by||sold_by||created_by} · {tgl jam}" di bawah Payment OK.
+- ORDER STATUS: bar aksi atas (semua status) — "Simpan Tiket (Gambar)" (canvas PNG) + "Tambah ke Kalender HP" (.ics). Warna tombol dibuat terang. Kotak nominal krem.
+- NO HP WAJIB 08: normalize_phone di backend (8..→08.., 62..→08.., tolak invalid) di POST /orders; frontend auto-fix + hint. Super Admin bisa edit No HP: PUT /admin/orders/{id}/phone (tombol "Edit No HP" di dialog bukti).
+- LOGIN/LOGOUT dicatat di Log. Role 'seller' (Petugas Penjual Tiket) walkin+checkin saja.
+- TESTING: iteration_15 backend 6/6 + frontend 8/8 PASS, no issues. Code review: no blockers (advisories: split server.py pasca-acara, rotasi password default sebelum hari-H, whitelist CORS di produksi).
+- CATATAN: isu PRODUKSI "Gagal memuat data acara" di kbikepri.com belum tuntas (khusus produksi; preview /api/event = 200). Perlu Redeploy + kemungkinan cek env produksi via Emergent Support.
+- Semua perubahan perlu REDEPLOY agar naik ke produksi.
