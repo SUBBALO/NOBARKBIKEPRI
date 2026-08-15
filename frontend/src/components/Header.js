@@ -20,14 +20,14 @@ export const Header = () => {
           <img src={LOGOS.kbi} alt="KBI" className="h-9 sm:h-11 w-auto object-contain" />
         </Link>
         <nav className="flex items-center gap-2 sm:gap-4">
-          {!comingSoon && (
+          {!comingSoon && !onAdmin && (
             <Link
               to="/upload"
               data-testid="nav-upload"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-[#7A241F] hover:text-[#B26A1E] transition-colors"
             >
               <Upload className="h-4 w-4" />
-              <span>Upload Bukti</span>
+              <span>Cek Pesanan &amp; Unggah Bukti Berdana</span>
             </Link>
           )}
           {onAdmin && (

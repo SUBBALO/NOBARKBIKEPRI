@@ -1,0 +1,19 @@
+{
+  "summary": "Iteration 14 tests PASSED across backend + frontend. Verified: (a) header hides 'Upload Bukti' on admin page (only 'Ke Pemesanan'); public header renamed link 'Cek Pesanan & Unggah Bukti Berdana'; (b) 'Masterlist Pembelian' button present at top of admin (data-testid=btn-masterlist-pembelian) and old admin-tab-masterlist removed from tab row (tabs now: payment, bendahara, vip, manual, sessions, logs, users, trash); Masterlist view renders VIP + Order Manual + Umum(Website+Panitia) tables each with its own Export Excel (3 buttons); (c) Channel labels renamed everywhere - verification list shows 'Website'/'Panitia · Lokasi'/'VIP · Undangan' (no 'Umum · Online'); Bendahara channel column shows 'Website'; backend /api/admin/bendahara channel_label values are only Website/VIP/Panitia*/Manual* (no legacy 'Umum'); (d) /upload title = 'Cek Pesanan & Unggah Bukti Berdana' with donation copy ('Sudah berdana...'); (e) booking / banner shows 'Cek pesanan atau upload bukti dana Anda di sini'; (f) Verified order page (/order/{id}) exposes btn-save-ticket and btn-add-calendar; both clicked without any JS/page errors; (g) masterlist export endpoints (umum/manual/vip) all return 200 xlsx; participants endpoint returns channel field.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_labels_masterlist.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Bendahara MasterlistPanel description still says 'tabel Umum (online + panitia)' — since channel labels are now 'Website'/'Panitia', consider aligning that helper text too (cosmetic only, not requested)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter14_labels_masterlist.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (superadmin)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Verified order id used for /order/{id} testing: fdab5de2-a394-4f62-98b4-4492f0b433c6. Save ticket + add calendar buttons trigger client-side downloads (PNG/ICS) with no page errors. Masterlist button is prominent at admin top-right next to Muat Ulang/Keluar."
+}

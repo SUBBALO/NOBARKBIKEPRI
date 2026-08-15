@@ -846,14 +846,15 @@ async def _collect_recap_orders(date_from: str = None, date_to: str = None):
         is_vip = bool(o.get("vip"))
         is_manual = bool(o.get("manual"))
         if is_vip:
-            channel, channel_label, seller, location = "vip", "VIP (Undangan)", "VIP (Undangan)", "VIP"
+            channel, channel_label, seller, location = "vip", "VIP", "VIP (Undangan)", "VIP"
         elif is_manual:
-            channel, channel_label, seller, location = "manual", "Order Manual", (o.get("created_by") or "-"), "Manual"
+            _by = o.get("created_by") or "-"
+            channel, channel_label, seller, location = "manual", f"Manual — oleh {_by}", _by, "Manual"
         elif is_walkin:
             channel, channel_label, seller = "panitia", "Panitia (Lokasi)", (o.get("sold_by") or "-")
             location = o.get("location") or "(tanpa lokasi)"
         else:
-            channel, channel_label, seller, location = "umum", "Umum (Online)", "Umum (Online)", "Online"
+            channel, channel_label, seller, location = "umum", "Website", "Website (Online)", "Online"
         rows.append({
             "date": d.strftime("%Y-%m-%d"),
             "date_label": f"{d.day} {_MONTHS_ID[d.month]} {d.year}",

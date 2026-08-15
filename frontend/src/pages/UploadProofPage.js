@@ -101,9 +101,9 @@ export default function UploadProofPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-8 py-10 sm:py-14">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="font-serif-display text-3xl sm:text-4xl text-[#7A241F]">Upload Bukti Pembayaran</h1>
+        <h1 className="font-serif-display text-3xl sm:text-4xl text-[#7A241F]">Cek Pesanan &amp; Unggah Bukti Berdana</h1>
         <p className="text-sm text-[#7A6A5E] mt-2">
-          Lupa upload bukti setelah bayar? Masukkan nomor HP yang Anda gunakan saat memesan untuk menemukan pesanan Anda.
+          Sudah berdana tapi belum sempat kirim bukti? Masukkan <b>nomor HP</b> yang Anda pakai saat memesan untuk menemukan pesanan Anda — lalu cek status &amp; unggah bukti transfer.
         </p>
 
         <form onSubmit={search} className="mt-6 flex flex-col sm:flex-row gap-3">

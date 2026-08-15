@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, QrCode, Landmark, Copy, Upload, CheckCircle2, Clock,
-  XCircle, AlertTriangle, Download, UploadCloud, Hourglass,
+  XCircle, AlertTriangle, Download, UploadCloud, Hourglass, ImageDown, CalendarPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +57,7 @@ const StatusBadge = ({ status }) => {
 export default function OrderStatusPage() {
   const { id } = useParams();
   const [order, setOrder] = useState(null);
+  const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -79,6 +80,84 @@ export default function OrderStatusPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.get("/event").then(({ data }) => setEvent(data)).catch(() => {}); }, []);
+
+  const saveTicketImage = () => {
+    try {
+      const W = 820, H = 1080;
+      const c = document.createElement("canvas");
+      c.width = W; c.height = H;
+      const x = c.getContext("2d");
+      x.fillStyle = "#7A241F"; x.fillRect(0, 0, W, H);
+      x.fillStyle = "#FDFBF7"; x.fillRect(30, 30, W - 60, H - 60);
+      x.fillStyle = "#B26A1E"; x.fillRect(30, 30, W - 60, 12);
+      const cx = W / 2;
+      x.textAlign = "center";
+      x.fillStyle = "#B26A1E"; x.font = "bold 26px Georgia"; x.fillText("E-TIKET  ·  NONTON BERSAMA", cx, 110);
+      x.fillStyle = "#7A241F"; x.font = "bold 40px Georgia";
+      x.fillText("ASHIN JINARAKKHITA", cx, 165);
+      x.fillStyle = "#5B4636"; x.font = "18px Arial";
+      x.fillText(event?.date || "Minggu, 13 September 2026", cx, 205);
+      x.fillText(event?.location || "CGV Grand Batam", cx, 232);
+      x.strokeStyle = "#B26A1E"; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(70, 270); x.lineTo(W - 70, 270); x.stroke(); x.setLineDash([]);
+      const rows = [
+        ["No. Order", `#${order.order_no}`],
+        ["Nama", order.name],
+        ["Sesi", `${order.session?.name} · ${order.session?.time}`],
+        ["Kursi", order.seats.join(", ")],
+        ["Jumlah", `${order.qty} kursi`],
+        ["Status", order.status === "verified" ? "TERVERIFIKASI ✓" : "MENUNGGU VERIFIKASI"],
+      ];
+      let y = 330;
+      x.textAlign = "left";
+      rows.forEach(([k, v]) => {
+        x.fillStyle = "#7A6A5E"; x.font = "18px Arial"; x.fillText(k, 80, y);
+        x.fillStyle = k === "Status" ? (order.status === "verified" ? "#255E33" : "#8A3A12") : "#2C1E16"; x.font = "bold 22px Arial";
+        x.textAlign = "right"; x.fillText(String(v).slice(0, 34), W - 80, y);
+        x.textAlign = "left"; y += 56;
+      });
+      x.textAlign = "center";
+      x.fillStyle = "#7A241F"; x.font = "bold 30px Georgia";
+      x.fillText(`#${order.order_no}`, cx, y + 30);
+      x.fillStyle = "#7A6A5E"; x.font = "15px Arial";
+      x.fillText("Tunjukkan tiket ini saat check-in di lokasi acara.", cx, H - 90);
+      x.fillStyle = "#B26A1E"; x.font = "13px Arial";
+      x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 62);
+      const a = document.createElement("a");
+      a.href = c.toDataURL("image/png");
+      a.download = `tiket-${order.order_no}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast.success("Tiket tersimpan sebagai gambar");
+    } catch (e) { console.error("save ticket:", e); toast.error("Gagal menyimpan tiket"); }
+  };
+
+  const addToCalendar = () => {
+    try {
+      // Tanggal acara tetap: 13 September 2026. Ambil jam mulai dari sesi (mis. "09.30–11.30").
+      const tm = (order.session?.time || "").match(/(\d{1,2})[.:](\d{2})\s*[–\-]\s*(\d{1,2})[.:](\d{2})/);
+      const pad = (n) => String(n).padStart(2, "0");
+      const base = "20260913";
+      const start = tm ? `${base}T${pad(tm[1])}${tm[2]}00` : `${base}T090000`;
+      const end = tm ? `${base}T${pad(tm[3])}${tm[4]}00` : `${base}T113000`;
+      const ics = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MBI Kepri//Nonton Bersama//ID",
+        "BEGIN:VEVENT", `UID:order-${order.order_no}@kbikepri`,
+        `SUMMARY:Nonton Bersama - Ashin Jinarakkhita (${order.session?.name})`,
+        `DESCRIPTION:Tiket #${order.order_no} a.n ${order.name}. Kursi ${order.seats.join(", ")}. Tunjukkan saat check-in.`,
+        `LOCATION:${event?.location || "CGV Grand Batam"}`,
+        `DTSTART:${start}`, `DTEND:${end}`,
+        "END:VEVENT", "END:VCALENDAR",
+      ].join("\r\n");
+      const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `acara-nonton-${order.order_no}.ics`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(a.href);
+      toast.success("Reminder acara ditambahkan ke kalender");
+    } catch (e) { console.error("calendar:", e); toast.error("Gagal menambahkan ke kalender"); }
+  };
+
 
   // countdown for pending payment
   useEffect(() => {
@@ -134,6 +213,21 @@ export default function OrderStatusPage() {
           <p className="font-mono text-sm text-[#7A241F]" data-testid="order-id">#{order.order_no}</p>
         </div>
         <StatusBadge status={order.status} />
+      </div>
+
+      {/* Aksi cepat: simpan tiket & kalender (selalu tampil) */}
+      <div className="rounded-2xl border border-[#B26A1E]/30 bg-[#F6EEE1]/70 p-3 sm:p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="ticket-actions-bar">
+        <p className="text-sm font-medium text-[#7A241F] flex-1">Simpan orderan Anda supaya tidak lupa saat hari acara:</p>
+        <div className="grid grid-cols-2 sm:flex gap-2">
+          <Button onClick={saveTicketImage} data-testid="btn-save-ticket"
+            className="h-11 px-4 bg-[#B26A1E] hover:bg-[#8A3A12]">
+            <ImageDown className="h-4 w-4 mr-1.5" /> Simpan Tiket (Gambar)
+          </Button>
+          <Button onClick={addToCalendar} data-testid="btn-add-calendar" variant="outline"
+            className="h-11 px-4 border-[#2F703E]/40 text-[#255E33] hover:bg-[#2F703E]/10">
+            <CalendarPlus className="h-4 w-4 mr-1.5" /> Tambah ke Kalender HP
+          </Button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">

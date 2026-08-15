@@ -231,10 +231,10 @@ export default function BookingPage() {
         className="flex items-center justify-between gap-2 rounded-xl border border-[#B26A1E]/40 bg-[#E8D8B6]/50 px-3 py-2 mb-4 hover:bg-[#E8D8B6]/80 transition-colors">
         <div className="flex items-center gap-2 min-w-0">
           <UploadCloud className="h-4 w-4 text-[#7A241F] shrink-0" />
-          <p className="font-semibold text-[#7A241F] text-xs sm:text-sm truncate">Sudah berdana tapi lupa upload bukti?</p>
+          <p className="font-semibold text-[#7A241F] text-xs sm:text-sm truncate">Cek pesanan atau upload bukti dana Anda di sini</p>
         </div>
         <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white bg-[#7A241F] px-3 py-1.5 rounded-full">
-          Upload <ArrowRight className="h-3.5 w-3.5" />
+          Cek / Upload <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </Link>
 

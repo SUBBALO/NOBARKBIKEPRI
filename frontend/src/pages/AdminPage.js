@@ -131,9 +131,11 @@ const FILTERS = [
 
 const channelInfo = (o) => o.vip
   ? { t: "VIP · Undangan", c: "bg-[#7A241F]/15 text-[#7A241F]" }
+  : o.manual
+  ? { t: "Manual", c: "bg-[#B26A1E]/10 text-[#8A3A12]" }
   : o.walkin
   ? { t: "Panitia · Lokasi", c: "bg-[#B26A1E]/15 text-[#8A3A12]" }
-  : { t: "Umum · Online", c: "bg-[#7A241F]/10 text-[#7A241F]" };
+  : { t: "Website", c: "bg-[#7A241F]/10 text-[#7A241F]" };
 
 function LoginView({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -952,7 +954,7 @@ function BendaharaPanel() {
                 <tr key={o.order_no ?? i} className="border-t border-border" data-testid={`bendahara-txn-${i}`}>
                   <td className="px-3 py-2 text-[#7A6A5E] whitespace-nowrap">{o.date}<span className="block text-[10px]">{o.time}</span></td>
                   <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
-                  <td className="px-3 py-2"><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", o.channel === "panitia" ? "bg-[#B26A1E]/15 text-[#8A3A12]" : "bg-[#7A241F]/10 text-[#7A241F]")}>{o.channel === "panitia" ? "Panitia" : "Umum"}</span></td>
+                  <td className="px-3 py-2"><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", o.channel === "panitia" ? "bg-[#B26A1E]/15 text-[#8A3A12]" : "bg-[#7A241F]/10 text-[#7A241F]")}>{o.channel === "panitia" ? "Panitia" : "Website"}</span></td>
                   <td className="px-3 py-2 text-[#5B4636]">{o.seller}</td>
                   <td className="px-3 py-2 text-[#5B4636]">{o.location}</td>
                   <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{o.session_name} · {o.seats.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.tickets} tkt)</span></td>
@@ -1394,7 +1396,7 @@ function ManualPanel() {
                 <th className="px-3 py-2 text-left font-medium">Nama</th>
                 <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
                 <th className="px-3 py-2 text-left font-medium">Status</th>
-                <th className="px-3 py-2 text-left font-medium">Tgl Transfer</th>
+                <th className="px-3 py-2 text-left font-medium">Tgl Order / Transfer</th>
                 <th className="px-3 py-2 text-right font-medium">Nominal</th>
                 <th className="px-3 py-2 text-right font-medium">Aksi</th>
               </tr>
@@ -1411,7 +1413,7 @@ function ManualPanel() {
                       {o.paid ? "Sudah Bayar" : "Belum Bayar"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-[#5B4636]">{o.transfer_date || "-"}</td>
+                  <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap"><span className="block text-[10px] text-[#7A6A5E]">order: {o.created_at ? new Date(o.created_at).toLocaleDateString("id-ID") : "-"}</span>transfer: {o.transfer_date || "-"}</td>
                   <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button onClick={() => setEdit({ ...o })} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
@@ -1537,7 +1539,7 @@ function MasterlistPanel() {
               <th className="px-3 py-2 text-left font-medium">Nama</th>
               <th className="px-3 py-2 text-left font-medium">No HP</th>
               <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
-              {isManual && <th className="px-3 py-2 text-left font-medium">Tgl Transfer</th>}
+              {isManual && <th className="px-3 py-2 text-left font-medium">Tgl Order / Transfer</th>}
               {!isVip && !isManual && <th className="px-3 py-2 text-left font-medium">Kanal</th>}
               {!isVip && <th className="px-3 py-2 text-right font-medium">Nominal</th>}
             </tr>
@@ -1547,11 +1549,11 @@ function MasterlistPanel() {
               <tr><td colSpan={nCols} className="px-3 py-8 text-center text-[#7A6A5E]">Belum ada.</td></tr>
             ) : rows.map((o, i) => (
               <tr key={o.order_no ?? i} className="border-t border-border">
-                <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
+                <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}{isManual && o.seller ? ` · input: ${o.seller}` : ""}</span></td>
                 <td className="px-3 py-2 text-[#5B4636]">{o.phone || "-"}</td>
                 <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{o.session_name} · {o.seats.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.tickets} tkt)</span></td>
-                {isManual && <td className="px-3 py-2 text-[#5B4636]">{o.transfer_date || "-"}</td>}
-                {!isVip && !isManual && <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[#7A241F]/10 text-[#7A241F]">{o.channel === "panitia" ? "Panitia" : "Umum"}</span></td>}
+                {isManual && <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap"><span className="block text-[10px] text-[#7A6A5E]">order: {o.date}</span>transfer: {o.transfer_date || "-"}</td>}
+                {!isVip && !isManual && <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[#7A241F]/10 text-[#7A241F]">{o.channel === "panitia" ? "Panitia" : "Website"}</span></td>}
                 {!isVip && <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.amount)}</td>}
               </tr>
             ))}
@@ -1612,6 +1614,8 @@ export default function AdminPage() {
   const [sessionFilter, setSessionFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [filter, sessionFilter, searchQuery]);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -1819,6 +1823,12 @@ export default function AdminPage() {
   );
 
   const selectableIds = filtered.filter((o) => o.status === "waiting_verification").map((o) => o.id);
+  const STATUS_PRIORITY = { waiting_verification: 0, pending_payment: 1, rejected: 2, expired: 3, verified: 4 };
+  const sortedFiltered = [...filtered].sort((a, b) => (STATUS_PRIORITY[a.status] ?? 9) - (STATUS_PRIORITY[b.status] ?? 9));
+  const PER_PAGE = 20;
+  const totalPages = Math.max(1, Math.ceil(sortedFiltered.length / PER_PAGE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = sortedFiltered.slice((pageSafe - 1) * PER_PAGE, pageSafe * PER_PAGE);
   const toggleSelect = (id) => setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id));
   const toggleSelectAll = () => setSelectedIds(allSelected ? [] : selectableIds);
@@ -1849,6 +1859,13 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => setTab("masterlist")} data-testid="btn-masterlist-pembelian"
+            className={cn("shadow-sm text-base font-semibold border h-10 px-4",
+              tab === "masterlist"
+                ? "bg-[#E4C57E] text-[#5E1B17] border-[#B26A1E] hover:bg-[#DBB768]"
+                : "bg-[#F6EEE1] text-[#7A241F] border-[#B26A1E]/50 hover:bg-[#EFE2CE]")}>
+            <ClipboardList className="h-5 w-5 mr-1.5" /> Masterlist Pembelian
+          </Button>
           <Button variant="outline" size="sm" onClick={load} data-testid="btn-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
           <Button variant="ghost" size="sm" onClick={logout} data-testid="btn-logout" className="text-[#EF4444]"><LogOut className="h-4 w-4 mr-1.5" /> Keluar</Button>
         </div>
@@ -1920,11 +1937,6 @@ export default function AdminPage() {
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
             tab === "sessions" ? "bg-[#2F703E] text-white border-[#2F703E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#2F703E]/50")}>
           <Users className="h-4 w-4" /> Buka/Tutup Sesi
-        </button>
-        <button data-testid="admin-tab-masterlist" onClick={() => setTab("masterlist")}
-          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
-            tab === "masterlist" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
-          <Users className="h-4 w-4" /> Masterlist
         </button>
         <button data-testid="admin-tab-logs" onClick={() => setTab("logs")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
@@ -2036,7 +2048,7 @@ export default function AdminPage() {
           <>
           {/* Mobile: card list */}
           <div className="md:hidden divide-y divide-border" data-testid="orders-cards">
-            {filtered.map((o) => {
+            {paged.map((o) => {
               const dstat = orderProgress(o);
               return (
                 <div key={o.id} className="p-4" data-testid={`order-card-${o.id.slice(0, 8)}`}>
@@ -2127,7 +2139,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map((o) => {
+                {paged.map((o) => {
                   const dstat = orderProgress(o);
                   return (
                     <tr key={o.id} data-testid={`order-row-${o.id.slice(0, 8)}`} className="hover:bg-muted/30">
@@ -2221,6 +2233,19 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border bg-muted/20" data-testid="orders-pagination">
+              <span className="text-xs text-[#7A6A5E]">Halaman <b>{pageSafe}</b> / {totalPages} · {sortedFiltered.length} pesanan</span>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={pageSafe <= 1}
+                  data-testid="orders-prev-page"
+                  className="h-8 px-3 rounded-lg border border-border text-sm font-medium text-[#7A241F] disabled:opacity-40 hover:bg-white">Sebelumnya</button>
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={pageSafe >= totalPages}
+                  data-testid="orders-next-page"
+                  className="h-8 px-3 rounded-lg border border-border text-sm font-medium text-[#7A241F] disabled:opacity-40 hover:bg-white">Berikutnya</button>
+              </div>
+            </div>
+          )}
           </>
         )}
       </div>
