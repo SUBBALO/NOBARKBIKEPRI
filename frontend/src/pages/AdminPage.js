@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { adminApi, api, ADMIN_TOKEN_KEY, getAdminUser, setAdminSession, clearAdminSession, rupiah, LOGOS } from "@/lib/apiClient";
+import { adminApi, api, getAdminUser, setAdminSession, clearAdminSession, rupiah, LOGOS } from "@/lib/apiClient";
 import { SeatMap } from "@/components/SeatMap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1591,7 +1591,7 @@ const SESSIONS_STATIC = [
 ];
 
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+  const [authed, setAuthed] = useState(!!getAdminUser());
   const [currentUser, setCurrentUser] = useState(getAdminUser());
   const isSuper = currentUser?.role === "superadmin";
   const isStaff = currentUser?.role === "superadmin" || currentUser?.role === "admin";

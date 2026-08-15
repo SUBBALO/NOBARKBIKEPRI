@@ -1,0 +1,23 @@
+{
+  "summary": "RETEST of iteration_16 refresh-persistence bug PASSED across all 3 staff pages. Backend regression (test_iter16_cookie_auth.py) 7/7 PASS. Frontend Playwright tests: /admin (admin1/admin123), /walkin (chelyn/Chelyn123456), /checkin (admin3/admin123) — all login succeed, /api/admin/me returns 200 via httpOnly cookie only, localStorage.mbi_admin_token === null while mbi_admin_user is present, and hard page reload keeps user on the dashboard (password input count = 0 after reload). Logout button on /admin is discoverable (count=1) and clicking it clears mbi_admin_user and returns to the login screen. Fix in AdminPage.js:1594 / WalkinPage.js:97 / CheckinPage.js:66 (useState(!!getAdminUser())) is verified in place. No regressions observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter16_cookie_auth.py",
+    "/app/test_reports/pytest/iter17_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "setAdminSession(token, user) still accepts and discards token — recommend simplifying signature to setAdminSession(user) to prevent future re-introduction of token in localStorage.",
+    "Consider a mount-time /api/admin/me probe on the 3 staff pages so the httpOnly cookie is the single source of truth (currently relies on mbi_admin_user presence which is derived state). Not a bug — cookie+user stay in sync via logout — but more robust.",
+    "server.py still ~1950 lines, not split into routers (carried over from iter16)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (3/3 staff pages persist across reload; logout works)"},
+  "test_credentials": "admin1/admin123 (superadmin), admin3/admin123 (checkin), chelyn/Chelyn123456 (admin) — all valid.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cookie-auth refresh bug from iter16 is fully fixed. Backend httpOnly cookie flow and dual header/cookie auth are both green. Frontend authed state initializes from getAdminUser() so refresh persists session; logout clears both cookie and LS user. Safe to move on to other features.",
+  "rca_of_the_issue": "Was: staff pages initialized authed from localStorage token that no longer exists after the cookie migration. Fix: replaced initializer with !!getAdminUser() on AdminPage/WalkinPage/CheckinPage. Verified: hard reload preserves session, LS token stays null, /api/admin/me returns 200 via cookie."
+}

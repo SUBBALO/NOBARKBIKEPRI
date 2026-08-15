@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Header, Depends, Request, Query, Response
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -397,11 +397,12 @@ async def log_activity(actor: dict, action: str, detail: str, target_id: str = N
     })
 
 
-async def get_current_user(x_admin_token: Optional[str] = Header(None)):
-    if not x_admin_token:
+async def get_current_user(request: Request, x_admin_token: Optional[str] = Header(None)):
+    token = request.cookies.get("admin_token") or x_admin_token
+    if not token:
         raise HTTPException(status_code=401, detail="Tidak diizinkan")
     try:
-        payload = jwt.decode(x_admin_token, JWT_SECRET, algorithms=[JWT_ALGO])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Sesi berakhir, silakan login ulang")
     except jwt.InvalidTokenError:
@@ -663,7 +664,7 @@ def client_ip(request: Request) -> str:
 
 
 @api_router.post("/admin/login")
-async def admin_login(payload: AdminLogin, request: Request):
+async def admin_login(payload: AdminLogin, request: Request, response: Response):
     uname = payload.username.strip().lower()
     ident = f"{client_ip(request)}:{uname}"
     now = datetime.now(timezone.utc)
@@ -683,12 +684,15 @@ async def admin_login(payload: AdminLogin, request: Request):
     if rec:
         await db.login_attempts.delete_one({"_id": ident})
     token = create_token(u)
+    response.set_cookie(key="admin_token", value=token, httponly=True, secure=True,
+                        samesite="none", max_age=7 * 24 * 3600, path="/")
     await log_activity(u, "login", f"Login sebagai {ROLE_LABELS.get(u['role'], u['role'])}")
     return {"token": token, "user": public_user(u)}
 
 
 @api_router.post("/admin/logout")
-async def admin_logout(user: dict = Depends(get_current_user)):
+async def admin_logout(response: Response, user: dict = Depends(get_current_user)):
+    response.delete_cookie(key="admin_token", path="/")
     await log_activity(user, "logout", "Logout dari sistem")
     return {"ok": True}
 

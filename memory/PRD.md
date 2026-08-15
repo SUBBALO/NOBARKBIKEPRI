@@ -134,3 +134,11 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - TESTING: iteration_15 backend 6/6 + frontend 8/8 PASS, no issues. Code review: no blockers (advisories: split server.py pasca-acara, rotasi password default sebelum hari-H, whitelist CORS di produksi).
 - CATATAN: isu PRODUKSI "Gagal memuat data acara" di kbikepri.com belum tuntas (khusus produksi; preview /api/event = 200). Perlu Redeploy + kemungkinan cek env produksi via Emergent Support.
 - Semua perubahan perlu REDEPLOY agar naik ke produksi.
+
+## Update (Jun 2026, sesi ini) — Migrasi Auth ke httpOnly Cookie (keamanan)
+- KEAMANAN UTAMA: token login staff TIDAK lagi disimpan di localStorage. Sekarang backend set httpOnly cookie saat /api/admin/login, auth extractor baca cookie (+ fallback header X-Admin-Token untuk kompatibilitas), /api/admin/logout hapus cookie. Frontend apiClient.js pakai withCredentials, tidak persist token; hanya simpan `mbi_admin_user` (non-sensitif) untuk restore UI/role.
+- REGRESI iteration_16 (frontend 60%): halaman Admin/Walkin/Checkin init authed dari token localStorage yang sudah tidak ada → login lagi setelah reload. FIX: initializer jadi useState(!!getAdminUser()) di AdminPage.js:1594 / WalkinPage.js:97 / CheckinPage.js:66. Hapus import ADMIN_TOKEN_KEY yg tak terpakai.
+- TESTING iteration_17: backend 100% (7/7), frontend 100% (3/3 halaman staff persist setelah reload; logout bersih). retest_needed=false. Test file: /app/backend/tests/test_iter16_cookie_auth.py.
+- Wording keamanan yg dipakai ke user: risiko utama pencurian token via JS berkurang; TIDAK ada situs yg bisa dijamin 100% kebal.
+- Preview dikembalikan siap-publish: coming_soon = ON (semua sesi tetap tutup). User perlu REDEPLOY agar migrasi cookie naik ke kbikepri.com, lalu cek login di kbikepri.com/admin sekali.
+- BACKLOG code-quality (pasca-acara, non-blocking): setAdminSession(token,user) masih terima+buang token (sederhanakan jadi setAdminSession(user)); pertimbangkan probe /api/admin/me saat mount 3 halaman staff; split server.py (~1950 baris) jadi routers.

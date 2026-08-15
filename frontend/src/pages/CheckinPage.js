@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { adminApi, api, ADMIN_TOKEN_KEY, clearAdminSession, setAdminSession, LOGOS } from "@/lib/apiClient";
+import { adminApi, api, getAdminUser, clearAdminSession, setAdminSession, LOGOS } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,7 +63,7 @@ function Login({ onLogin }) {
 }
 
 export default function CheckinPage() {
-  const [authed, setAuthed] = useState(!!localStorage.getItem(ADMIN_TOKEN_KEY));
+  const [authed, setAuthed] = useState(!!getAdminUser());
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
