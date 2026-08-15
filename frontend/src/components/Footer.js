@@ -2,8 +2,8 @@ import { CONTACT, LOGOS } from "@/lib/apiClient";
 import { Phone, MessageCircle } from "lucide-react";
 
 export const Footer = () => (
-  <footer data-testid="site-footer" className="mt-8 border-t border-black/5 bg-white/60">
-    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+  <footer data-testid="site-footer" className="mt-4 border-t border-black/5 bg-white/60">
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
       <div className="flex items-center gap-3">
         <img src={LOGOS.kbi} alt="KBI" className="h-9 w-auto object-contain" />
       </div>
@@ -20,16 +20,14 @@ export const Footer = () => (
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </a>
         </div>
+        <p className="mt-2 text-xs text-[#7A6A5E]">
+          Developed by{" "}
+          <a href="https://instagram.com/alam_tenang" target="_blank" rel="noreferrer"
+            data-testid="footer-credit" className="text-sm font-semibold text-[#B26A1E] hover:text-[#7A241F] hover:underline transition-colors">
+            Alam Tenang
+          </a>
+        </p>
       </div>
-    </div>
-    <div className="border-t border-black/5">
-      <p className="text-center text-sm text-[#7A6A5E] py-3.5">
-        Developed by{" "}
-        <a href="https://instagram.com/alam_tenang" target="_blank" rel="noreferrer"
-          data-testid="footer-credit" className="text-base font-semibold text-[#B26A1E] hover:text-[#7A241F] hover:underline transition-colors">
-          Alam Tenang
-        </a>
-      </p>
     </div>
   </footer>
 );
