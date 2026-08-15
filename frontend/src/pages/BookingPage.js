@@ -482,7 +482,8 @@ export default function BookingPage() {
           </DialogHeader>
           <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-1">
             <p><b>{selected.length}</b> kursi ({selected.join(", ")}) · {activeSession?.name}</p>
-            <p>Total <b>{rupiah(total)}</b> + kode unik · {method === "qris" ? "QRIS" : "Transfer BCA"}</p>
+            <p>Metode pembayaran: <b>{method === "qris" ? "QRIS" : "Transfer BCA"}</b></p>
+            <p className="text-xs text-[#7A6A5E]">Nominal pas + kode unik akan tampil di halaman pembayaran.</p>
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" data-testid="btn-cancel-confirm" onClick={() => setConfirmOpen(false)}>Batal</Button>
