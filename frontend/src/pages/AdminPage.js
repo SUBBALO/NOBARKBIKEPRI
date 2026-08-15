@@ -1274,8 +1274,8 @@ function MasterlistPanel() {
             data-testid="masterlist-search" className="w-full text-sm border border-border rounded-lg pl-8 pr-2 py-2 bg-white" />
         </div>
       </div>
-      <Table title="Pembeli Umum" rows={umum} vipMode={false} />
       <Table title="Tamu VIP" rows={vip} vipMode={true} />
+      <Table title="Pembeli Umum" rows={umum} vipMode={false} />
     </div>
   );
 }
@@ -1462,7 +1462,7 @@ export default function AdminPage() {
     try {
       await adminApi.post(`/admin/orders/${proofView.id}/set-amount`, { amount: amt });
       toast.success(`Nominal diperbarui ke ${rupiah(amt)}`);
-      setProofView({ ...proofView, total_amount: amt });
+      setProofView({ ...proofView, total_amount: amt, amount_adjusted: true, amount_edited_once: true });
       await load();
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal simpan nominal"); }
     setBusyId(null);
@@ -2039,21 +2039,36 @@ export default function AdminPage() {
                 </div>
               ) : proofView.status === "verified" ? (
                 <div className="mt-4 space-y-2">
-                  <div className="rounded-lg bg-[#F3E9DD]/60 border border-[#B26A1E]/30 p-3">
-                    <label className="text-xs font-semibold text-[#7A241F] block mb-1">Edit nominal (kalau tadi lupa/salah input)</label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
-                        <Input data-testid="edit-amount-input" inputMode="numeric"
-                          value={verifyAmount ? Number(verifyAmount).toLocaleString("id-ID") : ""}
-                          onChange={(e) => setVerifyAmount(e.target.value.replace(/[^0-9]/g, ""))}
-                          className="pl-9 h-10 bg-white" />
+                  {(!proofView.amount_edited_once || isSuper) ? (
+                    <div className="rounded-lg bg-[#F3E9DD]/60 border border-[#B26A1E]/30 p-3">
+                      <label className="text-xs font-semibold text-[#7A241F] block mb-1">
+                        Edit nominal (kalau tadi lupa/salah input)
+                        {proofView.amount_edited_once && isSuper && <span className="ml-1 text-[#B26A1E]">· sudah pernah diedit</span>}
+                      </label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                          <Input data-testid="edit-amount-input" inputMode="numeric"
+                            value={verifyAmount ? Number(verifyAmount).toLocaleString("id-ID") : ""}
+                            onChange={(e) => setVerifyAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                            className="pl-9 h-10 bg-white" />
+                        </div>
+                        <Button onClick={saveAmount} disabled={busyId === proofView.id} data-testid="edit-amount-save"
+                          className="bg-[#B26A1E] hover:bg-[#9A5716]">Simpan</Button>
                       </div>
-                      <Button onClick={saveAmount} disabled={busyId === proofView.id} data-testid="edit-amount-save"
-                        className="bg-[#B26A1E] hover:bg-[#9A5716]">Simpan</Button>
+                      <p className="text-[11px] text-[#7A6A5E] mt-1">
+                        Rekap Bendahara akan ikut nominal ini.
+                        {!isSuper && " Nominal hanya bisa diedit sekali."}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-[#7A6A5E] mt-1">Rekap Bendahara akan ikut nominal ini.</p>
-                  </div>
+                  ) : (
+                    <div className="rounded-lg bg-[#F3E9DD]/40 border border-dashed border-[#B26A1E]/30 p-3" data-testid="edit-amount-locked">
+                      <p className="text-xs text-[#7A6A5E]">
+                        Nominal <b className="text-[#7A241F]">{rupiah(proofView.total_amount)}</b> sudah pernah diedit sekali.
+                        Untuk mengubah lagi, minta bantuan <b>Super Admin</b>.
+                      </p>
+                    </div>
+                  )}
                   <Button onClick={() => sendAndMarkWA(proofView)} data-testid="dialog-send-wa-2"
                     className="w-full bg-[#2F703E] hover:bg-[#255E33]">
                     <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp

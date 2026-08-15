@@ -1065,10 +1065,14 @@ async def set_order_amount(order_id: str, payload: VerifyPayload, user: dict = D
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
     if not payload.amount or payload.amount <= 0:
         raise HTTPException(status_code=400, detail="Nominal tidak valid")
+    # Edit nominal via tombol ini hanya boleh SEKALI untuk admin biasa. Super Admin bebas.
+    if o.get("amount_edited_once") and user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Nominal sudah pernah diedit. Hanya Super Admin yang bisa mengubah lagi.")
     old = o.get("total_amount")
     await db.orders.update_one({"id": order_id}, {"$set": {
         "total_amount": payload.amount, "base_amount": payload.amount,
-        "amount_adjusted": True, "original_total": o.get("original_total", old),
+        "amount_adjusted": True, "amount_edited_once": True,
+        "original_total": o.get("original_total", old),
         "updated_at": now_iso()}})
     await log_activity(user, "verify",
                        f"Edit nominal #{o.get('order_no')} — {o.get('name')}: Rp{old:,} → Rp{payload.amount:,}".replace(",", "."),
