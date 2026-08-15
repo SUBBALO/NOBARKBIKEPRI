@@ -118,7 +118,7 @@ export default function CheckinPage() {
               <p className="text-[11px] text-white/70 leading-tight">Nonton Bersama · MBI Kepri</p>
             </div>
           </div>
-          <button onClick={() => { clearAdminSession(); setAuthed(false); }}
+          <button onClick={() => { adminApi.post("/admin/logout").catch(() => {}); clearAdminSession(); setAuthed(false); }}
             data-testid="checkin-logout" className="text-xs text-white/80 underline">Keluar</button>
         </div>
         <div className="px-4 pb-3">

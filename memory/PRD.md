@@ -111,3 +111,14 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - WARNA KOTAK NOMINAL (OrderStatusPage.js, kartu QRIS & Transfer): dari maroon solid (bg-#7A241F, teks putih) → krem lembut (bg-#F3E9DD, border #B26A1E/40, nominal #7A241F, teks #5B4636) agar mudah dibaca (ramah lansia).
 - DEPLOY READINESS: .gitignore — hapus baris .env/.env.*/*.env (jangan blok env files). /api/orders/lookup dioptimasi: filter phone via MongoDB $regex (abaikan spasi/strip) + .limit(200) (dulu tarik 3000 doc lalu filter di Python). Tambah `import re`. deployment_agent health check = PASS, no blockers.
 - Semua perubahan sesi ini frontend + 2 fix deploy; diverifikasi via screenshot preview & curl. Belum dijalankan testing_agent (perubahan visual/kecil). User perlu REDEPLOY agar naik ke kbikepri.com.
+
+
+## Update (15 Agu 2026, sesi ini — lanjutan) — Export per tabel, Edit User, Role Penjual, Log login/logout
+- EXPORT PER TABEL: tombol "Export Excel" GLOBAL di pojok panel admin DIHAPUS. Masterlist tiap tabel punya export sendiri: GET /api/admin/masterlist/export?type=umum|vip (xlsx, require_staff). Tombol UI: masterlist-export-umum / masterlist-export-vip. exportExcel + state exporting level-AdminPage dihapus (unused).
+- KELOLA USER — EDIT: PUT /api/admin/users/{id} body {name?, role?, can_delete?} (require_super). Safeguard: nama min 2 char (400), tidak bisa turunkan super admin TERAKHIR (400), tidak bisa turunkan role akun sendiri (400). Audit log 'user_update'. UI: tombol "Edit" per user → dialog user-edit-dialog (input nama + radio peran user-edit-role-{role}).
+- ROLE BARU 'seller' = Petugas Penjual Tiket: boleh /walkin + /checkin SAJA. Guard baru require_walkin = require_roles(superadmin,admin,seller) dipakai walkin_order. Seller DIBLOKIR (403) dari /admin/stats, /admin/bendahara, /admin/users, /admin/masterlist/export. ROLE_LABELS + UserCreate/UserUpdate Literal + frontend (ROLE_BADGE, create-user select, edit radio, WalkinPage gate x2, AdminPage !isStaff fallback role-aware → tombol /walkin + /checkin).
+- LOG LOGIN/LOGOUT: /api/admin/login catat action 'login' (+role). POST /api/admin/logout catat 'logout'. Semua halaman (admin/walkin/checkin) panggil /admin/logout saat "Keluar". Muncul di Log Aktivitas (ACTION labels login/logout ditambah).
+- TESTING: testing_agent iteration_12 = backend 18/18 + frontend 100% PASS, no issues. Test file baru: /app/backend/tests/test_iter12_seller_export_users.py.
+- HEALTH CHECK: deployment_agent = PASS, no blockers (build CI=true lolos, env & CORS OK, no hardcoded secret di production code).
+- CODE REVIEW (non-blocking, TIDAK dikerjakan biar aman menjelang acara): AdminPage.js ~1960 baris & server.py ~1768 baris (bisa dipecah pasca-acara); /api/admin/logs belum paginasi (pertimbangkan TTL/index kalau log membengkak).
+- User perlu REDEPLOY agar semua naik ke kbikepri.com.

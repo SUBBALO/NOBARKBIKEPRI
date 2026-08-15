@@ -1,0 +1,26 @@
+{
+  "summary": "Iteration 12 regression testing PASSED. Backend: 18/18 pytest passed on new suite covering (1) login/logout activity logs (verified via GET /api/admin/logs with actor_username field), (2) masterlist per-table export xlsx for umum & vip (both HTTP 200 with PK zip magic bytes, invalid type -> 400), (3) Kelola User PUT /admin/users/{id} updates name+role and safeguards (name<2 -> 400, self-demote -> 400, last super preserved), (4) NEW role 'seller' — created via POST /admin/users, login OK, POST /admin/walkin returns 422/400 (auth passes, NOT 403), while /admin/stats, /admin/bendahara, /admin/users, /admin/masterlist/export all return 403 as expected, (5) core booking regression (event, seat pick, order create, duplicate seat -> 409, bendahara returns grand_total+orders). Frontend: admin login (admin1/admin123) works. Header shows only 'Muat Ulang' + 'Keluar' — global Export Excel button confirmed REMOVED. Kelola User Edit dialog (user-edit-dialog) opens with all 4 role radios including user-edit-role-seller; 'Petugas Penjual Tiket' label present. Masterlist tab shows masterlist-export-umum and masterlist-export-vip buttons per section. Booking flow /: name+phone -> Sesi 1 -> seat map renders correctly with LORONG JALAN divider between rows L and K, IN/OUT blue box at row C right side, row C label remains aligned, K10 & K8 disability seats with empty gap where K9 would be. Konfirmasi Pesanan dialog shows seats(M21) + Sesi 1 + 'Metode pembayaran: QRIS' and 'Nominal pas + kode unik akan tampil di halaman pembayaran' — NO 'Total Rp X + kode unik' line as required. OrderStatusPage nominal box uses bg-[#F3E9DD] cream background (line 152 & 250) verified via code review.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter12_seller_export_users.py",
+    "/app/test_reports/pytest/iter12.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminPage.js remains ~1960 lines — recommend splitting UsersPanel, MasterlistPanel, VIPPanel, BendaharaPanel to satisfy <700-line guideline.",
+    "server.py grew to 1768 lines; consider extracting user management, walkin, bendahara, VIP routers into modules.",
+    "GET /api/admin/logs returns raw list without pagination — for long-running events log growth may need TTL/index or pagination.",
+    "OrderCreate model uses field 'amount' while UI/tests sometimes conflate 'donation' — consider aliasing for clarity but current behavior is correct."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter12_seller_export_users.py (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (super), admin2/admin123 (admin). Test seller users created dynamically with TEST_seller_* usernames and cleaned up post-test.",
+  "seed_data_creation": "Ephemeral: created 1 TEST_upd_* user (deleted), 1 TEST_seller_* user (deleted), 1 test order for seat-conflict check (soft-deleted via admin API). No lingering TEST data. Sesi 1 was already open (preview state) — no session toggle changes made.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New role 'seller' fully wired: backend require_walkin (server.py L399) = superadmin/admin/seller. UserCreate.role Literal includes 'seller' (L140). Frontend AdminPage UsersPanel radio 'user-edit-role-seller' works. Masterlist per-table export endpoint: GET /api/admin/masterlist/export?type=umum|vip (staff-only). Global Export Excel button removed from AdminPage header. Confirmation dialog copy: 'Nominal pas + kode unik akan tampil di halaman pembayaran' (no total line). Seat map SeatMap.js correctly renders LORONG JALAN + IN/OUT box + K9 gap. OrderStatusPage nominal box bg-[#F3E9DD] (cream). All admin API tests use header X-Admin-Token from POST /api/admin/login response. Order create payload requires field 'amount' (not 'donation' or 'buyer_name'; field is 'name').",
+  "rca of the issue": "N/A — no bugs found in this iteration. All features implemented per spec."
+}

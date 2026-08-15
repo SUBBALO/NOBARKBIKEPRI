@@ -31,7 +31,7 @@ ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'mbi-nonton-2026-admin')
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGO = "HS256"
 TOKEN_TTL_HOURS = 12
-ROLE_LABELS = {"superadmin": "Super Admin", "admin": "Admin", "checkin": "Petugas Check-in"}
+ROLE_LABELS = {"superadmin": "Super Admin", "admin": "Admin", "checkin": "Petugas Check-in", "seller": "Petugas Penjual Tiket"}
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -137,7 +137,7 @@ class UserCreate(BaseModel):
     username: str
     password: str
     name: Optional[str] = ""
-    role: Literal["superadmin", "admin", "checkin"] = "checkin"
+    role: Literal["superadmin", "admin", "checkin", "seller"] = "checkin"
     can_delete: bool = False
 
 
@@ -147,7 +147,7 @@ class UserPermission(BaseModel):
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    role: Optional[Literal["superadmin", "admin", "checkin"]] = None
+    role: Optional[Literal["superadmin", "admin", "checkin", "seller"]] = None
     can_delete: Optional[bool] = None
 
 
@@ -396,6 +396,7 @@ def require_roles(*roles):
 
 require_any = get_current_user
 require_staff = require_roles("superadmin", "admin")
+require_walkin = require_roles("superadmin", "admin", "seller")
 require_super = require_roles("superadmin")
 
 
@@ -642,7 +643,14 @@ async def admin_login(payload: AdminLogin, request: Request):
     if rec:
         await db.login_attempts.delete_one({"_id": ident})
     token = create_token(u)
+    await log_activity(u, "login", f"Login sebagai {ROLE_LABELS.get(u['role'], u['role'])}")
     return {"token": token, "user": public_user(u)}
+
+
+@api_router.post("/admin/logout")
+async def admin_logout(user: dict = Depends(get_current_user)):
+    await log_activity(user, "logout", "Logout dari sistem")
+    return {"ok": True}
 
 
 @api_router.get("/admin/me")
@@ -1172,7 +1180,7 @@ async def checkin_order(order_id: str, user: dict = Depends(require_any)):
 
 
 @api_router.post("/admin/walkin")
-async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_staff)):
+async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_walkin)):
     if not payload.name.strip():
         raise HTTPException(status_code=400, detail="Nama wajib diisi")
     if payload.session_id not in [s["id"] for s in SESSIONS]:
@@ -1597,6 +1605,8 @@ ACTION_LABEL_ID = {
     "bulk_verify": "Verifikasi Massal",
     "bulk_reject": "Tolak Massal",
     "checkin": "Check-in",
+    "login": "Login",
+    "logout": "Logout",
     "user_create": "Buat User",
     "user_delete": "Hapus User",
     "user_update": "Ubah User",

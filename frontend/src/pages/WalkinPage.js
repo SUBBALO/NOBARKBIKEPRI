@@ -57,7 +57,7 @@ function Login({ onLogin }) {
     setLoading(true);
     try {
       const { data } = await api.post("/admin/login", { username, password });
-      if (data.user.role !== "admin" && data.user.role !== "superadmin") {
+      if (!["admin", "superadmin", "seller"].includes(data.user.role)) {
         toast.error("Akun ini tidak boleh menjual tiket di tempat");
         setLoading(false);
         return;
@@ -148,7 +148,7 @@ export default function WalkinPage() {
 
   if (!authed) return <Login onLogin={() => { setUser(getAdminUser()); setAuthed(true); }} />;
 
-  const isStaff = user?.role === "admin" || user?.role === "superadmin";
+  const isStaff = ["admin", "superadmin", "seller"].includes(user?.role);
   if (!isStaff) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center px-6 text-center">
@@ -215,7 +215,7 @@ export default function WalkinPage() {
               <p className="text-[11px] text-white/70 leading-tight">Petugas: {user?.name}</p>
             </div>
           </div>
-          <button onClick={() => { clearAdminSession(); setAuthed(false); }} data-testid="walkin-logout" className="text-xs text-white/80 underline">Keluar</button>
+          <button onClick={() => { adminApi.post("/admin/logout").catch(() => {}); clearAdminSession(); setAuthed(false); }} data-testid="walkin-logout" className="text-xs text-white/80 underline">Keluar</button>
         </div>
       </div>
 

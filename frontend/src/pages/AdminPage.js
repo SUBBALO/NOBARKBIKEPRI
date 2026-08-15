@@ -179,6 +179,7 @@ const ROLE_BADGE = {
   superadmin: { t: "Super Admin", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
   admin: { t: "Admin", c: "bg-[#7A241F]/15 text-[#7A241F]" },
   checkin: { t: "Petugas Check-in", c: "bg-[#2F703E]/15 text-[#255E33]" },
+  seller: { t: "Petugas Penjual Tiket", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
 };
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
@@ -588,6 +589,7 @@ function UsersPanel({ currentUser }) {
               onChange={(e) => setForm({ ...form, role: e.target.value })}
               className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
               <option value="checkin">Petugas Check-in (hanya check-in)</option>
+              <option value="seller">Petugas Penjual Tiket (jual di tempat + check-in)</option>
               <option value="admin">Admin (verifikasi + hapus + check-in)</option>
               <option value="superadmin">Super Admin (semua + kelola user)</option>
             </select>
@@ -722,6 +724,7 @@ function UsersPanel({ currentUser }) {
                 <div className="space-y-2">
                   {[
                     { v: "checkin", t: "Petugas Check-in", d: "Hanya halaman check-in" },
+                    { v: "seller", t: "Petugas Penjual Tiket", d: "Jual tiket di tempat + check-in" },
                     { v: "admin", t: "Admin", d: "Verifikasi + hapus + check-in + jual" },
                     { v: "superadmin", t: "Super Admin", d: "Semua akses + kelola user" },
                   ].map((opt) => {
@@ -1385,7 +1388,10 @@ export default function AdminPage() {
     } catch { toast.error("Gagal mengubah mode"); }
   };
 
-  const logout = () => { clearAdminSession(); setCurrentUser(null); setAuthed(false); };
+  const logout = async () => {
+    try { await adminApi.post("/admin/logout"); } catch (e) { console.error("logout:", e); }
+    clearAdminSession(); setCurrentUser(null); setAuthed(false);
+  };
 
   const doDelete = async () => {
     if (!deleteTarget) return;
@@ -1471,18 +1477,32 @@ export default function AdminPage() {
 
   // Petugas Check-in tidak boleh akses panel verifikasi
   if (!isStaff) {
+    const isSeller = currentUser?.role === "seller";
     return (
       <div className="max-w-md mx-auto px-4 py-24 text-center">
         <div className="rounded-2xl border border-border bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
           <div className="h-12 w-12 rounded-full bg-[#2F703E]/10 flex items-center justify-center mb-4 mx-auto">
-            <ScanLine className="h-6 w-6 text-[#2F703E]" />
+            {isSeller ? <Store className="h-6 w-6 text-[#B26A1E]" /> : <ScanLine className="h-6 w-6 text-[#2F703E]" />}
           </div>
           <h1 className="font-serif-display text-2xl text-[#7A241F]">Halo, {currentUser?.name}</h1>
-          <p className="text-sm text-[#7A6A5E] mt-1 mb-5">Akun Anda adalah <b>Petugas Check-in</b>, jadi hanya bisa mengakses halaman check-in peserta.</p>
-          <a href="/checkin" data-testid="goto-checkin"
-            className="inline-flex items-center gap-2 bg-[#7A241F] hover:bg-[#5E1B17] text-white rounded-full px-6 py-3 text-sm font-medium">
-            <UserCheck className="h-4 w-4" /> Buka Halaman Check-in
-          </a>
+          <p className="text-sm text-[#7A6A5E] mt-1 mb-5">
+            {isSeller
+              ? <>Akun Anda adalah <b>Petugas Penjual Tiket</b> — bisa jual tiket di tempat dan check-in peserta.</>
+              : <>Akun Anda adalah <b>Petugas Check-in</b>, jadi hanya bisa mengakses halaman check-in peserta.</>}
+          </p>
+          <div className="flex flex-col items-center gap-2.5">
+            {isSeller && (
+              <a href="/walkin" data-testid="goto-walkin"
+                className="inline-flex items-center gap-2 bg-[#B26A1E] hover:bg-[#8A3A12] text-white rounded-full px-6 py-3 text-sm font-medium">
+                <Store className="h-4 w-4" /> Buka Halaman Jual di Tempat
+              </a>
+            )}
+            <a href="/checkin" data-testid="goto-checkin"
+              className={cn("inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-medium",
+                isSeller ? "border border-[#2F703E]/40 text-[#255E33] hover:bg-[#2F703E]/10" : "bg-[#7A241F] hover:bg-[#5E1B17] text-white")}>
+              <UserCheck className="h-4 w-4" /> Buka Halaman Check-in
+            </a>
+          </div>
           <button onClick={logout} data-testid="checkin-role-logout" className="block mx-auto mt-5 text-xs text-[#EF4444] underline">Keluar</button>
         </div>
       </div>
