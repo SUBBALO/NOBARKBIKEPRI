@@ -1112,6 +1112,74 @@ function VIPPanel() {
   );
 }
 
+function MasterlistPanel() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    (async () => {
+      try { const { data } = await adminApi.get("/admin/bendahara"); setOrders(data.orders || []); }
+      catch (e) { console.error("masterlist load:", e); toast.error("Gagal memuat masterlist"); }
+      setLoading(false);
+    })();
+  }, []);
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#7A241F]" /></div>;
+  const match = (o) => !q || o.name?.toLowerCase().includes(q.toLowerCase()) || String(o.order_no).includes(q) || (o.phone || "").includes(q);
+  const umum = orders.filter((o) => o.channel !== "vip" && match(o));
+  const vip = orders.filter((o) => o.channel === "vip" && match(o));
+  const Table = ({ title, rows, vipMode }) => (
+    <div className="rounded-2xl border border-border bg-white overflow-hidden" data-testid={vipMode ? "masterlist-vip" : "masterlist-umum"}>
+      <div className={cn("px-4 py-3 flex items-center justify-between", vipMode ? "bg-[#7A241F]/10" : "bg-[#2F703E]/10")}>
+        <h3 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2">{vipMode ? <Crown className="h-4 w-4 text-[#B26A1E]" /> : <Users className="h-4 w-4 text-[#2F703E]" />} {title}</h3>
+        <span className="text-sm font-semibold text-[#7A6A5E]">{rows.length} pembeli</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-[#7A6A5E] text-xs">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">Nama</th>
+              <th className="px-3 py-2 text-left font-medium">No HP</th>
+              <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
+              {!vipMode && <th className="px-3 py-2 text-left font-medium">Kanal</th>}
+              {!vipMode && <th className="px-3 py-2 text-right font-medium">Nominal</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr><td colSpan={vipMode ? 3 : 5} className="px-3 py-8 text-center text-[#7A6A5E]">Belum ada.</td></tr>
+            ) : rows.map((o, i) => (
+              <tr key={o.order_no ?? i} className="border-t border-border">
+                <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
+                <td className="px-3 py-2 text-[#5B4636]">{o.phone || "-"}</td>
+                <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{o.session_name} · {o.seats.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.tickets} tkt)</span></td>
+                {!vipMode && <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[#7A241F]/10 text-[#7A241F]">{o.channel === "panitia" ? "Panitia" : "Umum"}</span></td>}
+                {!vipMode && <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.amount)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+  return (
+    <div className="no-print space-y-5" data-testid="masterlist-panel">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-serif-display text-2xl text-[#7A241F]">Masterlist Pembelian</h2>
+          <p className="text-sm text-[#7A6A5E]">Daftar semua yang sudah beli — tabel Umum (online + panitia) & tabel VIP terpisah.</p>
+        </div>
+        <div className="relative min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9CA3AF]" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari nama / HP / no order"
+            data-testid="masterlist-search" className="w-full text-sm border border-border rounded-lg pl-8 pr-2 py-2 bg-white" />
+        </div>
+      </div>
+      <Table title="Pembeli Umum" rows={umum} vipMode={false} />
+      <Table title="Tamu VIP" rows={vip} vipMode={true} />
+    </div>
+  );
+}
+
 const SESSIONS_STATIC = [
   { id: 1, name: "Sesi 1", time: "09.30–11.30" },
   { id: 2, name: "Sesi 2", time: "12.00–14.00" },
@@ -1284,6 +1352,20 @@ export default function AdminPage() {
     setBusyId(null);
   };
 
+  const saveAmount = async () => {
+    if (!proofView) return;
+    const amt = parseInt(verifyAmount, 10);
+    if (!amt || amt <= 0) { toast.error("Isi nominal yang benar"); return; }
+    setBusyId(proofView.id);
+    try {
+      await adminApi.post(`/admin/orders/${proofView.id}/set-amount`, { amount: amt });
+      toast.success(`Nominal diperbarui ke ${rupiah(amt)}`);
+      setProofView({ ...proofView, total_amount: amt });
+      await load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal simpan nominal"); }
+    setBusyId(null);
+  };
+
   const exportExcel = async () => {
     setExporting(true);
     try {
@@ -1434,6 +1516,16 @@ export default function AdminPage() {
             tab === "vip" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/60")}>
           <Crown className="h-4 w-4" /> Tiket VIP
         </button>
+        <button data-testid="admin-tab-sessions" onClick={() => setTab("sessions")}
+          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+            tab === "sessions" ? "bg-[#2F703E] text-white border-[#2F703E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#2F703E]/50")}>
+          <Users className="h-4 w-4" /> Buka/Tutup Sesi
+        </button>
+        <button data-testid="admin-tab-masterlist" onClick={() => setTab("masterlist")}
+          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+            tab === "masterlist" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
+          <Users className="h-4 w-4" /> Masterlist
+        </button>
         <button data-testid="admin-tab-logs" onClick={() => setTab("logs")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
             tab === "logs" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
@@ -1476,43 +1568,6 @@ export default function AdminPage() {
           )}
         </div>
       )}
-      {/* Session control — buka/tutup penjualan per sesi (Super Admin) */}
-      {event && (
-        <div className="rounded-xl border border-border bg-white p-3 mb-4 no-print" data-testid="session-control-card">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-sm font-medium text-[#7A241F] flex items-center gap-2"><Users className="h-4 w-4" /> Buka/Tutup Penjualan per Sesi</p>
-            <span className="text-[10px] text-[#7A6A5E] hidden sm:flex items-center gap-3">
-              <span>Umum = online web</span><span>Panitia = jual di lokasi</span>
-            </span>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {event.sessions.map((s) => {
-              const isOpen = s.status === "open" || s.status === "full";
-              const walkinOpen = !!s.walkin_open;
-              return (
-                <div key={s.id} data-testid={`admin-session-${s.id}`}
-                  className={cn("rounded-lg border p-2",
-                    (isOpen || walkinOpen) ? "border-[#2F703E]/40 bg-[#2F703E]/[0.05]" : "border-border bg-muted/20")}>
-                  <p className="text-xs font-semibold text-[#2C1E16] leading-tight">{s.name}</p>
-                  <p className="text-[10px] text-[#7A6A5E] mb-1.5">{s.time.replace(" WIB", "")} · {s.booked}/{s.capacity}</p>
-                  <div className="flex items-center justify-between gap-1">
-                    <span className={cn("text-[10px] font-semibold", isOpen ? "text-[#255E33]" : "text-[#9CA3AF]")}>Umum</span>
-                    <Switch checked={isOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "public")}
-                      className="scale-90" data-testid={`session-open-switch-${s.id}`} />
-                  </div>
-                  <div className="flex items-center justify-between gap-1 mt-0.5">
-                    <span className={cn("text-[10px] font-semibold", walkinOpen ? "text-[#8A3A12]" : "text-[#9CA3AF]")}>Panitia</span>
-                    <Switch checked={walkinOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "walkin")}
-                      className="scale-90" data-testid={`session-walkin-switch-${s.id}`} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {!isSuper && <p className="text-[10px] text-[#7A6A5E] mt-1.5">Hanya Super Admin yang dapat membuka/menutup sesi.</p>}
-        </div>
-      )}
-
       {/* Filter per sesi */}
       <div className="flex flex-wrap items-center gap-2 mb-3 no-print">
         <span className="text-xs text-[#7A6A5E] mr-1">Filter sesi:</span>
@@ -1777,6 +1832,43 @@ export default function AdminPage() {
 
       {tab === "vip" && <VIPPanel />}
 
+      {tab === "sessions" && event && (
+        <div className="rounded-2xl border border-border bg-white p-5 no-print" data-testid="session-control-card">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div>
+              <h2 className="font-serif-display text-2xl text-[#2F703E] flex items-center gap-2"><Users className="h-5 w-5" /> Buka/Tutup Penjualan per Sesi</h2>
+              <p className="text-xs text-[#7A6A5E]">Umum = pembeli online di web · Panitia = jual di lokasi (/walkin). {isSuper ? "" : "Hanya Super Admin yang dapat mengubah."}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {event.sessions.map((s) => {
+              const isOpen = s.status === "open" || s.status === "full";
+              const walkinOpen = !!s.walkin_open;
+              return (
+                <div key={s.id} data-testid={`admin-session-${s.id}`}
+                  className={cn("rounded-xl border p-3",
+                    (isOpen || walkinOpen) ? "border-[#2F703E]/40 bg-[#2F703E]/[0.05]" : "border-border bg-muted/20")}>
+                  <p className="text-sm font-semibold text-[#2C1E16] leading-tight">{s.name}</p>
+                  <p className="text-[11px] text-[#7A6A5E] mb-2">{s.time.replace(" WIB", "")} · {s.booked}/{s.capacity} terisi</p>
+                  <div className="flex items-center justify-between gap-1 rounded-lg bg-white border border-border px-2 py-1.5">
+                    <span className={cn("text-[11px] font-semibold", isOpen ? "text-[#255E33]" : "text-[#9CA3AF]")}>Umum · {isOpen ? "BUKA" : "TUTUP"}</span>
+                    <Switch checked={isOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "public")}
+                      data-testid={`session-open-switch-${s.id}`} />
+                  </div>
+                  <div className="flex items-center justify-between gap-1 mt-1.5 rounded-lg bg-white border border-border px-2 py-1.5">
+                    <span className={cn("text-[11px] font-semibold", walkinOpen ? "text-[#8A3A12]" : "text-[#9CA3AF]")}>Panitia · {walkinOpen ? "BUKA" : "TUTUP"}</span>
+                    <Switch checked={walkinOpen} disabled={!isSuper} onCheckedChange={(v) => toggleSessionOpen(s.id, v, "walkin")}
+                      data-testid={`session-walkin-switch-${s.id}`} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab === "masterlist" && <MasterlistPanel />}
+
       {tab === "users" && isSuper && <UsersPanel currentUser={currentUser} />}
 
       {tab === "trash" && isSuper && (
@@ -1852,10 +1944,27 @@ export default function AdminPage() {
                   </div>
                 </div>
               ) : proofView.status === "verified" ? (
-                <Button onClick={() => sendAndMarkWA(proofView)} data-testid="dialog-send-wa-2"
-                  className="w-full mt-4 bg-[#2F703E] hover:bg-[#255E33]">
-                  <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
-                </Button>
+                <div className="mt-4 space-y-2">
+                  <div className="rounded-lg bg-[#F3E9DD]/60 border border-[#B26A1E]/30 p-3">
+                    <label className="text-xs font-semibold text-[#7A241F] block mb-1">Edit nominal (kalau tadi lupa/salah input)</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                        <Input data-testid="edit-amount-input" inputMode="numeric"
+                          value={verifyAmount ? Number(verifyAmount).toLocaleString("id-ID") : ""}
+                          onChange={(e) => setVerifyAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                          className="pl-9 h-10 bg-white" />
+                      </div>
+                      <Button onClick={saveAmount} disabled={busyId === proofView.id} data-testid="edit-amount-save"
+                        className="bg-[#B26A1E] hover:bg-[#9A5716]">Simpan</Button>
+                    </div>
+                    <p className="text-[11px] text-[#7A6A5E] mt-1">Rekap Bendahara akan ikut nominal ini.</p>
+                  </div>
+                  <Button onClick={() => sendAndMarkWA(proofView)} data-testid="dialog-send-wa-2"
+                    className="w-full bg-[#2F703E] hover:bg-[#255E33]">
+                    <MessageCircle className="h-4 w-4 mr-1.5" /> Kirim Tiket via WhatsApp
+                  </Button>
+                </div>
               ) : null}
             </div>
           )}

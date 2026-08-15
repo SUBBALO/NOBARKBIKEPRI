@@ -985,6 +985,24 @@ async def reject_order(order_id: str, user: dict = Depends(require_staff)):
     return clean(await db.orders.find_one({"id": order_id}))
 
 
+@api_router.post("/admin/orders/{order_id}/set-amount")
+async def set_order_amount(order_id: str, payload: VerifyPayload, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    if not payload.amount or payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Nominal tidak valid")
+    old = o.get("total_amount")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "total_amount": payload.amount, "base_amount": payload.amount,
+        "amount_adjusted": True, "original_total": o.get("original_total", old),
+        "updated_at": now_iso()}})
+    await log_activity(user, "verify",
+                       f"Edit nominal #{o.get('order_no')} — {o.get('name')}: Rp{old:,} → Rp{payload.amount:,}".replace(",", "."),
+                       order_id)
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
 @api_router.delete("/admin/orders/{order_id}")
 async def delete_order(order_id: str, user: dict = Depends(get_current_user)):
     if not (user["role"] == "superadmin" or user.get("can_delete")):
