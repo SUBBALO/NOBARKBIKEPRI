@@ -120,17 +120,19 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
                       </button>
                     );
                   })}
+                  {row.row === "C" && (
+                    <span data-testid="pintu-masuk-keluar" title="Pintu Masuk / Keluar"
+                      className="shrink-0 ml-1.5 rounded bg-[#2563EB] text-white font-bold flex flex-col items-center justify-center text-center leading-tight"
+                      style={{ height: sz, paddingLeft: 4, paddingRight: 4, fontSize: Math.max(7, fs - 2) }}>
+                      <span>IN/</span><span>OUT</span>
+                    </span>
+                  )}
                   <span className="font-semibold text-[#7A6A5E] text-center shrink-0"
                     style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
                 </div>
               </Fragment>
             );
           })}
-
-          {/* Entrance marker (kanan bawah seperti denah asli) */}
-          <div className="w-full flex justify-end pr-2 mt-1">
-            <span className="text-[10px] font-medium text-[#7A6A5E] bg-[#F3E9DD] rounded px-2 py-0.5">PINTU MASUK / KELUAR</span>
-          </div>
         </div>
       </div>
 
