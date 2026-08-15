@@ -98,3 +98,16 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - IZIN HAPUS PER-USER: field user `can_delete`. DELETE order kini diizinkan untuk superadmin ATAU user.can_delete (bukan lagi superadmin-only). POST /api/admin/users/{id}/permission {can_delete} (superadmin). UsersPanel: switch "Boleh hapus data pesanan" (user-candelete-{username}) untuk non-super; super admin tampil pesan statis. public_user & get_current_user kirim can_delete.
 - SOFT DELETE + KOTAK SAMPAH + RESTORE: delete_order jadi SOFT (set deleted:true, deleted_at, deleted_by) + lepas seat_locks. Semua query list/stats/export/lookup/participants/backfill exclude deleted:true. GET /api/admin/orders/deleted + POST /api/admin/orders/{id}/restore (superadmin only; restore re-lock kursi, tolak 409 bila kursi sudah diambil). Tab admin "Kotak Sampah" (admin-tab-trash, superadmin) + TrashPanel; dialog hapus kini "Ya, Hapus" (bukan permanen). Action log tambah "restore".
 - Testing iteration_8: backend 8/8 + frontend 100% pass, no issues. Preview dikembalikan: coming_soon ON, semua sesi (umum & panitia) tutup.
+
+
+## Update (15 Agu 2026, sesi ini) — Denah rapi + UI polish + deploy-ready
+- DENAH GRID SEJAJAR (SeatMap.js): render pakai kolom TETAP nomor kursi (maxN..minN, umumnya 21→1). Tiap baris di-map by nomor; kolom tanpa kursi = spacer kosong (shrink-0, lebar = sz) → semua baris sejajar persis kayak denah asli. A/B kursi 1-4 sejajar, sweetbox B (7-16) sejajar dgn C, disabilitas K10 & K8 kini ada kolom kosong (K9) di tengah.
+- LORONG JALAN: divider dashed "LORONG JALAN" di antara baris L & K (aisle horizontal).
+- IN/OUT: kotak biru "IN/OUT" di baris C, diposisikan ABSOLUTE (left: calc(100%+8px)) di kanan LUAR grid — label "C" tidak tergeser & tetap sejajar baris lain. Marker "PINTU MASUK/KELUAR" lama dihapus.
+- HEADER: tombol "Pesan Tiket" dihapus (Header.js). Sisa: logo + Upload Bukti (saat penjualan buka).
+- FOOTER (Footer.js): "Developed by Alam Tenang" pindah ke tengah bawah (text-center), font diperkecil (text-[11px]/link text-xs), padding footer dipadatkan (py-4, mt-4).
+- COPY DANA SUKARELA (BookingPage.js kartu donation): "Biaya pengadaan rata-rata Rp60.000/orang, sebagai acuan untuk 1 tiket. Nominal kontribusi bebas, sesuai Dana Paramita Anda. 🙏" (hapus var refTotal yg jadi unused).
+- DIALOG KONFIRMASI (BookingPage.js): hapus baris "Total Rp X + kode unik" yg bikin salah baca. Sekarang: "N kursi (...) · Sesi" + "Metode pembayaran: QRIS/Transfer BCA" + note kecil nominal muncul di halaman pembayaran.
+- WARNA KOTAK NOMINAL (OrderStatusPage.js, kartu QRIS & Transfer): dari maroon solid (bg-#7A241F, teks putih) → krem lembut (bg-#F3E9DD, border #B26A1E/40, nominal #7A241F, teks #5B4636) agar mudah dibaca (ramah lansia).
+- DEPLOY READINESS: .gitignore — hapus baris .env/.env.*/*.env (jangan blok env files). /api/orders/lookup dioptimasi: filter phone via MongoDB $regex (abaikan spasi/strip) + .limit(200) (dulu tarik 3000 doc lalu filter di Python). Tambah `import re`. deployment_agent health check = PASS, no blockers.
+- Semua perubahan sesi ini frontend + 2 fix deploy; diverifikasi via screenshot preview & curl. Belum dijalankan testing_agent (perubahan visual/kecil). User perlu REDEPLOY agar naik ke kbikepri.com.

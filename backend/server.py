@@ -7,6 +7,7 @@ from pymongo.errors import DuplicateKeyError
 import os
 import io
 import logging
+import re
 import secrets
 import uuid
 import bcrypt
@@ -528,9 +529,14 @@ async def lookup_orders(phone: str):
     p = phone.strip().replace(" ", "").replace("-", "")
     if len(p) < 6:
         raise HTTPException(status_code=400, detail="Masukkan nomor HP yang valid")
+    # Filter di MongoDB berdasarkan digit nomor (abaikan spasi/strip) + batasi hasil,
+    # supaya tidak menarik seluruh koleksi ke memori.
+    digits = re.sub(r"\D", "", p)
+    phone_pattern = r"\D*".join(re.escape(d) for d in digits)
     docs = await db.orders.find(
-        {"status": {"$ne": "rejected"}, "deleted": {"$ne": True}}, {"proof_image": 0}
-    ).sort("created_at", -1).to_list(3000)
+        {"phone": {"$regex": phone_pattern}, "status": {"$ne": "rejected"}, "deleted": {"$ne": True}},
+        {"proof_image": 0}
+    ).sort("created_at", -1).limit(200).to_list(200)
     result = []
     for o in docs:
         if o["phone"].replace(" ", "").replace("-", "") != p:
