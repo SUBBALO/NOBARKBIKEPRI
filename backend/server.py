@@ -1849,6 +1849,22 @@ async def export_logs(_: bool = Depends(require_staff)):
 
 app.include_router(api_router)
 
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+    response.headers["X-DNS-Prefetch-Control"] = "off"
+    response.headers["Origin-Agent-Cluster"] = "?1"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+    response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=(), payment=()"
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=False,

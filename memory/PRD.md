@@ -142,3 +142,10 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Wording keamanan yg dipakai ke user: risiko utama pencurian token via JS berkurang; TIDAK ada situs yg bisa dijamin 100% kebal.
 - Preview dikembalikan siap-publish: coming_soon = ON (semua sesi tetap tutup). User perlu REDEPLOY agar migrasi cookie naik ke kbikepri.com, lalu cek login di kbikepri.com/admin sekali.
 - BACKLOG code-quality (pasca-acara, non-blocking): setAdminSession(token,user) masih terima+buang token (sederhanakan jadi setAdminSession(user)); pertimbangkan probe /api/admin/me saat mount 3 halaman staff; split server.py (~1950 baris) jadi routers.
+
+## Update (Jun 2026 — Security Headers)
+- User scan ssl.org security-headers di produksi: HSTS sudah ada; header lain "Missing" (CSP Critical, X-Frame-Options, COOP/COEP/CORP, Permissions-Policy, dll).
+- BACKEND: tambah middleware `security_headers` (@app.middleware http) di server.py → semua /api response kini kirim X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, X-Permitted-Cross-Domain-Policies: none, X-DNS-Prefetch-Control: off, Origin-Agent-Cluster: ?1, Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Resource-Policy: same-site, Permissions-Policy. Terverifikasi via curl -I.
+- FRONTEND: tambah `<meta http-equiv="Content-Security-Policy">` + `<meta name="referrer">` di index.html. CSP mengizinkan emergent scripts, posthog, google fonts, backend api, img https/data/blob; frame-ancestors 'none'; upgrade-insecure-requests. Diuji: login admin1 sukses, dashboard load penuh, 0 CSP violation.
+- KETERBATASAN PENTING (jujur ke user): scanner membaca HTTP header di ROOT domain (hosting frontend statis Emergent). Header HTTP frontend (X-Frame-Options/COOP/COEP/CORP dst) TIDAK bisa di-set dari kode statis — hanya CSP via meta tag (proteksi browser nyata, tapi scanner mungkin tetap tandai header HTTP-nya "missing"). Untuk header HTTP di frontend perlu konfigurasi hosting/CDN Emergent → email support@emergent.sh.
+- User perlu REDEPLOY agar perubahan naik ke kbikepri.com.
