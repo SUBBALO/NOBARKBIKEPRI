@@ -901,8 +901,48 @@ async def _collect_recap_orders(date_from: str = None, date_to: str = None):
             "session_id": o["session_id"],
             "session_name": session["name"] if session else str(o["session_id"]),
             "verified_by": o.get("verified_by", ""),
+            "paid": True,
         })
     return rows
+
+
+async def _unpaid_manual_rows(date_from=None, date_to=None):
+    """Order manual yang BELUM bayar — untuk Masterlist (jumlah tiket), TIDAK dihitung uang Bendahara."""
+    wib = timezone(timedelta(hours=7))
+    docs = await db.orders.find(
+        {"manual": True, "paid": {"$ne": True}, "status": {"$ne": "verified"}, "deleted": {"$ne": True}},
+        {"proof_image": 0},
+    ).sort("created_at", 1).to_list(3000)
+    out = []
+    for o in docs:
+        try:
+            d = datetime.fromisoformat(o.get("created_at", "")).astimezone(wib)
+            key = d.strftime("%Y-%m-%d")
+            date_label = f"{d.day} {_MONTHS_ID[d.month]} {d.year}"
+        except (ValueError, TypeError):
+            key, date_label = "", ""
+        if date_from and key and key < date_from:
+            continue
+        if date_to and key and key > date_to:
+            continue
+        session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        _by = o.get("created_by") or "-"
+        out.append({
+            "date": key, "date_label": date_label,
+            "created_at": o.get("created_at"),
+            "order_no": o.get("order_no"), "name": o.get("name"), "phone": o.get("phone", ""),
+            "channel": "manual", "channel_label": f"Manual — oleh {_by}", "seller": _by,
+            "location": "Manual", "method": None,
+            "tickets": o.get("qty", 0) or 0,
+            "amount": o.get("total_amount", 0) or o.get("order_amount", 0) or 0,
+            "transfer_date": None,
+            "seats": o.get("seats", []),
+            "session_id": o["session_id"],
+            "session_name": session["name"] if session else str(o["session_id"]),
+            "verified_by": "",
+            "paid": False,
+        })
+    return out
 
 
 def _blank_agg():
@@ -952,7 +992,8 @@ async def bendahara_recap(user: dict = Depends(require_staff),
         })
     # daftar transaksi (flat, terbaru dulu) untuk tabel yang bisa di-sort di frontend
     orders = sorted(rows, key=lambda r: r.get("created_at") or "", reverse=True)
-    return {"grand_total": grand, "by_date": by_date, "orders": orders}
+    unpaid_manual = await _unpaid_manual_rows(date_from, date_to)
+    return {"grand_total": grand, "by_date": by_date, "orders": orders, "unpaid_manual": unpaid_manual}
 
 
 @api_router.get("/admin/bendahara/export")
@@ -1040,6 +1081,7 @@ async def export_masterlist(_: bool = Depends(require_staff), type: str = Query(
         rows = [r for r in rows if r["channel"] == "vip"]
     elif kind == "manual":
         rows = [r for r in rows if r["channel"] == "manual"]
+        rows += await _unpaid_manual_rows()
     else:
         rows = [r for r in rows if r["channel"] not in ("vip", "manual")]
     rows.sort(key=lambda r: (r["session_id"], r["name"] or ""))
@@ -1052,8 +1094,8 @@ async def export_masterlist(_: bool = Depends(require_staff), type: str = Query(
         ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket"])
         widths = [5, 24, 16, 10, 12, 18, 9]
     elif kind == "manual":
-        ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket", "Tgl Transfer", "Nominal (Rp)"])
-        widths = [5, 24, 16, 10, 12, 18, 9, 14, 15]
+        ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket", "Status", "Tgl Transfer", "Nominal (Rp)"])
+        widths = [5, 24, 16, 10, 12, 18, 9, 14, 14, 15]
     else:
         ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket", "Kanal", "Nominal (Rp)"])
         widths = [5, 24, 16, 10, 12, 18, 9, 16, 15]
@@ -1067,13 +1109,19 @@ async def export_masterlist(_: bool = Depends(require_staff), type: str = Query(
                        ", ".join(r["seats"]), r["tickets"]])
         elif kind == "manual":
             ws.append([i, r["name"], r["phone"], r["order_no"], r["session_name"],
-                       ", ".join(r["seats"]), r["tickets"], r.get("transfer_date") or "-", r["amount"]])
+                       ", ".join(r["seats"]), r["tickets"],
+                       "Sudah Berdana" if r.get("paid", True) else "Belum Berdana",
+                       r.get("transfer_date") or "-", r["amount"]])
         else:
             ws.append([i, r["name"], r["phone"], r["order_no"], r["session_name"],
                        ", ".join(r["seats"]), r["tickets"], r["channel_label"], r["amount"]])
     if kind != "vip" and rows:
-        total = sum(r["amount"] for r in rows)
-        ws.append(["", "TOTAL", "", "", "", "", sum(r["tickets"] for r in rows), "", total])
+        tickets_total = sum(r["tickets"] for r in rows)
+        amount_total = sum(r["amount"] for r in rows if r.get("paid", True))
+        if kind == "manual":
+            ws.append(["", "TOTAL", "", "", "", "", tickets_total, "", "", amount_total])
+        else:
+            ws.append(["", "TOTAL", "", "", "", "", tickets_total, "", amount_total])
         for cell in ws[ws.max_row]:
             cell.font = Font(bold=True)
     for idx, w in enumerate(widths, 1):

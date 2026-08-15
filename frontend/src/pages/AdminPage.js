@@ -1668,6 +1668,7 @@ function ManualPanel() {
 
 function MasterlistPanel() {
   const [orders, setOrders] = useState([]);
+  const [unpaidManual, setUnpaidManual] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [exportingType, setExportingType] = useState(null);
@@ -1686,7 +1687,7 @@ function MasterlistPanel() {
   };
   useEffect(() => {
     (async () => {
-      try { const { data } = await adminApi.get("/admin/bendahara"); setOrders(data.orders || []); }
+      try { const { data } = await adminApi.get("/admin/bendahara"); setOrders(data.orders || []); setUnpaidManual(data.unpaid_manual || []); }
       catch (e) { console.error("masterlist load:", e); toast.error("Gagal memuat masterlist"); }
       setLoading(false);
     })();
@@ -1695,7 +1696,7 @@ function MasterlistPanel() {
   const match = (o) => !q || o.name?.toLowerCase().includes(q.toLowerCase()) || String(o.order_no).includes(q) || (o.phone || "").includes(q);
   const umum = orders.filter((o) => o.channel !== "vip" && o.channel !== "manual" && match(o));
   const vip = orders.filter((o) => o.channel === "vip" && match(o));
-  const manual = orders.filter((o) => o.channel === "manual" && match(o));
+  const manual = [...orders.filter((o) => o.channel === "manual"), ...unpaidManual].filter(match);
   const Table = ({ title, rows, kind }) => {
     const isVip = kind === "vip";
     const isManual = kind === "manual";
@@ -1703,7 +1704,7 @@ function MasterlistPanel() {
     const btnBg = isVip ? "bg-[#7A241F] hover:bg-[#5E1B17]" : isManual ? "bg-[#B26A1E] hover:bg-[#8A3A12]" : "bg-[#2F703E] hover:bg-[#255E33]";
     const Icon = isVip ? Crown : isManual ? ClipboardList : Users;
     const iconColor = isVip ? "text-[#B26A1E]" : isManual ? "text-[#B26A1E]" : "text-[#2F703E]";
-    const nCols = isVip ? 3 : 5;
+    const nCols = isVip ? 3 : isManual ? 6 : 5;
     return (
     <div className="rounded-2xl border border-border bg-white overflow-hidden" data-testid={`masterlist-${kind}`}>
       <div className={cn("px-4 py-3 flex items-center justify-between gap-3", headBg)}>
@@ -1724,6 +1725,7 @@ function MasterlistPanel() {
               <th className="px-3 py-2 text-left font-medium">Nama</th>
               <th className="px-3 py-2 text-left font-medium">No HP</th>
               <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
+              {isManual && <th className="px-3 py-2 text-left font-medium">Status</th>}
               {isManual && <th className="px-3 py-2 text-left font-medium">Tgl Order / Transfer</th>}
               {!isVip && !isManual && <th className="px-3 py-2 text-left font-medium">Kanal</th>}
               {!isVip && <th className="px-3 py-2 text-right font-medium">Nominal</th>}
@@ -1737,9 +1739,12 @@ function MasterlistPanel() {
                 <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}{isManual && o.seller ? ` · input: ${o.seller}` : ""}</span></td>
                 <td className="px-3 py-2 text-[#5B4636]">{o.phone || "-"}</td>
                 <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{o.session_name} · {o.seats.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.tickets} tkt)</span></td>
+                {isManual && <td className="px-3 py-2 whitespace-nowrap">{o.paid === false
+                  ? <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-[#B26A1E]/15 text-[#8A3A12]">Belum Berdana</span>
+                  : <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-[#2F703E]/15 text-[#255E33]">Sudah Berdana</span>}</td>}
                 {isManual && <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap"><span className="block text-[10px] text-[#7A6A5E]">order: {o.date}</span>transfer: {o.transfer_date || "-"}</td>}
                 {!isVip && !isManual && <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[#7A241F]/10 text-[#7A241F]">{o.channel === "panitia" ? "Panitia" : "Website"}</span></td>}
-                {!isVip && <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.amount)}</td>}
+                {!isVip && <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{o.paid === false ? <span className="text-[#8A3A12]">{rupiah(o.amount)}</span> : rupiah(o.amount)}</td>}
               </tr>
             ))}
           </tbody>
