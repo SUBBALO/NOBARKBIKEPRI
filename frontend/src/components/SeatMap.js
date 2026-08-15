@@ -82,24 +82,12 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
                     <div className="flex-1 border-t border-dashed border-[#B26A1E]/40" />
                   </div>
                 )}
-                <div className="flex items-center" style={{ columnGap: gap }}>
+                <div className="flex items-center relative" style={{ columnGap: gap }}>
                   <span className="font-semibold text-[#7A6A5E] text-center shrink-0"
                     style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
                   {cols.map((n) => {
                     const seat = seatMap[n];
-                    if (!seat) {
-                      if (row.row === "C" && n === 2) {
-                        return (
-                          <span key={`${row.row}-inout`} data-testid="pintu-masuk-keluar" title="Pintu Masuk / Keluar"
-                            className="shrink-0 rounded bg-[#2563EB] text-white font-bold flex flex-col items-center justify-center text-center leading-tight"
-                            style={{ height: sz, width: sz * 2 + gap, fontSize: Math.max(7, fs - 2) }}>
-                            <span>IN/</span><span>OUT</span>
-                          </span>
-                        );
-                      }
-                      if (row.row === "C" && n === 1) return null;
-                      return <div key={`${row.row}-e${n}`} className="shrink-0" style={{ width: sz, height: sz }} />;
-                    }
+                    if (!seat) return <div key={`${row.row}-e${n}`} className="shrink-0" style={{ width: sz, height: sz }} />;
                     const isSel = selected.includes(seat.label);
                     const st = isSel ? "selected" : seat.status;
                     const disLocked = seat.disability && !allowDisability;
@@ -134,6 +122,13 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
                   })}
                   <span className="font-semibold text-[#7A6A5E] text-center shrink-0"
                     style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
+                  {row.row === "C" && (
+                    <span data-testid="pintu-masuk-keluar" title="Pintu Masuk / Keluar"
+                      className="absolute -translate-y-1/2 rounded bg-[#2563EB] text-white font-bold flex flex-col items-center justify-center text-center leading-tight"
+                      style={{ top: "50%", left: "calc(100% + 8px)", height: sz, paddingLeft: 5, paddingRight: 5, fontSize: Math.max(7, fs - 2) }}>
+                      <span>IN/</span><span>OUT</span>
+                    </span>
+                  )}
                 </div>
               </Fragment>
             );
