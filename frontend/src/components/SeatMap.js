@@ -87,7 +87,19 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
                     style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
                   {cols.map((n) => {
                     const seat = seatMap[n];
-                    if (!seat) return <div key={`${row.row}-e${n}`} className="shrink-0" style={{ width: sz, height: sz }} />;
+                    if (!seat) {
+                      if (row.row === "C" && n === 2) {
+                        return (
+                          <span key={`${row.row}-inout`} data-testid="pintu-masuk-keluar" title="Pintu Masuk / Keluar"
+                            className="shrink-0 rounded bg-[#2563EB] text-white font-bold flex flex-col items-center justify-center text-center leading-tight"
+                            style={{ height: sz, width: sz * 2 + gap, fontSize: Math.max(7, fs - 2) }}>
+                            <span>IN/</span><span>OUT</span>
+                          </span>
+                        );
+                      }
+                      if (row.row === "C" && n === 1) return null;
+                      return <div key={`${row.row}-e${n}`} className="shrink-0" style={{ width: sz, height: sz }} />;
+                    }
                     const isSel = selected.includes(seat.label);
                     const st = isSel ? "selected" : seat.status;
                     const disLocked = seat.disability && !allowDisability;
@@ -120,13 +132,6 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
                       </button>
                     );
                   })}
-                  {row.row === "C" && (
-                    <span data-testid="pintu-masuk-keluar" title="Pintu Masuk / Keluar"
-                      className="shrink-0 ml-1.5 rounded bg-[#2563EB] text-white font-bold flex flex-col items-center justify-center text-center leading-tight"
-                      style={{ height: sz, paddingLeft: 4, paddingRight: 4, fontSize: Math.max(7, fs - 2) }}>
-                      <span>IN/</span><span>OUT</span>
-                    </span>
-                  )}
                   <span className="font-semibold text-[#7A6A5E] text-center shrink-0"
                     style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
                 </div>
