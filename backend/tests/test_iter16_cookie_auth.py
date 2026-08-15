@@ -7,7 +7,10 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://qris-payment-7.previ
 API = f"{BASE_URL}/api"
 
 
-def _login(username="admin1", password="admin123"):
+DEFAULT_TEST_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
+
+
+def _login(username="admin1", password=DEFAULT_TEST_PASSWORD):
     s = requests.Session()
     r = s.post(f"{API}/admin/login", json={"username": username, "password": password}, timeout=15)
     return s, r

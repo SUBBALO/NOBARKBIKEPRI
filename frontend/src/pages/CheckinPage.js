@@ -31,7 +31,7 @@ function Login({ onLogin }) {
     setLoading(true);
     try {
       const { data } = await api.post("/admin/login", { username, password });
-      setAdminSession(data.token, data.user);
+      setAdminSession(data.user);
       onLogin();
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Login gagal");

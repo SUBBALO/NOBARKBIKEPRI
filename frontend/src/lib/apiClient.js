@@ -14,7 +14,7 @@ export const getAdminUser = () => {
 };
 // Token disimpan di httpOnly cookie oleh backend (aman dari XSS). Di localStorage
 // hanya info user non-sensitif (nama/role) untuk gating tampilan.
-export const setAdminSession = (token, user) => {
+export const setAdminSession = (user) => {
   localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(user));
 };
 export const clearAdminSession = () => {

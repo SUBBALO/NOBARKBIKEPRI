@@ -62,7 +62,7 @@ function Login({ onLogin }) {
         setLoading(false);
         return;
       }
-      setAdminSession(data.token, data.user);
+      setAdminSession(data.user);
       onLogin();
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Login gagal");
