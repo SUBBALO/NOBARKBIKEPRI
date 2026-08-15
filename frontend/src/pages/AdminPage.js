@@ -14,7 +14,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown, Pencil,
+  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown, Pencil, ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -1190,6 +1190,295 @@ function VIPPanel() {
   );
 }
 
+function ManualPanel() {
+  const [sessionId, setSessionId] = useState(1);
+  const [mapData, setMapData] = useState(null);
+  const [loadingMap, setLoadingMap] = useState(true);
+  const [selected, setSelected] = useState([]);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState("");
+  const [paid, setPaid] = useState(false);
+  const [tgl, setTgl] = useState("");
+  const [tfAmount, setTfAmount] = useState("");
+  const [proof, setProof] = useState(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [list, setList] = useState([]);
+  const [edit, setEdit] = useState(null);
+  const pollRef = useRef(null);
+
+  const loadMap = useCallback(async (sid, showLoad) => {
+    if (showLoad) setLoadingMap(true);
+    try { const { data } = await adminApi.get(`/sessions/${sid}/seats`); setMapData(data); }
+    catch (e) { console.error("Gagal memuat peta kursi manual:", e); }
+    setLoadingMap(false);
+  }, []);
+  const loadList = useCallback(async () => {
+    try { const { data } = await adminApi.get("/admin/manual"); setList(data || []); }
+    catch (e) { console.error("Gagal memuat order manual:", e); }
+  }, []);
+
+  useEffect(() => {
+    setSelected([]);
+    loadMap(sessionId, true);
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => loadMap(sessionId, false), 8000);
+    return () => pollRef.current && clearInterval(pollRef.current);
+  }, [sessionId, loadMap]);
+  useEffect(() => { loadList(); }, [loadList]);
+
+  const couples = mapData?.couples || {};
+  const toggle = (seat) => {
+    setSelected((prev) => {
+      const partner = couples[seat];
+      if (prev.includes(seat)) return prev.filter((s) => s !== seat && s !== partner);
+      const add = partner ? [seat, partner] : [seat];
+      return [...new Set([...prev, ...add])];
+    });
+  };
+  const onProof = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) { setProof(null); return; }
+    const r = new FileReader();
+    r.onload = () => setProof(r.result);
+    r.readAsDataURL(f);
+  };
+
+  const submit = async () => {
+    if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
+    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    if (!amount || parseInt(amount, 10) <= 0) { toast.error("Isi nominal order"); return; }
+    if (paid && !tgl) { toast.error("Isi tanggal transfer"); return; }
+    setBusy(true);
+    try {
+      await adminApi.post("/admin/manual", {
+        name, phone, session_id: sessionId, seats: selected,
+        amount: parseInt(amount, 10),
+        paid, transfer_date: paid ? tgl : null,
+        transfer_amount: paid && tfAmount ? parseInt(tfAmount, 10) : null,
+        proof_image: proof || null, note,
+      });
+      toast.success("Order manual dibuat");
+      setName(""); setPhone(""); setAmount(""); setPaid(false); setTgl(""); setTfAmount(""); setProof(null); setNote(""); setSelected([]);
+      loadMap(sessionId, false); loadList();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal membuat order manual"); loadMap(sessionId, false); }
+    setBusy(false);
+  };
+
+  const saveEdit = async () => {
+    if (!edit) return;
+    if (edit.paid && !edit.transfer_date) { toast.error("Isi tanggal transfer"); return; }
+    setBusy(true);
+    try {
+      await adminApi.put(`/admin/manual/${edit.id}`, {
+        name: edit.name,
+        amount: parseInt(edit.order_amount || edit.total_amount || 0, 10),
+        paid: edit.paid,
+        transfer_date: edit.paid ? edit.transfer_date : null,
+        transfer_amount: edit.paid && edit.transfer_amount ? parseInt(edit.transfer_amount, 10) : null,
+      });
+      toast.success("Order manual diperbarui");
+      setEdit(null); loadList();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal simpan"); }
+    setBusy(false);
+  };
+  const removeOrder = async (o) => {
+    if (!window.confirm(`Hapus order manual "${o.name}" (${o.seats?.join(", ")})?`)) return;
+    try {
+      await adminApi.delete(`/admin/orders/${o.id}`);
+      toast.success("Order manual dihapus");
+      loadList(); loadMap(sessionId, false);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal hapus"); }
+  };
+
+  return (
+    <div className="no-print" data-testid="manual-panel">
+      <div className="rounded-2xl border border-[#B26A1E]/25 bg-gradient-to-br from-[#B26A1E]/[0.07] to-transparent p-4 mb-4">
+        <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2"><ClipboardList className="h-5 w-5 text-[#B26A1E]" /> Order Manual (Rombongan)</h2>
+        <p className="text-sm text-[#7A6A5E]">Buat pesanan manual: pilih kursi (bebas), input nominal & status bayar. Kalau sudah bayar, isi tanggal & nominal transfer — otomatis masuk laporan Bendahara.</p>
+      </div>
+
+      <div className="grid lg:grid-cols-[1fr_340px] gap-4">
+        <div className="rounded-2xl border border-border bg-white p-4">
+          <div className="flex flex-wrap gap-2 mb-3">
+            {SESSIONS_STATIC.map((s) => (
+              <button key={s.id} data-testid={`manual-session-${s.id}`} onClick={() => setSessionId(s.id)}
+                className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+                  sessionId === s.id ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50")}>
+                {s.name} · {s.time}
+              </button>
+            ))}
+          </div>
+          {mapData && (
+            <p className="text-sm mb-3" data-testid="manual-remaining">
+              Sisa <b className="text-[#255E33]">{mapData.capacity - mapData.booked}</b> kursi · {mapData.booked}/{mapData.capacity} terisi
+            </p>
+          )}
+          {loadingMap ? (
+            <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#B26A1E]" /></div>
+          ) : mapData ? (
+            <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} couples={couples} allowDisability />
+          ) : (
+            <p className="text-center text-sm text-[#7A6A5E] py-16">Gagal memuat peta kursi.</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-white p-4 h-fit lg:sticky lg:top-4 space-y-3">
+          <div>
+            <Label htmlFor="mname">Nama Pembeli <span className="text-[#EF4444]">*</span></Label>
+            <Input id="mname" data-testid="manual-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="mis. Rombongan Vihara A" className="mt-1.5" />
+          </div>
+          <div>
+            <Label htmlFor="mphone">No HP <span className="text-[#9CA3AF]">(opsional)</span></Label>
+            <Input id="mphone" data-testid="manual-phone" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))} placeholder="08xxx" className="mt-1.5" />
+          </div>
+          <div>
+            <Label htmlFor="mamount">Nominal Order (Rp) <span className="text-[#EF4444]">*</span></Label>
+            <Input id="mamount" data-testid="manual-amount" inputMode="numeric"
+              value={amount ? Number(amount).toLocaleString("id-ID") : ""}
+              onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="mis. 500.000" className="mt-1.5" />
+          </div>
+          <div className="rounded-lg bg-muted/40 p-2.5">
+            <p className="text-xs text-[#7A6A5E]">Kursi dipilih ({selected.length}):</p>
+            <p className="text-sm font-semibold text-[#7A241F] break-words" data-testid="manual-selected">{selected.length ? selected.join(", ") : "— belum ada —"}</p>
+          </div>
+          <div>
+            <Label className="mb-1.5 block">Status Pembayaran</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" data-testid="manual-status-unpaid" onClick={() => setPaid(false)}
+                className={cn("rounded-lg border px-3 py-2 text-sm font-medium transition-colors", !paid ? "border-[#EF4444] bg-[#EF4444]/10 text-[#B91C1C]" : "border-border bg-white text-[#7A6A5E]")}>
+                Belum Bayar
+              </button>
+              <button type="button" data-testid="manual-status-paid" onClick={() => setPaid(true)}
+                className={cn("rounded-lg border px-3 py-2 text-sm font-medium transition-colors", paid ? "border-[#2F703E] bg-[#2F703E]/10 text-[#255E33]" : "border-border bg-white text-[#7A6A5E]")}>
+                Sudah Bayar
+              </button>
+            </div>
+          </div>
+          {paid && (
+            <div className="space-y-3 rounded-lg bg-[#2F703E]/5 border border-[#2F703E]/20 p-3">
+              <div>
+                <Label htmlFor="mtgl">Tanggal Transfer <span className="text-[#EF4444]">*</span></Label>
+                <Input id="mtgl" type="date" data-testid="manual-transfer-date" value={tgl} onChange={(e) => setTgl(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="mtf">Nominal Transfer (Rp)</Label>
+                <Input id="mtf" data-testid="manual-transfer-amount" inputMode="numeric"
+                  value={tfAmount ? Number(tfAmount).toLocaleString("id-ID") : ""}
+                  onChange={(e) => setTfAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="kosong = pakai nominal order" className="mt-1.5" />
+              </div>
+              <div>
+                <Label className="block mb-1.5">Foto Bukti Transfer <span className="text-[#9CA3AF]">(opsional)</span></Label>
+                <input type="file" accept="image/*" onChange={onProof} data-testid="manual-proof" className="text-xs" />
+                {proof && <p className="text-[11px] text-[#255E33] mt-1">Foto siap diunggah ✓</p>}
+              </div>
+            </div>
+          )}
+          <Button onClick={submit} disabled={busy || selected.length === 0 || !name.trim()} data-testid="manual-submit"
+            className="w-full h-12 bg-[#B26A1E] hover:bg-[#8A3A12] text-base">
+            {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <ClipboardList className="h-5 w-5 mr-1.5" />} Buat Order Manual
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-white overflow-hidden mt-5" data-testid="manual-list">
+        <div className="px-4 py-3 bg-[#B26A1E]/10 flex items-center justify-between">
+          <h3 className="font-serif-display text-xl text-[#7A241F]">Daftar Order Manual</h3>
+          <span className="text-sm font-semibold text-[#7A6A5E]">{list.length} order</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-[#7A6A5E] text-xs">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Nama</th>
+                <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
+                <th className="px-3 py-2 text-left font-medium">Status</th>
+                <th className="px-3 py-2 text-left font-medium">Tgl Transfer</th>
+                <th className="px-3 py-2 text-right font-medium">Nominal</th>
+                <th className="px-3 py-2 text-right font-medium">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-[#7A6A5E]">Belum ada order manual.</td></tr>
+              ) : list.map((o) => (
+                <tr key={o.id} className="border-t border-border" data-testid={`manual-row-${o.order_no}`}>
+                  <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
+                  <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name} · {o.seats?.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.qty} tkt)</span></td>
+                  <td className="px-3 py-2">
+                    <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", o.paid ? "bg-[#2F703E]/15 text-[#255E33]" : "bg-[#EF4444]/15 text-[#B91C1C]")}>
+                      {o.paid ? "Sudah Bayar" : "Belum Bayar"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-[#5B4636]">{o.transfer_date || "-"}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => setEdit({ ...o })} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
+                    <button onClick={() => removeOrder(o)} data-testid={`manual-del-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 text-xs font-medium"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <Dialog open={!!edit} onOpenChange={() => !busy && setEdit(null)}>
+        <DialogContent data-testid="manual-edit-dialog" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Edit Order Manual</DialogTitle>
+          </DialogHeader>
+          {edit && (
+            <div className="space-y-3">
+              <div>
+                <Label>Nama Pembeli</Label>
+                <Input data-testid="manual-edit-name" value={edit.name || ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })} className="mt-1.5" />
+              </div>
+              <div>
+                <Label>Nominal Order (Rp)</Label>
+                <Input data-testid="manual-edit-amount" inputMode="numeric"
+                  value={edit.order_amount ? Number(edit.order_amount).toLocaleString("id-ID") : (edit.total_amount ? Number(edit.total_amount).toLocaleString("id-ID") : "")}
+                  onChange={(e) => setEdit({ ...edit, order_amount: e.target.value.replace(/[^0-9]/g, "") })} className="mt-1.5" />
+              </div>
+              <div>
+                <Label className="mb-1.5 block">Status</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" data-testid="manual-edit-unpaid" onClick={() => setEdit({ ...edit, paid: false })}
+                    className={cn("rounded-lg border px-3 py-2 text-sm font-medium", !edit.paid ? "border-[#EF4444] bg-[#EF4444]/10 text-[#B91C1C]" : "border-border bg-white text-[#7A6A5E]")}>Belum Bayar</button>
+                  <button type="button" data-testid="manual-edit-paid" onClick={() => setEdit({ ...edit, paid: true })}
+                    className={cn("rounded-lg border px-3 py-2 text-sm font-medium", edit.paid ? "border-[#2F703E] bg-[#2F703E]/10 text-[#255E33]" : "border-border bg-white text-[#7A6A5E]")}>Sudah Bayar</button>
+                </div>
+              </div>
+              {edit.paid && (
+                <div className="space-y-3 rounded-lg bg-[#2F703E]/5 border border-[#2F703E]/20 p-3">
+                  <div>
+                    <Label>Tanggal Transfer</Label>
+                    <Input type="date" data-testid="manual-edit-date" value={edit.transfer_date || ""} onChange={(e) => setEdit({ ...edit, transfer_date: e.target.value })} className="mt-1.5" />
+                  </div>
+                  <div>
+                    <Label>Nominal Transfer (Rp)</Label>
+                    <Input data-testid="manual-edit-tf" inputMode="numeric"
+                      value={edit.transfer_amount ? Number(edit.transfer_amount).toLocaleString("id-ID") : ""}
+                      onChange={(e) => setEdit({ ...edit, transfer_amount: e.target.value.replace(/[^0-9]/g, "") })} placeholder="kosong = pakai nominal order" className="mt-1.5" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setEdit(null)} disabled={busy} className="flex-1">Batal</Button>
+            <Button onClick={saveEdit} disabled={busy} className="flex-1 bg-[#B26A1E] hover:bg-[#8A3A12]" data-testid="manual-edit-save">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
 function MasterlistPanel() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1217,19 +1506,27 @@ function MasterlistPanel() {
   }, []);
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#7A241F]" /></div>;
   const match = (o) => !q || o.name?.toLowerCase().includes(q.toLowerCase()) || String(o.order_no).includes(q) || (o.phone || "").includes(q);
-  const umum = orders.filter((o) => o.channel !== "vip" && match(o));
+  const umum = orders.filter((o) => o.channel !== "vip" && o.channel !== "manual" && match(o));
   const vip = orders.filter((o) => o.channel === "vip" && match(o));
-  const Table = ({ title, rows, vipMode }) => (
-    <div className="rounded-2xl border border-border bg-white overflow-hidden" data-testid={vipMode ? "masterlist-vip" : "masterlist-umum"}>
-      <div className={cn("px-4 py-3 flex items-center justify-between gap-3", vipMode ? "bg-[#7A241F]/10" : "bg-[#2F703E]/10")}>
-        <h3 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2">{vipMode ? <Crown className="h-4 w-4 text-[#B26A1E]" /> : <Users className="h-4 w-4 text-[#2F703E]" />} {title}</h3>
+  const manual = orders.filter((o) => o.channel === "manual" && match(o));
+  const Table = ({ title, rows, kind }) => {
+    const isVip = kind === "vip";
+    const isManual = kind === "manual";
+    const headBg = isVip ? "bg-[#7A241F]/10" : isManual ? "bg-[#B26A1E]/10" : "bg-[#2F703E]/10";
+    const btnBg = isVip ? "bg-[#7A241F] hover:bg-[#5E1B17]" : isManual ? "bg-[#B26A1E] hover:bg-[#8A3A12]" : "bg-[#2F703E] hover:bg-[#255E33]";
+    const Icon = isVip ? Crown : isManual ? ClipboardList : Users;
+    const iconColor = isVip ? "text-[#B26A1E]" : isManual ? "text-[#B26A1E]" : "text-[#2F703E]";
+    const nCols = isVip ? 3 : 5;
+    return (
+    <div className="rounded-2xl border border-border bg-white overflow-hidden" data-testid={`masterlist-${kind}`}>
+      <div className={cn("px-4 py-3 flex items-center justify-between gap-3", headBg)}>
+        <h3 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2"><Icon className={cn("h-4 w-4", iconColor)} /> {title}</h3>
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-[#7A6A5E] whitespace-nowrap">{rows.length} pembeli</span>
-          <button onClick={() => exportTable(vipMode ? "vip" : "umum")} disabled={exportingType !== null}
-            data-testid={vipMode ? "masterlist-export-vip" : "masterlist-export-umum"}
-            className={cn("inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-60",
-              vipMode ? "bg-[#7A241F] hover:bg-[#5E1B17]" : "bg-[#2F703E] hover:bg-[#255E33]")}>
-            {exportingType === (vipMode ? "vip" : "umum") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Export Excel
+          <button onClick={() => exportTable(kind)} disabled={exportingType !== null}
+            data-testid={`masterlist-export-${kind}`}
+            className={cn("inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-60", btnBg)}>
+            {exportingType === kind ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Export Excel
           </button>
         </div>
       </div>
@@ -1240,27 +1537,30 @@ function MasterlistPanel() {
               <th className="px-3 py-2 text-left font-medium">Nama</th>
               <th className="px-3 py-2 text-left font-medium">No HP</th>
               <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
-              {!vipMode && <th className="px-3 py-2 text-left font-medium">Kanal</th>}
-              {!vipMode && <th className="px-3 py-2 text-right font-medium">Nominal</th>}
+              {isManual && <th className="px-3 py-2 text-left font-medium">Tgl Transfer</th>}
+              {!isVip && !isManual && <th className="px-3 py-2 text-left font-medium">Kanal</th>}
+              {!isVip && <th className="px-3 py-2 text-right font-medium">Nominal</th>}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={vipMode ? 3 : 5} className="px-3 py-8 text-center text-[#7A6A5E]">Belum ada.</td></tr>
+              <tr><td colSpan={nCols} className="px-3 py-8 text-center text-[#7A6A5E]">Belum ada.</td></tr>
             ) : rows.map((o, i) => (
               <tr key={o.order_no ?? i} className="border-t border-border">
                 <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
                 <td className="px-3 py-2 text-[#5B4636]">{o.phone || "-"}</td>
                 <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{o.session_name} · {o.seats.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.tickets} tkt)</span></td>
-                {!vipMode && <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[#7A241F]/10 text-[#7A241F]">{o.channel === "panitia" ? "Panitia" : "Umum"}</span></td>}
-                {!vipMode && <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.amount)}</td>}
+                {isManual && <td className="px-3 py-2 text-[#5B4636]">{o.transfer_date || "-"}</td>}
+                {!isVip && !isManual && <td className="px-3 py-2"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-[#7A241F]/10 text-[#7A241F]">{o.channel === "panitia" ? "Panitia" : "Umum"}</span></td>}
+                {!isVip && <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.amount)}</td>}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
-  );
+    );
+  };
   return (
     <div className="no-print space-y-5" data-testid="masterlist-panel">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1274,8 +1574,9 @@ function MasterlistPanel() {
             data-testid="masterlist-search" className="w-full text-sm border border-border rounded-lg pl-8 pr-2 py-2 bg-white" />
         </div>
       </div>
-      <Table title="Tamu VIP" rows={vip} vipMode={true} />
-      <Table title="Pembeli Umum" rows={umum} vipMode={false} />
+      <Table title="Tamu VIP" rows={vip} kind="vip" />
+      <Table title="Order Manual" rows={manual} kind="manual" />
+      <Table title="Pembeli Umum" rows={umum} kind="umum" />
     </div>
   );
 }
@@ -1610,6 +1911,11 @@ export default function AdminPage() {
             tab === "vip" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/60")}>
           <Crown className="h-4 w-4" /> Tiket VIP
         </button>
+        <button data-testid="admin-tab-manual" onClick={() => setTab("manual")}
+          className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+            tab === "manual" ? "bg-[#B26A1E] text-white border-[#B26A1E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/60")}>
+          <ClipboardList className="h-4 w-4" /> Order Manual
+        </button>
         <button data-testid="admin-tab-sessions" onClick={() => setTab("sessions")}
           className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
             tab === "sessions" ? "bg-[#2F703E] text-white border-[#2F703E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#2F703E]/50")}>
@@ -1759,7 +2065,7 @@ export default function AdminPage() {
                         <span className="text-[#8A3A12]">Dijual: <b>{o.sold_by}</b>{o.payment_method === "cash" ? " (Cash)" : ""}</span>
                       )}
                       {o.verified_by && o.status === "verified" && (
-                        <span className="text-[#255E33]">Diverifikasi: <b>{o.verified_by}</b></span>
+                        <span className="text-[#255E33]">Diverifikasi: <b>{o.verified_by}</b>{o.updated_at ? ` · ${fmtTime(o.updated_at)}` : ""}</span>
                       )}
                     </div>
                   ) : null}
@@ -1772,7 +2078,7 @@ export default function AdminPage() {
                       <button onClick={() => o.has_proof && openProof(o)}
                         className="inline-flex flex-col items-start text-[#255E33] text-xs font-medium">
                         <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Payment OK</span>
-                        {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}</span>}
+                        {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}{o.updated_at ? ` · ${fmtTime(o.updated_at)}` : ""}</span>}
                       </button>
                     ) : (o.status === "pending_payment" || o.status === "expired") ? (
                       <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
@@ -1865,7 +2171,7 @@ export default function AdminPage() {
                           <button onClick={() => o.has_proof && openProof(o)} data-testid={`verify-done-${o.id.slice(0, 8)}`}
                             className="inline-flex flex-col items-center text-[#255E33] text-xs font-medium">
                             <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Payment OK</span>
-                            {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}</span>}
+                            {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}{o.updated_at ? ` · ${fmtTime(o.updated_at)}` : ""}</span>}
                           </button>
                         ) : o.status === "pending_payment" ? (
                           <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
@@ -1925,6 +2231,7 @@ export default function AdminPage() {
       {tab === "bendahara" && <BendaharaPanel />}
 
       {tab === "vip" && <VIPPanel />}
+      {tab === "manual" && <ManualPanel />}
 
       {tab === "sessions" && event && (
         <div className="rounded-2xl border border-border bg-white p-5 no-print" data-testid="session-control-card">

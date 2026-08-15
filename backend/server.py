@@ -166,6 +166,29 @@ class VIPCreate(BaseModel):
     note: Optional[str] = ""
 
 
+class ManualCreate(BaseModel):
+    name: str
+    phone: Optional[str] = ""
+    session_id: int
+    seats: List[str]
+    amount: int = 0
+    paid: bool = False
+    transfer_date: Optional[str] = None
+    transfer_amount: Optional[int] = None
+    proof_image: Optional[str] = None
+    note: Optional[str] = ""
+
+
+class ManualUpdate(BaseModel):
+    name: Optional[str] = None
+    amount: Optional[int] = None
+    paid: Optional[bool] = None
+    transfer_date: Optional[str] = None
+    transfer_amount: Optional[int] = None
+    proof_image: Optional[str] = None
+    note: Optional[str] = None
+
+
 class SetActiveSession(BaseModel):
     session_id: int
 
@@ -821,8 +844,11 @@ async def _collect_recap_orders(date_from: str = None, date_to: str = None):
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
         is_walkin = bool(o.get("walkin"))
         is_vip = bool(o.get("vip"))
+        is_manual = bool(o.get("manual"))
         if is_vip:
             channel, channel_label, seller, location = "vip", "VIP (Undangan)", "VIP (Undangan)", "VIP"
+        elif is_manual:
+            channel, channel_label, seller, location = "manual", "Order Manual", (o.get("created_by") or "-"), "Manual"
         elif is_walkin:
             channel, channel_label, seller = "panitia", "Panitia (Lokasi)", (o.get("sold_by") or "-")
             location = o.get("location") or "(tanpa lokasi)"
@@ -841,6 +867,7 @@ async def _collect_recap_orders(date_from: str = None, date_to: str = None):
             "method": o.get("payment_method"),
             "tickets": o.get("qty", 0) or 0,
             "amount": o.get("total_amount", 0) or 0,
+            "transfer_date": o.get("transfer_date"),
             "seats": o.get("seats", []),
             "session_id": o["session_id"],
             "session_name": session["name"] if session else str(o["session_id"]),
@@ -975,24 +1002,29 @@ async def export_bendahara(_: bool = Depends(require_staff),
 
 @api_router.get("/admin/masterlist/export")
 async def export_masterlist(_: bool = Depends(require_staff), type: str = Query("umum")):
-    """Export Masterlist pembelian per tabel: type=umum (online+panitia) atau type=vip."""
+    """Export Masterlist per tabel: type=umum (online+panitia), vip, atau manual."""
     kind = (type or "umum").lower()
-    if kind not in ("umum", "vip"):
-        raise HTTPException(status_code=400, detail="type harus 'umum' atau 'vip'")
+    if kind not in ("umum", "vip", "manual"):
+        raise HTTPException(status_code=400, detail="type harus 'umum', 'vip', atau 'manual'")
     rows = await _collect_recap_orders()
     if kind == "vip":
         rows = [r for r in rows if r["channel"] == "vip"]
+    elif kind == "manual":
+        rows = [r for r in rows if r["channel"] == "manual"]
     else:
-        rows = [r for r in rows if r["channel"] != "vip"]
+        rows = [r for r in rows if r["channel"] not in ("vip", "manual")]
     rows.sort(key=lambda r: (r["session_id"], r["name"] or ""))
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Tamu VIP" if kind == "vip" else "Pembeli Umum"
-    header_fill = PatternFill("solid", fgColor="7A241F" if kind == "vip" else "255E33")
+    ws.title = {"vip": "Tamu VIP", "manual": "Order Manual"}.get(kind, "Pembeli Umum")
+    header_fill = PatternFill("solid", fgColor={"vip": "7A241F", "manual": "B26A1E"}.get(kind, "255E33"))
     if kind == "vip":
         ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket"])
         widths = [5, 24, 16, 10, 12, 18, 9]
+    elif kind == "manual":
+        ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket", "Tgl Transfer", "Nominal (Rp)"])
+        widths = [5, 24, 16, 10, 12, 18, 9, 14, 15]
     else:
         ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket", "Kanal", "Nominal (Rp)"])
         widths = [5, 24, 16, 10, 12, 18, 9, 16, 15]
@@ -1004,6 +1036,9 @@ async def export_masterlist(_: bool = Depends(require_staff), type: str = Query(
         if kind == "vip":
             ws.append([i, r["name"], r["phone"], r["order_no"], r["session_name"],
                        ", ".join(r["seats"]), r["tickets"]])
+        elif kind == "manual":
+            ws.append([i, r["name"], r["phone"], r["order_no"], r["session_name"],
+                       ", ".join(r["seats"]), r["tickets"], r.get("transfer_date") or "-", r["amount"]])
         else:
             ws.append([i, r["name"], r["phone"], r["order_no"], r["session_name"],
                        ", ".join(r["seats"]), r["tickets"], r["channel_label"], r["amount"]])
@@ -1018,8 +1053,7 @@ async def export_masterlist(_: bool = Depends(require_staff), type: str = Query(
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    label = "vip" if kind == "vip" else "umum"
-    fname = f"masterlist-{label}-{datetime.now().strftime('%Y%m%d-%H%M')}.xlsx"
+    fname = f"masterlist-{kind}-{datetime.now().strftime('%Y%m%d-%H%M')}.xlsx"
     return StreamingResponse(
         buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={fname}"},
@@ -1313,6 +1347,108 @@ async def vip_order(payload: VIPCreate, user: dict = Depends(require_staff)):
     return clean(dict(order))
 
 
+def _manual_counted(paid, amount, transfer_amount):
+    return ((transfer_amount if (paid and transfer_amount) else amount) or 0)
+
+
+@api_router.get("/admin/manual")
+async def list_manual(user: dict = Depends(require_staff)):
+    docs = await db.orders.find({"manual": True, "deleted": {"$ne": True}}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
+    return [clean(d) for d in docs]
+
+
+@api_router.post("/admin/manual")
+async def manual_order(payload: ManualCreate, user: dict = Depends(require_staff)):
+    """Order manual (rombongan) — pilih kursi, input nominal, status bayar. Transfer/edit belakangan."""
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Isi nama pembeli")
+    if payload.session_id not in [s["id"] for s in SESSIONS]:
+        raise HTTPException(status_code=400, detail="Sesi tidak valid")
+    seats = list(dict.fromkeys(payload.seats))
+    if not seats:
+        raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
+    for seat in seats:
+        if seat not in ALL_SEAT_LABELS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
+        if seat in RESERVED_SEATS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} khusus operator, tidak bisa dipilih")
+
+    await taken_seats(payload.session_id)
+    order_id = str(uuid.uuid4())
+    claimed = []
+    for seat in seats:
+        try:
+            await db.seat_locks.insert_one({
+                "_id": f"{payload.session_id}:{seat}", "session_id": payload.session_id,
+                "seat": seat, "order_id": order_id, "expires_at": None,
+            })
+            claimed.append(seat)
+        except DuplicateKeyError:
+            if claimed:
+                await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
+            raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah terisi. Pilih kursi lain.")
+
+    actor = user.get("name") or user.get("username")
+    paid = bool(payload.paid)
+    counted = _manual_counted(paid, payload.amount, payload.transfer_amount)
+    order = {
+        "id": order_id, "order_no": await gen_order_no(),
+        "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
+        "session_id": payload.session_id, "seats": claimed, "qty": len(claimed),
+        "order_amount": payload.amount or 0,
+        "base_amount": counted, "unique_code": 0, "total_amount": counted,
+        "payment_method": "transfer",
+        "status": "verified" if paid else "manual_unpaid",
+        "paid": paid,
+        "transfer_date": payload.transfer_date or None,
+        "transfer_amount": payload.transfer_amount or None,
+        "proof_image": payload.proof_image or None, "checked_in": False,
+        "verified_by": actor if paid else None,
+        "manual": True, "sold_by": actor, "created_by": actor,
+        "note": (payload.note or "").strip(),
+        "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.orders.insert_one(order)
+    await log_activity(user, "manual",
+                       f"Order manual {len(claimed)} kursi #{order['order_no']} — {order['name']} ({'SUDAH BAYAR' if paid else 'BELUM BAYAR'}), kursi {', '.join(claimed)}",
+                       order_id)
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.put("/admin/manual/{order_id}")
+async def update_manual(order_id: str, payload: ManualUpdate, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id, "manual": True})
+    if not o:
+        raise HTTPException(status_code=404, detail="Order manual tidak ditemukan")
+    name = payload.name.strip() if payload.name is not None else o.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="Nama tidak boleh kosong")
+    amount = payload.amount if payload.amount is not None else o.get("order_amount", o.get("total_amount", 0))
+    paid = bool(payload.paid) if payload.paid is not None else bool(o.get("paid"))
+    transfer_date = payload.transfer_date if payload.transfer_date is not None else o.get("transfer_date")
+    transfer_amount = payload.transfer_amount if payload.transfer_amount is not None else o.get("transfer_amount")
+    counted = _manual_counted(paid, amount, transfer_amount)
+    updates = {
+        "name": name, "order_amount": amount or 0,
+        "paid": paid, "transfer_date": transfer_date or None,
+        "transfer_amount": transfer_amount or None,
+        "total_amount": counted, "base_amount": counted,
+        "status": "verified" if paid else "manual_unpaid",
+        "verified_by": (o.get("verified_by") or (user.get("name") or user.get("username"))) if paid else None,
+        "updated_at": now_iso(),
+    }
+    if payload.note is not None:
+        updates["note"] = payload.note.strip()
+    if payload.proof_image is not None:
+        updates["proof_image"] = payload.proof_image or None
+    await db.orders.update_one({"id": order_id}, {"$set": updates})
+    await log_activity(user, "manual",
+                       f"Ubah order manual #{o.get('order_no')} — {name} ({'SUDAH BAYAR' if paid else 'BELUM BAYAR'})",
+                       order_id)
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
+
 @api_router.post("/admin/sessions/toggle")
 async def toggle_session_open(payload: SessionToggle, user: dict = Depends(require_roles("superadmin"))):
     if payload.session_id not in [s["id"] for s in SESSIONS]:
@@ -1346,9 +1482,17 @@ async def list_participants(user: dict = Depends(require_any)):
     result = []
     for o in docs:
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+        if o.get("vip"):
+            ch = "vip"
+        elif o.get("manual"):
+            ch = "manual"
+        elif o.get("walkin"):
+            ch = "panitia"
+        else:
+            ch = "umum"
         result.append({
             "id": o["id"], "order_no": o.get("order_no"), "name": o["name"], "phone": o["phone"],
-            "session": session, "seats": o["seats"], "qty": o["qty"],
+            "session": session, "seats": o["seats"], "qty": o["qty"], "channel": ch,
             "checked_in": o.get("checked_in", False), "checked_in_at": o.get("checked_in_at"),
             "checked_in_by": o.get("checked_in_by"),
         })
@@ -1609,6 +1753,7 @@ ACTION_LABEL_ID = {
     "bulk_verify": "Verifikasi Massal",
     "bulk_reject": "Tolak Massal",
     "checkin": "Check-in",
+    "manual": "Order Manual",
     "login": "Login",
     "logout": "Logout",
     "user_create": "Buat User",

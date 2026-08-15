@@ -160,6 +160,8 @@ export default function CheckinPage() {
                         #{o.order_no}
                       </span>
                     ) : null}
+                    {o.channel === "vip" && <span className="shrink-0 text-[10px] font-bold text-[#B26A1E] bg-[#B26A1E]/15 px-2 py-0.5 rounded-md">VIP</span>}
+                    {o.channel === "manual" && <span className="shrink-0 text-[10px] font-bold text-[#8A3A12] bg-[#B26A1E]/10 px-2 py-0.5 rounded-md">MANUAL</span>}
                   </div>
                   <p className="text-xs text-[#7A6A5E]">{o.phone}</p>
                   <p className="text-xs text-[#7A6A5E] mt-0.5">{o.session?.name} · {o.session?.time} · {o.qty} tiket</p>
