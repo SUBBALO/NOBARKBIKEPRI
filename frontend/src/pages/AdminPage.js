@@ -14,7 +14,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown,
+  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -544,6 +544,22 @@ function UsersPanel({ currentUser }) {
     setBusy(false);
   };
 
+  const [editTarget, setEditTarget] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editRole, setEditRole] = useState("checkin");
+  const openEdit = (u) => { setEditTarget(u); setEditName(u.name || ""); setEditRole(u.role); };
+  const doEdit = async () => {
+    if (editName.trim().length < 2) { toast.error("Nama minimal 2 karakter"); return; }
+    setBusy(true);
+    try {
+      const { data } = await adminApi.put(`/admin/users/${editTarget.id}`, { name: editName.trim(), role: editRole });
+      setUsers((prev) => prev.map((x) => x.id === editTarget.id ? { ...x, ...data } : x));
+      toast.success(`User "${editTarget.username}" diperbarui`);
+      setEditTarget(null);
+    } catch (err) { toast.error(err?.response?.data?.detail || "Gagal memperbarui user"); }
+    setBusy(false);
+  };
+
   return (
     <div className="grid lg:grid-cols-2 gap-6 no-print">
       {/* Create form */}
@@ -603,6 +619,10 @@ function UsersPanel({ currentUser }) {
                       <span className={cn("inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium", rb.c)}>{rb.t}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => openEdit(u)} data-testid={`user-edit-${u.username}`}
+                        title="Edit nama & peran" className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium">
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
                       <button onClick={() => { setPwTarget(u); setNewPw(""); setShowPw(false); }} data-testid={`user-resetpw-${u.username}`}
                         title="Reset password" className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#B26A1E] hover:bg-[#B26A1E]/10 text-xs font-medium">
                         <KeyRound className="h-3.5 w-3.5" /> Reset PW
@@ -682,10 +702,65 @@ function UsersPanel({ currentUser }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editTarget} onOpenChange={() => !busy && setEditTarget(null)}>
+        <DialogContent data-testid="user-edit-dialog" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#2F703E]/15 flex items-center justify-center mb-2"><Pencil className="h-5 w-5 text-[#2F703E]" /></div>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Edit User</DialogTitle>
+          </DialogHeader>
+          {editTarget && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editname">Nama Lengkap</Label>
+                <Input id="editname" data-testid="user-edit-name" value={editName}
+                  onChange={(e) => setEditName(e.target.value)} placeholder="Nama user" className="mt-1.5" />
+                <p className="text-[11px] text-[#7A6A5E] mt-1">Username <b>@{editTarget.username}</b> tidak bisa diubah.</p>
+              </div>
+              <div>
+                <Label className="mb-1.5 block">Peran / Akses</Label>
+                <div className="space-y-2">
+                  {[
+                    { v: "checkin", t: "Petugas Check-in", d: "Hanya halaman check-in" },
+                    { v: "admin", t: "Admin", d: "Verifikasi + hapus + check-in + jual" },
+                    { v: "superadmin", t: "Super Admin", d: "Semua akses + kelola user" },
+                  ].map((opt) => {
+                    const active = editRole === opt.v;
+                    const selfDemote = editTarget.id === currentUser?.id && opt.v !== "superadmin";
+                    return (
+                      <button key={opt.v} type="button" disabled={selfDemote}
+                        onClick={() => setEditRole(opt.v)} data-testid={`user-edit-role-${opt.v}`}
+                        className={cn("w-full text-left flex items-start gap-2.5 rounded-xl border px-3 py-2.5 transition-colors disabled:opacity-40",
+                          active ? "border-[#2F703E] bg-[#2F703E]/[0.06]" : "border-border bg-white hover:border-[#2F703E]/40")}>
+                        <span className={cn("mt-0.5 h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0",
+                          active ? "border-[#2F703E]" : "border-[#9CA3AF]")}>
+                          {active && <span className="h-2 w-2 rounded-full bg-[#2F703E]" />}
+                        </span>
+                        <span>
+                          <span className="block text-sm font-semibold text-[#2C1E16]">{opt.t}</span>
+                          <span className="block text-[11px] text-[#7A6A5E]">{opt.d}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {editTarget.id === currentUser?.id && (
+                  <p className="text-[11px] text-[#B26A1E] mt-1.5">Anda tidak bisa menurunkan peran akun sendiri.</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setEditTarget(null)} disabled={busy} className="flex-1" data-testid="user-edit-cancel">Batal</Button>
+            <Button onClick={doEdit} disabled={busy || editName.trim().length < 2} className="flex-1 bg-[#2F703E] hover:bg-[#255E33]" data-testid="user-edit-confirm">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Pencil className="h-4 w-4 mr-1.5" />} Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
 
 function BendaharaPanel() {
   const [resp, setResp] = useState(null);
@@ -1116,6 +1191,20 @@ function MasterlistPanel() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [exportingType, setExportingType] = useState(null);
+  const exportTable = async (type) => {
+    setExportingType(type);
+    try {
+      const res = await adminApi.get(`/admin/masterlist/export?type=${type}`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = `masterlist-${type}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("File Excel berhasil diunduh");
+    } catch (e) { console.error("masterlist export:", e); toast.error("Gagal export Excel"); }
+    setExportingType(null);
+  };
   useEffect(() => {
     (async () => {
       try { const { data } = await adminApi.get("/admin/bendahara"); setOrders(data.orders || []); }
@@ -1129,9 +1218,17 @@ function MasterlistPanel() {
   const vip = orders.filter((o) => o.channel === "vip" && match(o));
   const Table = ({ title, rows, vipMode }) => (
     <div className="rounded-2xl border border-border bg-white overflow-hidden" data-testid={vipMode ? "masterlist-vip" : "masterlist-umum"}>
-      <div className={cn("px-4 py-3 flex items-center justify-between", vipMode ? "bg-[#7A241F]/10" : "bg-[#2F703E]/10")}>
+      <div className={cn("px-4 py-3 flex items-center justify-between gap-3", vipMode ? "bg-[#7A241F]/10" : "bg-[#2F703E]/10")}>
         <h3 className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2">{vipMode ? <Crown className="h-4 w-4 text-[#B26A1E]" /> : <Users className="h-4 w-4 text-[#2F703E]" />} {title}</h3>
-        <span className="text-sm font-semibold text-[#7A6A5E]">{rows.length} pembeli</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-[#7A6A5E] whitespace-nowrap">{rows.length} pembeli</span>
+          <button onClick={() => exportTable(vipMode ? "vip" : "umum")} disabled={exportingType !== null}
+            data-testid={vipMode ? "masterlist-export-vip" : "masterlist-export-umum"}
+            className={cn("inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-white transition-colors disabled:opacity-60",
+              vipMode ? "bg-[#7A241F] hover:bg-[#5E1B17]" : "bg-[#2F703E] hover:bg-[#255E33]")}>
+            {exportingType === (vipMode ? "vip" : "umum") ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Export Excel
+          </button>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -1208,7 +1305,6 @@ export default function AdminPage() {
   const [tab, setTab] = useState("payment");
   const [checkinQuery, setCheckinQuery] = useState("");
   const [checkinPopup, setCheckinPopup] = useState(null);
-  const [exporting, setExporting] = useState(false);
   const [sessionFilter, setSessionFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
@@ -1366,25 +1462,6 @@ export default function AdminPage() {
     setBusyId(null);
   };
 
-  const exportExcel = async () => {
-    setExporting(true);
-    try {
-      const res = await adminApi.get("/admin/export", { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `peserta_nonton_mbi.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("File Excel berhasil diunduh");
-    } catch (err) {
-      toast.error("Gagal mengunduh Excel");
-    }
-    setExporting(false);
-  };
-
   const doPrint = (o) => {
     setPrintOrder(o);
     setTimeout(() => window.print(), 250);
@@ -1451,9 +1528,6 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={exportExcel} disabled={exporting} data-testid="btn-export">
-            {exporting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Download className="h-4 w-4 mr-1.5" />} Export Excel
-          </Button>
           <Button variant="outline" size="sm" onClick={load} data-testid="btn-refresh"><RefreshCw className="h-4 w-4 mr-1.5" /> Muat Ulang</Button>
           <Button variant="ghost" size="sm" onClick={logout} data-testid="btn-logout" className="text-[#EF4444]"><LogOut className="h-4 w-4 mr-1.5" /> Keluar</Button>
         </div>

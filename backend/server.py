@@ -145,6 +145,12 @@ class UserPermission(BaseModel):
     can_delete: bool
 
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[Literal["superadmin", "admin", "checkin"]] = None
+    can_delete: Optional[bool] = None
+
+
 class PasswordReset(BaseModel):
     new_password: str
 
@@ -959,6 +965,59 @@ async def export_bendahara(_: bool = Depends(require_staff),
     )
 
 
+@api_router.get("/admin/masterlist/export")
+async def export_masterlist(_: bool = Depends(require_staff), type: str = Query("umum")):
+    """Export Masterlist pembelian per tabel: type=umum (online+panitia) atau type=vip."""
+    kind = (type or "umum").lower()
+    if kind not in ("umum", "vip"):
+        raise HTTPException(status_code=400, detail="type harus 'umum' atau 'vip'")
+    rows = await _collect_recap_orders()
+    if kind == "vip":
+        rows = [r for r in rows if r["channel"] == "vip"]
+    else:
+        rows = [r for r in rows if r["channel"] != "vip"]
+    rows.sort(key=lambda r: (r["session_id"], r["name"] or ""))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Tamu VIP" if kind == "vip" else "Pembeli Umum"
+    header_fill = PatternFill("solid", fgColor="7A241F" if kind == "vip" else "255E33")
+    if kind == "vip":
+        ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket"])
+        widths = [5, 24, 16, 10, 12, 18, 9]
+    else:
+        ws.append(["No", "Nama", "No HP", "No. Order", "Sesi", "Kursi", "Jml Tiket", "Kanal", "Nominal (Rp)"])
+        widths = [5, 24, 16, 10, 12, 18, 9, 16, 15]
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    for i, r in enumerate(rows, 1):
+        if kind == "vip":
+            ws.append([i, r["name"], r["phone"], r["order_no"], r["session_name"],
+                       ", ".join(r["seats"]), r["tickets"]])
+        else:
+            ws.append([i, r["name"], r["phone"], r["order_no"], r["session_name"],
+                       ", ".join(r["seats"]), r["tickets"], r["channel_label"], r["amount"]])
+    if kind != "vip" and rows:
+        total = sum(r["amount"] for r in rows)
+        ws.append(["", "TOTAL", "", "", "", "", sum(r["tickets"] for r in rows), "", total])
+        for cell in ws[ws.max_row]:
+            cell.font = Font(bold=True)
+    for idx, w in enumerate(widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    label = "vip" if kind == "vip" else "umum"
+    fname = f"masterlist-{label}-{datetime.now().strftime('%Y%m%d-%H%M')}.xlsx"
+    return StreamingResponse(
+        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
 
 @api_router.post("/admin/orders/{order_id}/verify")
 async def verify_order(order_id: str, payload: VerifyPayload = VerifyPayload(), user: dict = Depends(require_staff)):
@@ -1455,6 +1514,43 @@ async def set_user_permission(user_id: str, payload: UserPermission, user: dict 
     return public_user(updated)
 
 
+@api_router.put("/admin/users/{user_id}")
+async def update_user(user_id: str, payload: UserUpdate, user: dict = Depends(require_super)):
+    target = await db.admin_users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    updates = {}
+    changes = []
+    if payload.name is not None:
+        nm = payload.name.strip()
+        if len(nm) < 2:
+            raise HTTPException(status_code=400, detail="Nama minimal 2 karakter")
+        if nm != target.get("name"):
+            updates["name"] = nm
+            changes.append(f"nama → '{nm}'")
+    if payload.role is not None and payload.role != target["role"]:
+        # jaga jangan sampai super admin terakhir diturunkan
+        if target["role"] == "superadmin" and payload.role != "superadmin":
+            supers = await db.admin_users.count_documents({"role": "superadmin"})
+            if supers <= 1:
+                raise HTTPException(status_code=400, detail="Minimal harus ada 1 Super Admin")
+        # cegah super admin menurunkan role dirinya sendiri (bisa terkunci)
+        if user_id == user["id"] and payload.role != "superadmin":
+            raise HTTPException(status_code=400, detail="Tidak bisa menurunkan role akun sendiri")
+        updates["role"] = payload.role
+        changes.append(f"peran → {ROLE_LABELS.get(payload.role, payload.role)}")
+    if payload.can_delete is not None and bool(payload.can_delete) != bool(target.get("can_delete")):
+        updates["can_delete"] = bool(payload.can_delete)
+        changes.append(f"izin hapus → {'ya' if payload.can_delete else 'tidak'}")
+    if not updates:
+        return public_user(target)
+    await db.admin_users.update_one({"id": user_id}, {"$set": updates})
+    await log_activity(user, "user_update",
+                       f"Ubah user '{target['username']}': {', '.join(changes)}", user_id)
+    updated = await db.admin_users.find_one({"id": user_id})
+    return public_user(updated)
+
+
 @api_router.post("/admin/users/{user_id}/reset-password")
 async def reset_user_password(user_id: str, payload: PasswordReset, user: dict = Depends(require_super)):
     target = await db.admin_users.find_one({"id": user_id})
@@ -1503,6 +1599,9 @@ ACTION_LABEL_ID = {
     "checkin": "Check-in",
     "user_create": "Buat User",
     "user_delete": "Hapus User",
+    "user_update": "Ubah User",
+    "user_permission": "Izin User",
+    "reset_password": "Reset Password",
     "walkin": "Walk-in (Jual di Tempat)",
     "coming_soon": "Mode Coming Soon",
     "session_toggle": "Buka/Tutup Sesi",
