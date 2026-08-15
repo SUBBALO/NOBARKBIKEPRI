@@ -149,15 +149,15 @@ export default function OrderStatusPage() {
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">Jumlah tiket</dt><dd className="font-medium">{order.qty} kursi</dd></div>
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">Kontribusi</dt><dd className="font-medium">Dana Sukarela</dd></div>
           </dl>
-          <div className="mt-5 rounded-xl bg-[#7A241F] text-white p-5">
-            <p className="text-xs text-white/70">Nominal Dana Sukarela</p>
+          <div className="mt-5 rounded-xl bg-[#F3E9DD] border border-[#B26A1E]/40 p-5">
+            <p className="text-xs text-[#7A6A5E]">Nominal Dana Sukarela</p>
             <div className="flex items-center justify-between mt-1">
-              <span className="font-serif-display text-3xl" data-testid="order-total">{rupiah(order.total_amount)}</span>
-              <button onClick={copyTotal} data-testid="btn-copy-total" className="text-white/80 hover:text-white transition-colors">
+              <span className="font-serif-display text-3xl text-[#7A241F]" data-testid="order-total">{rupiah(order.total_amount)}</span>
+              <button onClick={copyTotal} data-testid="btn-copy-total" className="text-[#B26A1E] hover:text-[#7A241F] transition-colors">
                 <Copy className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-[11px] text-[#E4C57E] mt-2 leading-relaxed">
+            <p className="text-[11px] text-[#5B4636] mt-2 leading-relaxed">
               Kontribusi bersifat sukarela. Mohon transfer sesuai nominal yang tertera di atas untuk memudahkan verifikasi pembayaran. Nominal di atas sudah termasuk kode unik untuk identifikasi pembayaran.
             </p>
           </div>
@@ -247,14 +247,14 @@ export default function OrderStatusPage() {
                   </div>
 
                   {/* Nominal transfer - ditonjolkan */}
-                  <div className="mt-3 rounded-xl bg-[#7A241F] text-white px-4 py-3">
-                    <p className="text-xs text-white/70">Nominal Dana Sukarela</p>
+                  <div className="mt-3 rounded-xl bg-[#F3E9DD] border border-[#B26A1E]/40 px-4 py-3">
+                    <p className="text-xs text-[#7A6A5E]">Nominal Dana Sukarela</p>
                     <div className="flex items-center justify-between">
-                      <span className="font-serif-display text-3xl tracking-tight" data-testid="transfer-amount">{rupiah(order.total_amount)}</span>
+                      <span className="font-serif-display text-3xl tracking-tight text-[#7A241F]" data-testid="transfer-amount">{rupiah(order.total_amount)}</span>
                       <button onClick={() => { navigator.clipboard.writeText(String(order.total_amount)); toast.success("Nominal disalin"); }}
-                        data-testid="btn-copy-transfer-total" className="text-white/80 hover:text-white"><Copy className="h-5 w-5" /></button>
+                        data-testid="btn-copy-transfer-total" className="text-[#B26A1E] hover:text-[#7A241F]"><Copy className="h-5 w-5" /></button>
                     </div>
-                    <p className="text-[11px] text-[#E4C57E] mt-0.5 leading-relaxed">Mohon transfer sesuai nominal yang tertera untuk memudahkan verifikasi. Nominal sudah termasuk kode unik untuk identifikasi pembayaran.</p>
+                    <p className="text-[11px] text-[#5B4636] mt-0.5 leading-relaxed">Mohon transfer sesuai nominal yang tertera untuk memudahkan verifikasi. Nominal sudah termasuk kode unik untuk identifikasi pembayaran.</p>
                   </div>
                 </TabsContent>
               </Tabs>
