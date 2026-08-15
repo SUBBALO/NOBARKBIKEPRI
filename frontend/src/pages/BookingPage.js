@@ -195,7 +195,6 @@ export default function BookingPage() {
   const back = () => setStep((s) => Math.max(1, s - 1));
 
   const amount = parseInt(amountText || "0", 10) || 0;
-  const refTotal = selected.length * REF_COST;
   const total = amount;
 
   const submit = async () => {
@@ -408,11 +407,10 @@ export default function BookingPage() {
                   <HandHeart className="h-5 w-5 text-[#B26A1E]" /> Kontribusi Tiket: Dana Sukarela
                 </h3>
                 <p className="text-xs text-[#7A6A5E] mt-1.5">
-                  Biaya pengadaan rata-rata <b>{rupiah(REF_COST)}/orang</b>.
-                  Acuan untuk {selected.length} tiket: <b className="text-[#7A241F]">{rupiah(refTotal)}</b>.
+                  Biaya pengadaan rata-rata <b>{rupiah(REF_COST)}/orang</b>, sebagai acuan untuk 1 tiket.
                 </p>
                 <p className="text-base sm:text-lg font-semibold text-[#7A241F] mt-2 leading-snug" data-testid="donation-free-note">
-                  Nominal tetap <span className="text-[#B26A1E]">bebas</span> sesuai kerelaan Anda 🙏
+                  Nominal kontribusi <span className="text-[#B26A1E]">bebas</span>, sesuai Dana Paramita Anda. 🙏
                 </p>
                 <Label htmlFor="donation" className="text-xs text-[#5B4636] mt-4 block">Nominal dana sukarela (Rp)</Label>
                 <div className="relative mt-1.5">
