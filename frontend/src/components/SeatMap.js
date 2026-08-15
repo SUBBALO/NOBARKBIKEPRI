@@ -21,6 +21,15 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
   const gap = Math.max(2, Math.round(3 * z));
   const aisle = Math.round(14 * z);
 
+  // Kolom tetap berdasarkan nomor kursi (kiri->kanan = nomor besar->kecil),
+  // supaya setiap baris sejajar persis seperti denah asli. Kolom kosong = gang/lorong.
+  const seatNums = [];
+  rows.forEach((r) => r.blocks.forEach((b) => b.forEach((s) => seatNums.push(parseInt(s.label.slice(r.row.length), 10)))));
+  const maxN = seatNums.length ? Math.max(...seatNums) : 21;
+  const minN = seatNums.length ? Math.min(...seatNums) : 1;
+  const cols = [];
+  for (let n = maxN; n >= minN; n--) cols.push(n);
+
   const handleClick = (label) => {
     const partner = couples[label];
     onToggle(label, partner || null);
@@ -59,60 +68,64 @@ export const SeatMap = ({ rows, selected, onToggle, couples = {}, allowDisabilit
             <span className="mt-1.5 text-xs tracking-[0.3em] text-[#7A241F]/70 font-medium">LAYAR</span>
           </div>
 
-          {rows.map((row) => (
-            <Fragment key={row.row}>
-              {row.row === "K" && (
-                <div className="w-full flex items-center gap-2 select-none" style={{ marginTop: aisle, marginBottom: aisle }} data-testid="seatmap-aisle">
-                  <div className="flex-1 border-t border-dashed border-[#B26A1E]/40" />
-                  <span className="text-[9px] tracking-[0.25em] font-semibold text-[#B26A1E]/70 whitespace-nowrap">LORONG JALAN</span>
-                  <div className="flex-1 border-t border-dashed border-[#B26A1E]/40" />
-                </div>
-              )}
-              <div className="flex items-center" style={{ columnGap: aisle }}>
-                <span className="font-semibold text-[#7A6A5E] text-center"
-                  style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
-                {row.blocks.map((block, bi) => (
-                  <div key={`${row.row}-b${bi}`} className="flex" style={{ columnGap: gap }}>
-                    {block.map((seat) => {
-                      const isSel = selected.includes(seat.label);
-                      const st = isSel ? "selected" : seat.status;
-                      const disLocked = seat.disability && !allowDisability;
-                      const disabled = seat.status === "booked" || seat.status === "locked" || seat.status === "reserved" || disLocked;
-                      return (
-                        <button
-                          key={seat.label}
-                          type="button"
-                          data-testid={`seat-${seat.label}`}
-                          disabled={disabled}
-                          onClick={() => handleClick(seat.label)}
-                          title={seat.status === "reserved" ? `${seat.label} (operator)` : seat.disability ? `${seat.label} (disabilitas — beli di lokasi)` : seat.couple ? `${seat.label} (sweetbox)` : seat.label}
-                          style={{ height: sz, width: sz, fontSize: fs }}
-                          className={cn(
-                            "relative rounded-md font-semibold flex items-center justify-center transition-colors duration-150",
-                            st === "available" && !seat.couple && !seat.disability && "bg-[#E5E7EB] text-[#374151] hover:bg-[#B26A1E]/30",
-                            st === "available" && seat.couple && "bg-[#F9A8D4] text-[#831843] hover:bg-[#EC4899]/60",
-                            st === "available" && seat.disability && (allowDisability
-                              ? "bg-[#6EE7B7] text-[#065F46] hover:bg-[#34D399]"
-                              : "bg-[#6EE7B7]/60 text-[#065F46]/60 cursor-not-allowed"),
-                            st === "selected" && !seat.couple && !seat.disability && "bg-[#B26A1E] text-white seat-pop shadow-md",
-                            st === "selected" && seat.couple && "bg-[#DB2777] text-white seat-pop shadow-md",
-                            st === "selected" && seat.disability && "bg-[#059669] text-white seat-pop shadow-md",
-                            st === "booked" && "bg-[#9CA3AF] text-white/70 cursor-not-allowed",
-                            st === "reserved" && "bg-[#4B5563] text-white/60 cursor-not-allowed",
-                            st === "locked" && "bg-[#F3E9DD] text-[#B26A1E]/40 cursor-not-allowed border border-dashed border-[#B26A1E]/40"
-                          )}
-                        >
-                          {seat.label.replace(row.row, "")}
-                        </button>
-                      );
-                    })}
+          {rows.map((row) => {
+            const seatMap = {};
+            row.blocks.forEach((b) => b.forEach((s) => {
+              seatMap[parseInt(s.label.slice(row.row.length), 10)] = s;
+            }));
+            return (
+              <Fragment key={row.row}>
+                {row.row === "K" && (
+                  <div className="w-full flex items-center gap-2 select-none" style={{ marginTop: aisle, marginBottom: aisle }} data-testid="seatmap-aisle">
+                    <div className="flex-1 border-t border-dashed border-[#B26A1E]/40" />
+                    <span className="text-[9px] tracking-[0.25em] font-semibold text-[#B26A1E]/70 whitespace-nowrap">LORONG JALAN</span>
+                    <div className="flex-1 border-t border-dashed border-[#B26A1E]/40" />
                   </div>
-                ))}
-                <span className="font-semibold text-[#7A6A5E] text-center"
-                  style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
-              </div>
-            </Fragment>
-          ))}
+                )}
+                <div className="flex items-center" style={{ columnGap: gap }}>
+                  <span className="font-semibold text-[#7A6A5E] text-center shrink-0"
+                    style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
+                  {cols.map((n) => {
+                    const seat = seatMap[n];
+                    if (!seat) return <div key={`${row.row}-e${n}`} className="shrink-0" style={{ width: sz, height: sz }} />;
+                    const isSel = selected.includes(seat.label);
+                    const st = isSel ? "selected" : seat.status;
+                    const disLocked = seat.disability && !allowDisability;
+                    const disabled = seat.status === "booked" || seat.status === "locked" || seat.status === "reserved" || disLocked;
+                    return (
+                      <button
+                        key={seat.label}
+                        type="button"
+                        data-testid={`seat-${seat.label}`}
+                        disabled={disabled}
+                        onClick={() => handleClick(seat.label)}
+                        title={seat.status === "reserved" ? `${seat.label} (operator)` : seat.disability ? `${seat.label} (disabilitas — beli di lokasi)` : seat.couple ? `${seat.label} (sweetbox)` : seat.label}
+                        style={{ height: sz, width: sz, fontSize: fs }}
+                        className={cn(
+                          "relative rounded-md font-semibold flex items-center justify-center transition-colors duration-150 shrink-0",
+                          st === "available" && !seat.couple && !seat.disability && "bg-[#E5E7EB] text-[#374151] hover:bg-[#B26A1E]/30",
+                          st === "available" && seat.couple && "bg-[#F9A8D4] text-[#831843] hover:bg-[#EC4899]/60",
+                          st === "available" && seat.disability && (allowDisability
+                            ? "bg-[#6EE7B7] text-[#065F46] hover:bg-[#34D399]"
+                            : "bg-[#6EE7B7]/60 text-[#065F46]/60 cursor-not-allowed"),
+                          st === "selected" && !seat.couple && !seat.disability && "bg-[#B26A1E] text-white seat-pop shadow-md",
+                          st === "selected" && seat.couple && "bg-[#DB2777] text-white seat-pop shadow-md",
+                          st === "selected" && seat.disability && "bg-[#059669] text-white seat-pop shadow-md",
+                          st === "booked" && "bg-[#9CA3AF] text-white/70 cursor-not-allowed",
+                          st === "reserved" && "bg-[#4B5563] text-white/60 cursor-not-allowed",
+                          st === "locked" && "bg-[#F3E9DD] text-[#B26A1E]/40 cursor-not-allowed border border-dashed border-[#B26A1E]/40"
+                        )}
+                      >
+                        {seat.label.replace(row.row, "")}
+                      </button>
+                    );
+                  })}
+                  <span className="font-semibold text-[#7A6A5E] text-center shrink-0"
+                    style={{ width: sz * 0.6, fontSize: fs + 1 }}>{row.row}</span>
+                </div>
+              </Fragment>
+            );
+          })}
 
           {/* Entrance marker (kanan bawah seperti denah asli) */}
           <div className="w-full flex justify-end pr-2 mt-1">

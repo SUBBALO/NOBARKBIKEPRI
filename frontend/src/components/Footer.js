@@ -20,14 +20,14 @@ export const Footer = () => (
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </a>
         </div>
-        <p className="mt-2 text-xs text-[#7A6A5E]">
-          Developed by{" "}
-          <a href="https://instagram.com/alam_tenang" target="_blank" rel="noreferrer"
-            data-testid="footer-credit" className="text-sm font-semibold text-[#B26A1E] hover:text-[#7A241F] hover:underline transition-colors">
-            Alam Tenang
-          </a>
-        </p>
       </div>
     </div>
+    <p className="text-center text-[11px] text-[#7A6A5E] pb-3 -mt-1">
+      Developed by{" "}
+      <a href="https://instagram.com/alam_tenang" target="_blank" rel="noreferrer"
+        data-testid="footer-credit" className="text-xs font-semibold text-[#B26A1E] hover:text-[#7A241F] hover:underline transition-colors">
+        Alam Tenang
+      </a>
+    </p>
   </footer>
 );
