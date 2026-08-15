@@ -1073,6 +1073,18 @@ function TrashPanel({ orders, loading, onRefresh, onRestore, restoreBusyId }) {
   );
 }
 
+function markEditableSeats(mapData, ownSeats) {
+  if (!mapData) return mapData;
+  const own = new Set(ownSeats || []);
+  return {
+    ...mapData,
+    rows: mapData.rows.map((r) => ({
+      ...r,
+      blocks: r.blocks.map((b) => b.map((s) => (own.has(s.label) ? { ...s, status: "available" } : s))),
+    })),
+  };
+}
+
 function VIPPanel() {
   const [sessionId, setSessionId] = useState(1);
   const [mapData, setMapData] = useState(null);
@@ -1082,6 +1094,11 @@ function VIPPanel() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [list, setList] = useState([]);
+  const [edit, setEdit] = useState(null);
+  const [editSeats, setEditSeats] = useState([]);
+  const [editMap, setEditMap] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
   const pollRef = useRef(null);
 
   const loadMap = useCallback(async (sid, showLoad) => {
@@ -1120,6 +1137,50 @@ function VIPPanel() {
       loadMap(sessionId, false);
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal membuat tiket VIP"); loadMap(sessionId, false); }
     setBusy(false);
+  };
+
+  const loadList = useCallback(async () => {
+    try { const { data } = await adminApi.get("/admin/vip"); setList(data || []); }
+    catch (e) { console.error("Gagal memuat daftar VIP:", e); }
+  }, []);
+  useEffect(() => { loadList(); }, [loadList]);
+
+  const openEdit = async (o) => {
+    setEdit(o); setEditSeats(o.seats || []); setEditMap(null); setEditLoading(true);
+    try {
+      const { data } = await adminApi.get(`/sessions/${o.session_id}/seats`);
+      setEditMap(markEditableSeats(data, o.seats || []));
+    } catch (e) { toast.error("Gagal memuat peta kursi"); }
+    setEditLoading(false);
+  };
+  const editCouples = editMap?.couples || {};
+  const toggleEdit = (seat) => {
+    setEditSeats((prev) => {
+      const partner = editCouples[seat];
+      if (prev.includes(seat)) return prev.filter((s) => s !== seat && s !== partner);
+      const add = partner ? [seat, partner] : [seat];
+      return [...new Set([...prev, ...add])];
+    });
+  };
+  const saveEdit = async () => {
+    if (!edit) return;
+    if (!edit.name || !edit.name.trim()) { toast.error("Isi nama tamu VIP"); return; }
+    if (editSeats.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    setBusy(true);
+    try {
+      await adminApi.put(`/admin/vip/${edit.id}`, { name: edit.name, note: edit.note || "", seats: editSeats });
+      toast.success("Tiket VIP diperbarui");
+      setEdit(null); setEditMap(null); loadList(); loadMap(sessionId, false);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal simpan"); }
+    setBusy(false);
+  };
+  const delItem = async (o) => {
+    if (!window.confirm(`Hapus tiket VIP "${o.name}" (${o.seats?.join(", ")})? Kursi akan dilepas.`)) return;
+    try {
+      await adminApi.delete(`/admin/vip/${o.id}`);
+      toast.success("Tiket VIP dihapus");
+      loadList(); loadMap(sessionId, false);
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal hapus"); }
   };
 
   return (
@@ -1188,6 +1249,79 @@ function VIPPanel() {
           <Button onClick={() => setResult(null)} className="w-full bg-[#7A241F] hover:bg-[#5E1B17] mt-2" data-testid="vip-result-close">Selesai</Button>
         </DialogContent>
       </Dialog>
+
+      <div className="rounded-2xl border border-border bg-white overflow-hidden mt-5" data-testid="vip-list">
+        <div className="px-4 py-3 bg-[#7A241F]/10 flex items-center justify-between">
+          <h3 className="font-serif-display text-xl text-[#7A241F]">Daftar Tiket VIP</h3>
+          <span className="text-sm font-semibold text-[#7A6A5E]">{list.length} tiket</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-[#7A6A5E] text-xs">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Nama</th>
+                <th className="px-3 py-2 text-left font-medium">Sesi / Kursi</th>
+                <th className="px-3 py-2 text-left font-medium">Catatan</th>
+                <th className="px-3 py-2 text-right font-medium">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr><td colSpan={4} className="px-3 py-8 text-center text-[#7A6A5E]">Belum ada tiket VIP.</td></tr>
+              ) : list.map((o) => (
+                <tr key={o.id} className="border-t border-border" data-testid={`vip-row-${o.order_no}`}>
+                  <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
+                  <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name} · {o.seats?.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.qty} kursi)</span></td>
+                  <td className="px-3 py-2 text-[#7A6A5E]">{o.note || "—"}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => openEdit({ ...o })} data-testid={`vip-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit Kursi</button>
+                    <button onClick={() => delItem(o)} data-testid={`vip-del-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 text-xs font-medium"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <Dialog open={!!edit} onOpenChange={() => { if (!busy) { setEdit(null); setEditMap(null); } }}>
+        <DialogContent data-testid="vip-edit-dialog" className="max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Edit Tiket VIP</DialogTitle>
+          </DialogHeader>
+          {edit && (
+            <div className="space-y-3">
+              <div>
+                <Label>Nama Tamu VIP</Label>
+                <Input data-testid="vip-edit-name" value={edit.name || ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })} className="mt-1.5" />
+              </div>
+              <div>
+                <Label>Catatan <span className="text-[#9CA3AF]">(opsional)</span></Label>
+                <Input data-testid="vip-edit-note" value={edit.note || ""} onChange={(e) => setEdit({ ...edit, note: e.target.value })} className="mt-1.5" />
+              </div>
+              <div className="rounded-lg bg-muted/40 p-2.5">
+                <p className="text-xs text-[#7A6A5E]">Sesi: <b>{SESSIONS_STATIC.find((s) => s.id === edit.session_id)?.name}</b></p>
+                <p className="text-xs text-[#7A6A5E] mt-1">Kursi terpilih ({editSeats.length}):</p>
+                <p className="text-sm font-semibold text-[#7A241F] break-words" data-testid="vip-edit-selected">{editSeats.length ? editSeats.join(", ") : "— belum ada —"}</p>
+              </div>
+              <p className="text-xs text-[#7A6A5E]">Klik kursi untuk mengganti: hijau/pilih kursi baru, klik kursi terpilih untuk melepasnya.</p>
+              {editLoading ? (
+                <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-[#B26A1E]" /></div>
+              ) : editMap ? (
+                <SeatMap rows={editMap.rows} selected={editSeats} onToggle={toggleEdit} couples={editCouples} allowDisability />
+              ) : (
+                <p className="text-center text-sm text-[#7A6A5E] py-10">Gagal memuat peta kursi.</p>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => { setEdit(null); setEditMap(null); }} disabled={busy} className="flex-1">Batal</Button>
+            <Button onClick={saveEdit} disabled={busy || editLoading} className="flex-1 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="vip-edit-save">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1209,6 +1343,9 @@ function ManualPanel() {
   const [list, setList] = useState([]);
   const [edit, setEdit] = useState(null);
   const [editProof, setEditProof] = useState(null);
+  const [editSeats, setEditSeats] = useState([]);
+  const [editMap, setEditMap] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
   const pollRef = useRef(null);
 
   const loadMap = useCallback(async (sid, showLoad) => {
@@ -1272,6 +1409,7 @@ function ManualPanel() {
   const saveEdit = async () => {
     if (!edit) return;
     if (edit.paid && !edit.transfer_date) { toast.error("Isi tanggal transfer"); return; }
+    if (editSeats.length === 0) { toast.error("Pilih minimal 1 kursi (atau hapus order)"); return; }
     setBusy(true);
     try {
       await adminApi.put(`/admin/manual/${edit.id}`, {
@@ -1280,17 +1418,35 @@ function ManualPanel() {
         paid: edit.paid,
         transfer_date: edit.paid ? edit.transfer_date : null,
         transfer_amount: edit.paid && edit.transfer_amount ? parseInt(edit.transfer_amount, 10) : null,
+        seats: editSeats,
         ...(editProof ? { proof_image: editProof } : {}),
       });
       toast.success("Order manual diperbarui");
-      setEdit(null); setEditProof(null); loadList();
+      setEdit(null); setEditProof(null); setEditMap(null); loadList(); loadMap(sessionId, false);
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal simpan"); }
     setBusy(false);
+  };
+  const openEdit = async (o) => {
+    setEdit({ ...o }); setEditProof(null); setEditSeats(o.seats || []); setEditMap(null); setEditLoading(true);
+    try {
+      const { data } = await adminApi.get(`/sessions/${o.session_id}/seats`);
+      setEditMap(markEditableSeats(data, o.seats || []));
+    } catch (e) { toast.error("Gagal memuat peta kursi"); }
+    setEditLoading(false);
+  };
+  const editCouples = editMap?.couples || {};
+  const toggleEdit = (seat) => {
+    setEditSeats((prev) => {
+      const partner = editCouples[seat];
+      if (prev.includes(seat)) return prev.filter((s) => s !== seat && s !== partner);
+      const add = partner ? [seat, partner] : [seat];
+      return [...new Set([...prev, ...add])];
+    });
   };
   const removeOrder = async (o) => {
     if (!window.confirm(`Hapus order manual "${o.name}" (${o.seats?.join(", ")})?`)) return;
     try {
-      await adminApi.delete(`/admin/orders/${o.id}`);
+      await adminApi.delete(`/admin/manual/${o.id}`);
       toast.success("Order manual dihapus");
       loadList(); loadMap(sessionId, false);
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal hapus"); }
@@ -1418,7 +1574,7 @@ function ManualPanel() {
                   <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap"><span className="block text-[10px] text-[#7A6A5E]">order: {o.created_at ? new Date(o.created_at).toLocaleDateString("id-ID") : "-"}</span>transfer: {o.transfer_date || "-"}</td>
                   <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <button onClick={() => { setEdit({ ...o }); setEditProof(null); }} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
+                    <button onClick={() => openEdit(o)} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
                     <button onClick={() => removeOrder(o)} data-testid={`manual-del-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 text-xs font-medium"><Trash2 className="h-3.5 w-3.5" /></button>
                   </td>
                 </tr>
@@ -1428,8 +1584,8 @@ function ManualPanel() {
         </div>
       </div>
 
-      <Dialog open={!!edit} onOpenChange={() => { if (!busy) { setEdit(null); setEditProof(null); } }}>
-        <DialogContent data-testid="manual-edit-dialog" className="max-w-sm rounded-2xl">
+      <Dialog open={!!edit} onOpenChange={() => { if (!busy) { setEdit(null); setEditProof(null); setEditMap(null); } }}>
+        <DialogContent data-testid="manual-edit-dialog" className="max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Edit Order Manual</DialogTitle>
           </DialogHeader>
@@ -1482,11 +1638,24 @@ function ManualPanel() {
                   </div>
                 </div>
               )}
+              <div className="rounded-lg bg-muted/40 p-2.5">
+                <p className="text-xs text-[#7A6A5E]">Sesi: <b>{SESSIONS_STATIC.find((s) => s.id === edit.session_id)?.name}</b></p>
+                <p className="text-xs text-[#7A6A5E] mt-1">Kursi terpilih ({editSeats.length}):</p>
+                <p className="text-sm font-semibold text-[#7A241F] break-words" data-testid="manual-edit-selected">{editSeats.length ? editSeats.join(", ") : "— belum ada —"}</p>
+              </div>
+              <p className="text-xs text-[#7A6A5E]">Klik kursi terpilih untuk melepasnya, atau pilih kursi lain untuk menambah.</p>
+              {editLoading ? (
+                <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-[#B26A1E]" /></div>
+              ) : editMap ? (
+                <SeatMap rows={editMap.rows} selected={editSeats} onToggle={toggleEdit} couples={editCouples} allowDisability />
+              ) : (
+                <p className="text-center text-sm text-[#7A6A5E] py-10">Gagal memuat peta kursi.</p>
+              )}
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => { setEdit(null); setEditProof(null); }} disabled={busy} className="flex-1">Batal</Button>
-            <Button onClick={saveEdit} disabled={busy} className="flex-1 bg-[#B26A1E] hover:bg-[#8A3A12]" data-testid="manual-edit-save">
+            <Button variant="outline" onClick={() => { setEdit(null); setEditProof(null); setEditMap(null); }} disabled={busy} className="flex-1">Batal</Button>
+            <Button onClick={saveEdit} disabled={busy || editLoading} className="flex-1 bg-[#B26A1E] hover:bg-[#8A3A12]" data-testid="manual-edit-save">
               {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Simpan
             </Button>
           </DialogFooter>

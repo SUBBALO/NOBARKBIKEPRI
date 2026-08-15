@@ -170,6 +170,12 @@ class VIPCreate(BaseModel):
     note: Optional[str] = ""
 
 
+class VIPUpdate(BaseModel):
+    name: Optional[str] = None
+    note: Optional[str] = None
+    seats: Optional[List[str]] = None
+
+
 class ManualCreate(BaseModel):
     name: str
     phone: Optional[str] = ""
@@ -191,6 +197,7 @@ class ManualUpdate(BaseModel):
     transfer_amount: Optional[int] = None
     proof_image: Optional[str] = None
     note: Optional[str] = None
+    seats: Optional[List[str]] = None
 
 
 class SetActiveSession(BaseModel):
@@ -1384,6 +1391,94 @@ async def vip_order(payload: VIPCreate, user: dict = Depends(require_staff)):
     return clean(dict(order))
 
 
+async def reconcile_seats(order_id: str, session_id: int, old_seats, new_seats):
+    """Ganti kursi sebuah order: kunci kursi baru, lepas kursi lama. Return daftar kursi final."""
+    new_list = list(dict.fromkeys(new_seats))
+    old_set = set(old_seats or [])
+    new_set = set(new_list)
+    to_add = [s for s in new_list if s not in old_set]
+    to_remove = old_set - new_set
+    for seat in to_add:
+        if seat not in ALL_SEAT_LABELS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
+        if seat in RESERVED_SEATS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} khusus operator, tidak bisa dipilih")
+    await taken_seats(session_id)  # release expired first
+    claimed = []
+    for seat in to_add:
+        try:
+            await db.seat_locks.insert_one({
+                "_id": f"{session_id}:{seat}", "session_id": session_id,
+                "seat": seat, "order_id": order_id, "expires_at": None,
+            })
+            claimed.append(seat)
+        except DuplicateKeyError:
+            if claimed:
+                await db.seat_locks.delete_many({"_id": {"$in": [f"{session_id}:{s}" for s in claimed]}})
+            raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah terisi. Pilih kursi lain.")
+    if to_remove:
+        await db.seat_locks.delete_many(
+            {"_id": {"$in": [f"{session_id}:{s}" for s in to_remove]}, "order_id": order_id})
+    return new_list
+
+
+@api_router.get("/admin/vip")
+async def list_vip(user: dict = Depends(require_staff)):
+    docs = await db.orders.find({"vip": True, "deleted": {"$ne": True}}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
+    return [clean(d) for d in docs]
+
+
+@api_router.put("/admin/vip/{order_id}")
+async def update_vip(order_id: str, payload: VIPUpdate, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id, "vip": True})
+    if not o or o.get("deleted"):
+        raise HTTPException(status_code=404, detail="Tiket VIP tidak ditemukan")
+    updates = {"updated_at": now_iso()}
+    if payload.name is not None:
+        nm = payload.name.strip()
+        if not nm:
+            raise HTTPException(status_code=400, detail="Nama tidak boleh kosong")
+        updates["name"] = nm
+    if payload.note is not None:
+        updates["note"] = payload.note.strip()
+    if payload.seats is not None:
+        if not list(dict.fromkeys(payload.seats)):
+            raise HTTPException(status_code=400, detail="Minimal 1 kursi. Untuk mengosongkan, hapus tiket ini.")
+        final = await reconcile_seats(order_id, o["session_id"], o.get("seats", []), payload.seats)
+        updates["seats"] = final
+        updates["qty"] = len(final)
+    await db.orders.update_one({"id": order_id}, {"$set": updates})
+    await log_activity(user, "vip",
+                       f"Ubah tiket VIP #{o.get('order_no')} — {updates.get('name', o.get('name'))}", order_id)
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.delete("/admin/vip/{order_id}")
+async def delete_vip(order_id: str, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id, "vip": True})
+    if not o or o.get("deleted"):
+        raise HTTPException(status_code=404, detail="Tiket VIP tidak ditemukan")
+    actor = user.get("name") or user.get("username")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "deleted": True, "deleted_at": now_iso(), "deleted_by": actor, "updated_at": now_iso()}})
+    await db.seat_locks.delete_many({"order_id": order_id})
+    await log_activity(user, "delete", f"Hapus tiket VIP #{o.get('order_no')} — {o.get('name')}", order_id)
+    return {"deleted": True, "id": order_id}
+
+
+@api_router.delete("/admin/manual/{order_id}")
+async def delete_manual(order_id: str, user: dict = Depends(require_staff)):
+    o = await db.orders.find_one({"id": order_id, "manual": True})
+    if not o or o.get("deleted"):
+        raise HTTPException(status_code=404, detail="Order manual tidak ditemukan")
+    actor = user.get("name") or user.get("username")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "deleted": True, "deleted_at": now_iso(), "deleted_by": actor, "updated_at": now_iso()}})
+    await db.seat_locks.delete_many({"order_id": order_id})
+    await log_activity(user, "delete", f"Hapus order manual #{o.get('order_no')} — {o.get('name')}", order_id)
+    return {"deleted": True, "id": order_id}
+
+
 def _manual_counted(paid, amount, transfer_amount):
     return ((transfer_amount if (paid and transfer_amount) else amount) or 0)
 
@@ -1478,6 +1573,12 @@ async def update_manual(order_id: str, payload: ManualUpdate, user: dict = Depen
         updates["note"] = payload.note.strip()
     if payload.proof_image is not None:
         updates["proof_image"] = payload.proof_image or None
+    if payload.seats is not None:
+        if not list(dict.fromkeys(payload.seats)):
+            raise HTTPException(status_code=400, detail="Minimal 1 kursi. Untuk mengosongkan, hapus order ini.")
+        final = await reconcile_seats(order_id, o["session_id"], o.get("seats", []), payload.seats)
+        updates["seats"] = final
+        updates["qty"] = len(final)
     await db.orders.update_one({"id": order_id}, {"$set": updates})
     await log_activity(user, "manual",
                        f"Ubah order manual #{o.get('order_no')} — {name} ({'SUDAH BAYAR' if paid else 'BELUM BAYAR'})",
