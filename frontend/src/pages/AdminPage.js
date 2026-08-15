@@ -2090,7 +2090,7 @@ export default function AdminPage() {
                       <button onClick={() => o.has_proof && openProof(o)}
                         className="inline-flex flex-col items-start text-[#255E33] text-xs font-medium">
                         <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Payment OK</span>
-                        {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}{o.updated_at ? ` · ${fmtTime(o.updated_at)}` : ""}</span>}
+                        {(o.verified_by || o.sold_by || o.created_by) && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by || o.sold_by || o.created_by}{o.updated_at ? ` · ${fmtTime(o.updated_at)}` : ""}</span>}
                       </button>
                     ) : (o.status === "pending_payment" || o.status === "expired") ? (
                       <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
@@ -2183,7 +2183,7 @@ export default function AdminPage() {
                           <button onClick={() => o.has_proof && openProof(o)} data-testid={`verify-done-${o.id.slice(0, 8)}`}
                             className="inline-flex flex-col items-center text-[#255E33] text-xs font-medium">
                             <span className="inline-flex items-center gap-1"><CheckCircle2 className="h-4 w-4" /> Payment OK</span>
-                            {o.verified_by && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by}{o.updated_at ? ` · ${fmtTime(o.updated_at)}` : ""}</span>}
+                            {(o.verified_by || o.sold_by || o.created_by) && <span className="text-[10px] text-[#7A6A5E] font-normal">oleh {o.verified_by || o.sold_by || o.created_by}{o.updated_at ? ` · ${fmtTime(o.updated_at)}` : ""}</span>}
                           </button>
                         ) : o.status === "pending_payment" ? (
                           <Button size="sm" variant="outline" onClick={() => adminUpload(o)} disabled={busyId === o.id}
@@ -2314,7 +2314,22 @@ export default function AdminPage() {
             <div>
               <div className="text-sm mb-3 space-y-0.5">
                 <p><b>{proofView.name}</b> <span className="font-mono text-xs text-[#7A6A5E]">#{proofView.order_no}</span></p>
-                <p className="text-[#7A6A5E]">{proofView.phone} · {proofView.session?.name} · Kursi {proofView.seats.join(", ")}</p>
+                <p className="text-[#7A6A5E]">
+                  {proofView.phone} · {proofView.session?.name} · Kursi {proofView.seats.join(", ")}
+                  {isSuper && (
+                    <button data-testid="btn-edit-phone" className="ml-2 text-[11px] text-[#B26A1E] underline"
+                      onClick={async () => {
+                        const np = window.prompt("Nomor HP baru (wajib diawali 08):", proofView.phone || "");
+                        if (np === null) return;
+                        try {
+                          const { data } = await adminApi.put(`/admin/orders/${proofView.id}/phone`, { phone: np });
+                          setProofView({ ...proofView, phone: data.phone });
+                          setOrders((prev) => prev.map((x) => x.id === proofView.id ? { ...x, phone: data.phone } : x));
+                          toast.success("No HP diperbarui");
+                        } catch (e) { toast.error(e?.response?.data?.detail || "Gagal ubah No HP"); }
+                      }}>Edit No HP</button>
+                  )}
+                </p>
                 <p>Nominal: <b className="text-[#B26A1E]">{rupiah(proofView.total_amount)}</b> (kode unik {proofView.unique_code})</p>
               </div>
 

@@ -216,15 +216,15 @@ export default function OrderStatusPage() {
       </div>
 
       {/* Aksi cepat: simpan tiket & kalender (selalu tampil) */}
-      <div className="rounded-2xl border border-[#B26A1E]/30 bg-[#F6EEE1]/70 p-3 sm:p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="ticket-actions-bar">
+      <div className="rounded-2xl border border-[#B26A1E]/30 bg-white p-3 sm:p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="ticket-actions-bar">
         <p className="text-sm font-medium text-[#7A241F] flex-1">Simpan orderan Anda supaya tidak lupa saat hari acara:</p>
         <div className="grid grid-cols-2 sm:flex gap-2">
           <Button onClick={saveTicketImage} data-testid="btn-save-ticket"
-            className="h-11 px-4 bg-[#B26A1E] hover:bg-[#8A3A12]">
+            className="h-11 px-4 bg-[#E4C57E] hover:bg-[#DBB768] text-[#5E1B17] font-semibold border border-[#B26A1E]">
             <ImageDown className="h-4 w-4 mr-1.5" /> Simpan Tiket (Gambar)
           </Button>
-          <Button onClick={addToCalendar} data-testid="btn-add-calendar" variant="outline"
-            className="h-11 px-4 border-[#2F703E]/40 text-[#255E33] hover:bg-[#2F703E]/10">
+          <Button onClick={addToCalendar} data-testid="btn-add-calendar"
+            className="h-11 px-4 bg-[#3E9B57] hover:bg-[#2F703E] text-white font-semibold border border-[#2F703E]">
             <CalendarPlus className="h-4 w-4 mr-1.5" /> Tambah ke Kalender HP
           </Button>
         </div>

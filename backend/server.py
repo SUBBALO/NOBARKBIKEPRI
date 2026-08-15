@@ -159,6 +159,10 @@ class VerifyPayload(BaseModel):
     amount: Optional[int] = None  # nominal aktual yang masuk (dari slip TT), opsional
 
 
+class PhonePayload(BaseModel):
+    phone: str
+
+
 class VIPCreate(BaseModel):
     name: str
     session_id: int
@@ -469,12 +473,25 @@ async def get_seats(session_id: int):
     }
 
 
+def normalize_phone(raw: str) -> str:
+    """Pastikan nomor HP Indonesia diawali 08. Perbaiki input 8..., 62..., +62..."""
+    d = re.sub(r"\D", "", raw or "")
+    if d.startswith("62"):
+        d = "0" + d[2:]
+    elif d.startswith("8"):
+        d = "0" + d
+    if not d.startswith("08") or len(d) < 9:
+        raise HTTPException(status_code=400, detail="Nomor HP harus diawali 08 dan valid (mis. 0812xxxxxxx)")
+    return d
+
+
 @api_router.post("/orders")
 async def create_order(payload: OrderCreate):
     if await is_coming_soon():
         raise HTTPException(status_code=403, detail="Penjualan tiket belum dibuka")
     if not payload.name.strip() or not payload.phone.strip():
         raise HTTPException(status_code=400, detail="Nama dan nomor HP wajib diisi")
+    phone_norm = normalize_phone(payload.phone)
     if not payload.seats:
         raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
     amount = int(payload.amount or 0)
@@ -534,7 +551,7 @@ async def create_order(payload: OrderCreate):
         "id": order_id,
         "order_no": order_no,
         "name": payload.name.strip(),
-        "phone": payload.phone.strip(),
+        "phone": phone_norm,
         "session_id": payload.session_id,
         "seats": seats,
         "qty": qty,
@@ -1113,6 +1130,21 @@ async def set_order_amount(order_id: str, payload: VerifyPayload, user: dict = D
                        f"Edit nominal #{o.get('order_no')} — {o.get('name')}: Rp{old:,} → Rp{payload.amount:,}".replace(",", "."),
                        order_id)
     return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.put("/admin/orders/{order_id}/phone")
+async def update_order_phone(order_id: str, payload: PhonePayload, user: dict = Depends(require_super)):
+    o = await db.orders.find_one({"id": order_id})
+    if not o:
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    new_phone = normalize_phone(payload.phone)
+    old_phone = o.get("phone")
+    await db.orders.update_one({"id": order_id}, {"$set": {"phone": new_phone, "updated_at": now_iso()}})
+    await log_activity(user, "verify",
+                       f"Ubah No HP #{o.get('order_no')} — {o.get('name')}: {old_phone} → {new_phone}",
+                       order_id)
+    return clean(await db.orders.find_one({"id": order_id}))
+
 
 
 @api_router.delete("/admin/orders/{order_id}")

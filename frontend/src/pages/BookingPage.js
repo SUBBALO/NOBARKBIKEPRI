@@ -186,7 +186,7 @@ export default function BookingPage() {
   const next = () => {
     if (step === 1) {
       if (!name.trim() || !phone.trim()) return toast.error("Isi nama dan nomor HP dulu");
-      if (!/^[0-9+\-\s]{8,}$/.test(phone.trim())) return toast.error("Nomor HP tidak valid");
+      if (!/^08[0-9]{7,}$/.test(phone.replace(/[^0-9]/g, ""))) return toast.error("Nomor HP wajib diawali 08 (mis. 0812xxxxxxx)");
     }
     if (step === 2 && !sessionId) return toast.error("Pilih sesi terlebih dahulu");
     if (step === 3 && selected.length === 0) return toast.error("Pilih minimal 1 kursi");
@@ -318,7 +318,14 @@ export default function BookingPage() {
               <div>
                 <Label htmlFor="phone">Nomor HP / WhatsApp</Label>
                 <Input id="phone" data-testid="input-phone" value={phone}
-                  onChange={(e) => setPhone(e.target.value)} placeholder="08xxxxxxxxxx" className="mt-1.5" />
+                  inputMode="numeric"
+                  onChange={(e) => {
+                    let v = e.target.value.replace(/[^0-9]/g, "");
+                    if (v.startsWith("62")) v = "0" + v.slice(2);
+                    else if (v.startsWith("8")) v = "0" + v;
+                    setPhone(v);
+                  }} placeholder="08xxxxxxxxxx" className="mt-1.5" />
+                <p className="text-[11px] text-[#7A6A5E] mt-1">Wajib diawali <b>08</b> agar tiket bisa dikirim via WhatsApp.</p>
               </div>
             </div>
           </div>
