@@ -21,7 +21,7 @@ if not BASE_URL:
             BASE_URL = ln.split("=", 1)[1].strip().rstrip("/")
 
 API = f"{BASE_URL}/api"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "admin123")
 
 
 # ---------------- Fixtures ----------------
