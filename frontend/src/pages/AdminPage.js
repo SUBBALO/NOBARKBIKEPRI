@@ -1208,6 +1208,7 @@ function ManualPanel() {
   const [busy, setBusy] = useState(false);
   const [list, setList] = useState([]);
   const [edit, setEdit] = useState(null);
+  const [editProof, setEditProof] = useState(null);
   const pollRef = useRef(null);
 
   const loadMap = useCallback(async (sid, showLoad) => {
@@ -1279,9 +1280,10 @@ function ManualPanel() {
         paid: edit.paid,
         transfer_date: edit.paid ? edit.transfer_date : null,
         transfer_amount: edit.paid && edit.transfer_amount ? parseInt(edit.transfer_amount, 10) : null,
+        ...(editProof ? { proof_image: editProof } : {}),
       });
       toast.success("Order manual diperbarui");
-      setEdit(null); loadList();
+      setEdit(null); setEditProof(null); loadList();
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal simpan"); }
     setBusy(false);
   };
@@ -1416,7 +1418,7 @@ function ManualPanel() {
                   <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap"><span className="block text-[10px] text-[#7A6A5E]">order: {o.created_at ? new Date(o.created_at).toLocaleDateString("id-ID") : "-"}</span>transfer: {o.transfer_date || "-"}</td>
                   <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <button onClick={() => setEdit({ ...o })} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
+                    <button onClick={() => { setEdit({ ...o }); setEditProof(null); }} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
                     <button onClick={() => removeOrder(o)} data-testid={`manual-del-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 text-xs font-medium"><Trash2 className="h-3.5 w-3.5" /></button>
                   </td>
                 </tr>
@@ -1426,7 +1428,7 @@ function ManualPanel() {
         </div>
       </div>
 
-      <Dialog open={!!edit} onOpenChange={() => !busy && setEdit(null)}>
+      <Dialog open={!!edit} onOpenChange={() => { if (!busy) { setEdit(null); setEditProof(null); } }}>
         <DialogContent data-testid="manual-edit-dialog" className="max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Edit Order Manual</DialogTitle>
@@ -1464,12 +1466,26 @@ function ManualPanel() {
                       value={edit.transfer_amount ? Number(edit.transfer_amount).toLocaleString("id-ID") : ""}
                       onChange={(e) => setEdit({ ...edit, transfer_amount: e.target.value.replace(/[^0-9]/g, "") })} placeholder="kosong = pakai nominal order" className="mt-1.5" />
                   </div>
+                  <div>
+                    <Label className="block mb-1.5">Foto Bukti Transfer <span className="text-[#9CA3AF]">(opsional)</span></Label>
+                    <input type="file" accept="image/*" data-testid="manual-edit-proof" className="text-xs"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) { setEditProof(null); return; }
+                        const r = new FileReader();
+                        r.onload = () => setEditProof(r.result);
+                        r.readAsDataURL(f);
+                      }} />
+                    {editProof
+                      ? <p className="text-[11px] text-[#255E33] mt-1">Foto baru siap diunggah ✓</p>
+                      : <p className="text-[11px] text-[#7A6A5E] mt-1">Kosongkan bila tidak ingin mengubah bukti yang sudah ada.</p>}
+                  </div>
                 </div>
               )}
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => setEdit(null)} disabled={busy} className="flex-1">Batal</Button>
+            <Button variant="outline" onClick={() => { setEdit(null); setEditProof(null); }} disabled={busy} className="flex-1">Batal</Button>
             <Button onClick={saveEdit} disabled={busy} className="flex-1 bg-[#B26A1E] hover:bg-[#8A3A12]" data-testid="manual-edit-save">
               {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null} Simpan
             </Button>
