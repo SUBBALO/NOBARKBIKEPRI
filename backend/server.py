@@ -1320,9 +1320,9 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_walki
         raise HTTPException(status_code=400, detail="Sesi ini belum dibuka untuk penjualan panitia di lokasi. Minta Super Admin membukanya.")
     proof = (payload.proof_image or "").strip() or None
     if payload.payment_method in ("qris", "transfer"):
-        if not proof or not proof.startswith("data:image"):
-            raise HTTPException(status_code=400, detail="Untuk QRIS/Transfer wajib upload foto bukti pembayaran.")
-        if len(proof) > MAX_PROOF_BYTES:
+        if proof and not proof.startswith("data:image"):
+            raise HTTPException(status_code=400, detail="Format bukti tidak valid")
+        if proof and len(proof) > MAX_PROOF_BYTES:
             raise HTTPException(status_code=400, detail="Ukuran gambar bukti terlalu besar (maks ~6MB)")
     else:
         proof = None  # cash tidak perlu bukti
@@ -1385,6 +1385,38 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_walki
                        f"Walk-in {qty} tiket #{order_no} — {payload.name.strip()} ({payload.payment_method.upper()}) @ {location}, kursi {', '.join(claimed)}",
                        order_id)
     return clean(dict(order))
+
+
+class WalkinProof(BaseModel):
+    proof_image: Optional[str] = None
+
+
+@api_router.post("/admin/walkin/{order_id}/proof")
+async def walkin_attach_proof(order_id: str, payload: WalkinProof, user: dict = Depends(require_walkin)):
+    o = await db.orders.find_one({"id": order_id, "walkin": True})
+    if not o or o.get("deleted"):
+        raise HTTPException(status_code=404, detail="Order walk-in tidak ditemukan")
+    proof = (payload.proof_image or "").strip() or None
+    if proof:
+        if not proof.startswith("data:image"):
+            raise HTTPException(status_code=400, detail="Format bukti tidak valid")
+        if len(proof) > MAX_PROOF_BYTES:
+            raise HTTPException(status_code=400, detail="Ukuran gambar bukti terlalu besar (maks ~6MB)")
+    await db.orders.update_one({"id": order_id}, {"$set": {"proof_image": proof, "updated_at": now_iso()}})
+    return {"ok": True, "id": order_id}
+
+
+@api_router.delete("/admin/walkin/{order_id}")
+async def walkin_cancel(order_id: str, user: dict = Depends(require_walkin)):
+    o = await db.orders.find_one({"id": order_id, "walkin": True})
+    if not o or o.get("deleted"):
+        raise HTTPException(status_code=404, detail="Order walk-in tidak ditemukan")
+    actor = user.get("name") or user.get("username")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "deleted": True, "deleted_at": now_iso(), "deleted_by": actor, "updated_at": now_iso()}})
+    await db.seat_locks.delete_many({"order_id": order_id})
+    await log_activity(user, "walkin_cancel", f"Batalkan walk-in #{o.get('order_no')} — {o.get('name')}", order_id)
+    return {"deleted": True, "id": order_id}
 
 
 

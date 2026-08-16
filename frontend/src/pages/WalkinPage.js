@@ -118,6 +118,7 @@ export default function WalkinPage() {
   const [displayMode, setDisplayMode] = useState("welcome"); // welcome | selecting | paying
   const [webcamOpen, setWebcamOpen] = useState(false);
   const [payStep, setPayStep] = useState(null); // null | "pay"
+  const [pendingOrder, setPendingOrder] = useState(null);
   const pollRef = useRef(null);
   const chanRef = useRef(null);
   const videoRef = useRef(null);
@@ -172,17 +173,22 @@ export default function WalkinPage() {
     if (result) {
       payload = { mode: "done", result, sessionName: s?.name, sessionTime: s?.time };
     } else {
+      const paying = displayMode === "paying" && pendingOrder;
       payload = {
         mode: displayMode === "welcome" ? "idle" : displayMode,
         sessionId, sessionName: s?.name, sessionTime: s?.time,
         rows: mapData?.rows || null, couples: mapData?.couples || {},
-        selected, method, amount: parseInt(amountText || "0", 10) || 0, transfer,
+        selected, method,
+        amount: paying ? pendingOrder.total_amount : (parseInt(amountText || "0", 10) || 0),
+        orderNo: paying ? pendingOrder.order_no : null,
+        qty: paying ? (pendingOrder.seats?.length || pendingOrder.qty) : null,
+        transfer,
         remaining: mapData ? (mapData.capacity - mapData.booked) : null,
       };
     }
     displayPayload.current = payload;
     chanRef.current?.postMessage({ type: "state", payload });
-  }, [authed, result, displayMode, sessionId, mapData, selected, method, amountText, transfer]);
+  }, [authed, result, displayMode, sessionId, mapData, selected, method, amountText, transfer, pendingOrder]);
 
   const openMonitor = () => window.open("/display", "kbi_monitor", "width=1280,height=800");
 
@@ -240,23 +246,35 @@ export default function WalkinPage() {
   const refTotal = selected.length * REF_COST;
   const total = amount;
 
-  const submit = async () => {
+  const doCreate = async (proofImg) => {
+    const { data } = await adminApi.post("/admin/walkin", {
+      name, phone, session_id: sessionId, seats: selected, payment_method: method, amount,
+      proof_image: proofImg || null, location: location.trim(),
+    });
+    localStorage.setItem("walkin_location", location.trim());
+    const loc = location.trim();
+    const nextHist = [loc, ...locHistory.filter((l) => l.toLowerCase() !== loc.toLowerCase())].slice(0, 12);
+    setLocHistory(nextHist);
+    localStorage.setItem("walkin_locations", JSON.stringify(nextHist));
+    return data;
+  };
+
+  const clearForm = () => { setName(""); setPhone(""); setSelected([]); setAmountText(""); setProof(null); };
+
+  const startPayment = async () => {
+    if (!walkinSessions[sessionId]) { toast.error("Sesi ini belum dibuka untuk panitia (lokasi)"); return; }
+    if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
+    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    if (amount <= 0) { toast.error("Isi nominal dana sukarela"); return; }
+    if (!location.trim()) { toast.error("Isi lokasi penjualan"); return; }
     setBusy(true);
     try {
-      const { data } = await adminApi.post("/admin/walkin", {
-        name, phone, session_id: sessionId, seats: selected, payment_method: method, amount,
-        proof_image: method !== "cash" ? proof : null,
-        location: location.trim(),
-      });
-      localStorage.setItem("walkin_location", location.trim());
-      const loc = location.trim();
-      const nextHist = [loc, ...locHistory.filter((l) => l.toLowerCase() !== loc.toLowerCase())].slice(0, 12);
-      setLocHistory(nextHist);
-      localStorage.setItem("walkin_locations", JSON.stringify(nextHist));
-      setPayStep(null);
-      setResult(data);
-      setName(""); setPhone(""); setSelected([]); setAmountText(""); setProof(null);
-      loadMap(sessionId, false);
+      const data = await doCreate(null);
+      if (method === "cash") {
+        setResult(data); clearForm(); loadMap(sessionId, false);
+      } else {
+        setProof(null); setPendingOrder(data); setDisplayMode("paying"); setPayStep("pay");
+      }
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Gagal membuat tiket");
       loadMap(sessionId, false);
@@ -264,16 +282,24 @@ export default function WalkinPage() {
     setBusy(false);
   };
 
-  const startPayment = () => {
-    if (!walkinSessions[sessionId]) { toast.error("Sesi ini belum dibuka untuk panitia (lokasi)"); return; }
-    if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
-    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
-    if (amount <= 0) { toast.error("Isi nominal dana sukarela"); return; }
-    if (!location.trim()) { toast.error("Isi lokasi penjualan"); return; }
-    if (method === "cash") { submit(); return; }
-    setProof(null);
-    setDisplayMode("paying");
-    setPayStep("pay");
+  const confirmPayment = async () => {
+    if (!pendingOrder || !proof) { toast.error("Foto struk dulu"); return; }
+    setBusy(true);
+    try {
+      await adminApi.post(`/admin/walkin/${pendingOrder.id}/proof`, { proof_image: proof });
+      setPayStep(null); setResult(pendingOrder); setPendingOrder(null);
+      clearForm(); loadMap(sessionId, false);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Gagal simpan bukti");
+    }
+    setBusy(false);
+  };
+
+  const cancelPayment = async () => {
+    if (busy) return;
+    const po = pendingOrder;
+    setPayStep(null); setDisplayMode("selecting"); setPendingOrder(null); setProof(null);
+    if (po) { try { await adminApi.delete(`/admin/walkin/${po.id}`); } catch { /* ignore */ } loadMap(sessionId, false); }
   };
 
   const remaining = mapData ? (mapData.capacity - mapData.booked) : null;
@@ -463,7 +489,7 @@ export default function WalkinPage() {
       </div>
 
       {/* Payment step dialog (QRIS / Transfer) */}
-      <Dialog open={payStep === "pay"} onOpenChange={(o) => { if (!o && !busy) { setPayStep(null); setDisplayMode("selecting"); } }}>
+      <Dialog open={payStep === "pay"} onOpenChange={(o) => { if (!o) cancelPayment(); }}>
         <DialogContent data-testid="walkin-pay-dialog" className="max-w-md rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">
@@ -473,13 +499,18 @@ export default function WalkinPage() {
           <div className="space-y-3">
             <div className="rounded-xl bg-[#B26A1E] text-white p-4 text-center">
               <p className="text-sm text-white/85">Nominal (WAJIB PAS)</p>
-              <p className="font-serif-display text-4xl leading-tight" data-testid="walkin-pay-amount">{rupiah(total)}</p>
+              <p className="font-serif-display text-4xl leading-tight" data-testid="walkin-pay-amount">{rupiah(pendingOrder?.total_amount || 0)}</p>
+              {pendingOrder?.unique_code ? <p className="text-xs text-white/80 mt-0.5">termasuk kode unik {pendingOrder.unique_code} (untuk cek mutasi)</p> : null}
+              <div className="flex items-center justify-center gap-4 mt-2 text-sm">
+                <span data-testid="walkin-pay-orderno">No. Tiket: <b>#{pendingOrder?.order_no}</b></span>
+                <span data-testid="walkin-pay-qty">{pendingOrder?.seats?.length || pendingOrder?.qty} tiket</span>
+              </div>
             </div>
 
             {method === "qris" ? (
               <div className="rounded-xl border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4 text-center">
                 <p className="text-sm text-[#7A241F] font-medium mb-2">1️⃣ Minta pembeli scan QRIS ini:</p>
-                <img src={LOGOS.qris} alt="QRIS" className="mx-auto w-full max-w-[240px] rounded-lg border border-border bg-white" />
+                <img src={LOGOS.qris} alt="QRIS" className="mx-auto w-full max-w-[220px] rounded-lg border border-border bg-white" />
               </div>
             ) : (
               <div className="rounded-xl border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4">
@@ -524,8 +555,8 @@ export default function WalkinPage() {
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={() => { setPayStep(null); setDisplayMode("selecting"); }} disabled={busy} className="flex-1">Batal</Button>
-            <Button onClick={submit} disabled={busy || !proof} data-testid="walkin-pay-confirm" className="flex-1 bg-[#2F703E] hover:bg-[#255E33]">
+            <Button variant="outline" onClick={cancelPayment} disabled={busy} className="flex-1">Batal</Button>
+            <Button onClick={confirmPayment} disabled={busy || !proof} data-testid="walkin-pay-confirm" className="flex-1 bg-[#2F703E] hover:bg-[#255E33]">
               {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Konfirmasi LUNAS
             </Button>
           </DialogFooter>

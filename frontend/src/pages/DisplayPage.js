@@ -34,7 +34,7 @@ export default function DisplayPage() {
 
   if (mode === "idle" || !mode) {
     return (
-      <div className="min-h-screen bg-[#7A241F] flex items-center justify-center px-8 py-8" data-testid="display-idle">
+      <div className="h-screen overflow-hidden bg-[#7A241F] flex items-center justify-center px-8 py-6" data-testid="display-idle">
         <div className="flex flex-col lg:flex-row items-center gap-10 max-w-6xl w-full">
           <img src={POSTER_URL} alt="Poster Ashin Jinarakkhita" data-testid="display-idle-poster"
             className="w-auto max-h-[80vh] rounded-2xl shadow-2xl border-4 border-white/10 object-contain shrink-0" />
@@ -84,51 +84,54 @@ export default function DisplayPage() {
   if (mode === "paying") {
     const method = state.method || "cash";
     return (
-      <div className="min-h-screen bg-[#FDFBF7] flex flex-col" data-testid="display-paying">
-        <div className="bg-[#7A241F] text-white px-8 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src={LOGOS.kbi} alt="KBI" className="h-12 bg-white/95 rounded-lg p-1.5" />
+      <div className="h-screen overflow-hidden bg-[#FDFBF7] flex flex-col" data-testid="display-paying">
+        <div className="bg-[#7A241F] text-white px-8 py-3 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <img src={LOGOS.kbi} alt="KBI" className="h-10 bg-white/95 rounded-lg p-1.5" />
             <div>
-              <p className="text-2xl font-serif-display leading-tight">{state.sessionName}</p>
-              <p className="text-white/70 text-lg">{state.sessionTime}</p>
+              <p className="text-xl font-serif-display leading-tight">{state.sessionName}</p>
+              <p className="text-white/70 text-base">{state.sessionTime}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-white/70 text-lg">Kursi</p>
-            <p className="text-3xl font-bold">{(state.selected || []).join(", ") || "-"}</p>
+            <p className="text-white/70 text-sm">No. Tiket · Kursi</p>
+            <p className="text-2xl font-bold">{state.orderNo ? `#${state.orderNo}` : ""} · {(state.selected || []).join(", ") || "-"}</p>
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center px-8 py-6">
-          <div className="grid lg:grid-cols-2 gap-8 items-center max-w-6xl w-full">
+        <div className="flex-1 min-h-0 flex items-center justify-center px-8 py-4">
+          <div className="grid lg:grid-cols-2 gap-6 items-center max-w-5xl w-full">
             {/* Nominal */}
-            <div className="rounded-3xl bg-[#B26A1E] text-white p-10 text-center shadow-2xl order-2 lg:order-1">
-              <p className="text-2xl text-white/85">Total Dana Sukarela</p>
-              <p className="font-serif-display text-7xl lg:text-8xl leading-none mt-3" data-testid="display-amount">{rupiah(state.amount || 0)}</p>
-              <p className="text-lg text-white/80 mt-4">
+            <div className="rounded-3xl bg-[#B26A1E] text-white p-6 text-center shadow-2xl order-2 lg:order-1">
+              <p className="text-xl text-white/85">Total Dana Sukarela</p>
+              <p className="font-serif-display text-6xl leading-none mt-2" data-testid="display-amount">{rupiah(state.amount || 0)}</p>
+              <p className="text-base text-white/80 mt-2">
                 {method === "cash" ? "Bayar tunai pas ke panitia" : "Mohon bayar sesuai nominal PAS"}
               </p>
+              <div className="mt-3 pt-3 border-t border-white/25 flex items-center justify-center gap-6 text-lg">
+                <span data-testid="display-pay-orderno">No. Tiket: <b>#{state.orderNo}</b></span>
+                <span data-testid="display-pay-qty"><b>{state.qty}</b> tiket</span>
+              </div>
             </div>
 
             {/* Instruksi metode */}
             {method === "qris" ? (
-              <div className="rounded-3xl bg-white border-4 border-[#7A241F]/15 p-8 text-center shadow-xl order-1 lg:order-2" data-testid="display-qris">
-                <p className="text-[#7A241F] text-3xl font-serif-display mb-2 flex items-center justify-center gap-2"><QrCode className="h-8 w-8" /> Scan QRIS</p>
-                <p className="text-[#7A6A5E] text-lg mb-4">Scan kode di bawah dengan aplikasi bank/e-wallet</p>
-                <img src={LOGOS.qris} alt="QRIS" className="mx-auto w-full max-w-sm rounded-xl border border-border bg-white" />
+              <div className="rounded-3xl bg-white border-4 border-[#7A241F]/15 p-6 text-center shadow-xl order-1 lg:order-2" data-testid="display-qris">
+                <p className="text-[#7A241F] text-2xl font-serif-display mb-1 flex items-center justify-center gap-2"><QrCode className="h-7 w-7" /> Scan QRIS</p>
+                <p className="text-[#7A6A5E] text-base mb-3">Scan dengan aplikasi bank / e-wallet</p>
+                <img src={LOGOS.qris} alt="QRIS" className="mx-auto w-full max-w-[260px] rounded-xl border border-border bg-white" />
               </div>
             ) : method === "transfer" ? (
-              <div className="rounded-3xl bg-white border-4 border-[#7A241F]/15 p-10 text-center shadow-xl order-1 lg:order-2" data-testid="display-transfer">
-                <p className="text-[#7A241F] text-3xl font-serif-display mb-4 flex items-center justify-center gap-2"><Landmark className="h-8 w-8" /> Transfer Bank</p>
-                <p className="text-[#7A6A5E] text-xl">{state.transfer?.bank || "BCA"}</p>
-                <p className="font-mono text-6xl font-bold text-[#7A241F] tracking-wider my-4">{state.transfer?.account_number}</p>
-                <p className="text-[#7A6A5E] text-xl">a.n. {state.transfer?.account_name}</p>
+              <div className="rounded-3xl bg-white border-4 border-[#7A241F]/15 p-6 text-center shadow-xl order-1 lg:order-2" data-testid="display-transfer">
+                <p className="text-[#7A241F] text-2xl font-serif-display mb-3 flex items-center justify-center gap-2"><Landmark className="h-7 w-7" /> Transfer Bank</p>
+                <p className="text-[#7A6A5E] text-lg">{state.transfer?.bank || "BCA"}</p>
+                <p className="font-mono text-5xl font-bold text-[#7A241F] tracking-wider my-3">{state.transfer?.account_number}</p>
+                <p className="text-[#7A6A5E] text-lg">a.n. {state.transfer?.account_name}</p>
               </div>
             ) : (
-              <div className="rounded-3xl bg-[#2F703E] text-white p-12 text-center shadow-xl order-1 lg:order-2 flex flex-col items-center justify-center" data-testid="display-cash">
-                <Banknote className="h-24 w-24 mb-4" />
-                <p className="text-4xl font-serif-display">Pembayaran Tunai</p>
-                <p className="text-white/80 text-xl mt-3">Silakan serahkan uang tunai ke panitia</p>
+              <div className="rounded-3xl bg-[#2F703E] text-white p-8 text-center shadow-xl order-1 lg:order-2 flex flex-col items-center justify-center" data-testid="display-cash">
+                <Banknote className="h-20 w-20 mb-3" />
+                <p className="text-3xl font-serif-display">Pembayaran Tunai</p>
               </div>
             )}
           </div>
@@ -139,25 +142,25 @@ export default function DisplayPage() {
 
   // mode === "selecting"
   return (
-    <div className="min-h-screen bg-[#FDFBF7] flex flex-col" data-testid="display-selecting">
-      <div className="bg-[#7A241F] text-white px-8 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <img src={LOGOS.kbi} alt="KBI" className="h-12 bg-white/95 rounded-lg p-1.5" />
+    <div className="h-screen overflow-hidden bg-[#FDFBF7] flex flex-col" data-testid="display-selecting">
+      <div className="bg-[#7A241F] text-white px-8 py-3 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <img src={LOGOS.kbi} alt="KBI" className="h-10 bg-white/95 rounded-lg p-1.5" />
           <div>
-            <p className="text-3xl font-serif-display leading-tight">{state.sessionName || "Pilih Kursi"}</p>
-            <p className="text-white/70 text-lg">{state.sessionTime}</p>
+            <p className="text-2xl font-serif-display leading-tight">{state.sessionName || "Pilih Kursi"}</p>
+            <p className="text-white/70 text-base">{state.sessionTime}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-white/70 text-base">Sisa kursi</p>
-          <p className="text-4xl font-bold text-[#F3E9DD]" data-testid="display-remaining">{state.remaining ?? "-"}</p>
+          <p className="text-white/70 text-sm">Sisa kursi</p>
+          <p className="text-3xl font-bold text-[#F3E9DD]" data-testid="display-remaining">{state.remaining ?? "-"}</p>
         </div>
       </div>
 
-      <div className="flex-1 px-6 py-5 flex flex-col items-center">
+      <div className="flex-1 min-h-0 overflow-auto px-4 py-3 flex flex-col items-center">
         <div className="w-full max-w-5xl">
           {state.rows ? (
-            <div style={{ pointerEvents: "none" }} className="scale-[1.05] origin-top">
+            <div style={{ pointerEvents: "none" }}>
               <SeatMap rows={state.rows} selected={state.selected || []} onToggle={() => {}} couples={state.couples || {}} allowDisability />
             </div>
           ) : (
@@ -166,13 +169,13 @@ export default function DisplayPage() {
         </div>
       </div>
 
-      <div className="bg-white border-t border-border px-8 py-5 flex items-center justify-between">
-        <p className="text-[#7A6A5E] text-xl flex items-center gap-2"><Armchair className="h-6 w-6 text-[#B26A1E]" /> Kursi dipilih ({(state.selected || []).length})</p>
+      <div className="bg-white border-t border-border px-8 py-3 flex items-center justify-between shrink-0">
+        <p className="text-[#7A6A5E] text-lg flex items-center gap-2"><Armchair className="h-5 w-5 text-[#B26A1E]" /> Kursi dipilih ({(state.selected || []).length})</p>
         <div className="flex flex-wrap gap-2 justify-end max-w-3xl" data-testid="display-selected">
           {(state.selected || []).length === 0
-            ? <span className="text-[#9CA3AF] text-xl">Belum ada kursi dipilih</span>
+            ? <span className="text-[#9CA3AF] text-lg">Belum ada kursi dipilih</span>
             : (state.selected || []).map((s) => (
-              <span key={s} className="px-4 py-2 rounded-lg bg-[#B26A1E]/15 text-[#8A3A12] font-bold text-2xl">{s}</span>
+              <span key={s} className="px-3 py-1.5 rounded-lg bg-[#B26A1E]/15 text-[#8A3A12] font-bold text-xl">{s}</span>
             ))}
         </div>
       </div>

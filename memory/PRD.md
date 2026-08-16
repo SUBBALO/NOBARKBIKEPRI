@@ -191,3 +191,10 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Banner monitor idle kini tampilkan POSTER film (POSTER_URL) di kiri + info/sesi di kanan (layout 2 kolom). data-testid display-idle-poster. Screenshot bagus.
 - Layar "Terima Kasih" (done, hijau) kini ada logo KBI di atas checkmark.
 - Setelah panitia klik "Sudah Saya Serahkan" → sessionId di-reset null → panitia balik ke prompt "Pilih Sesi Dulu" (layar utama), monitor balik banner.
+
+## Update (Jun 2026 — Kode unik walk-in QRIS/transfer + no tiket di layar bayar + monitor dikecilkan)
+- KODE UNIK: backend memang sudah generate kode unik utk QRIS & transfer (gen_unique_total). Alur bayar dirombak agar order DIBUAT saat "Lanjut Bayar" (proof opsional) → dapat total_amount (incl kode unik), order_no, qty → baru tampil di layar bayar. Verified via test: base 100.000 → tampil Rp 100.095 (kode unik 095) → bisa cek mutasi.
+- BACKEND: walkin_order proof jadi OPSIONAL utk qris/transfer. Tambah POST /admin/walkin/{id}/proof (attach struk setelah bayar) & DELETE /admin/walkin/{id} (cancel, require_walkin, lepas kursi). Model WalkinProof.
+- FRONTEND: startPayment→doCreate (buat order dulu, proof null). Cash→langsung LUNAS. QRIS/transfer→pendingOrder+dialog bayar (tampil total incl kode unik + No.Tiket + qty + QRIS/rekening) → foto struk (webcam/upload) → confirmPayment (POST proof) → LUNAS. Batal/tutup dialog → cancelPayment (DELETE order, lepas kursi). Broadcast paying kirim orderNo+qty+total.
+- MONITOR: layar paying tampilkan No.Tiket + jumlah tiket (data-testid display-pay-orderno/qty). Semua layar monitor diubah h-screen overflow-hidden + ukuran font/padding dikecilkan + seatmap tanpa scale → TIDAK perlu scroll (verified overflow=False).
+- DIUJI 2-jendela: QRIS Rp100.095 + #6428 + 2 tiket tampil di dialog & monitor; monitor tanpa scroll; foto→Konfirmasi→LUNAS #6428; OK→panitia balik Pilih Sesi + monitor idle. Order uji dihapus, sesi walk-in ditutup. Catatan: ada data uji lama lain di preview (SS/a/aa/susanti/candi) belum dibersihkan (bukan dari sesi ini).
