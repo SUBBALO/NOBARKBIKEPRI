@@ -8,8 +8,9 @@ import { SeatMap } from "@/components/SeatMap";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin } from "lucide-react";
+import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin, Monitor, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DISPLAY_CHANNEL } from "./DisplayPage";
 
 const compressImage = (file) =>
   new Promise((resolve, reject) => {
@@ -114,7 +115,12 @@ export default function WalkinPage() {
   const [result, setResult] = useState(null);
   const [transfer, setTransfer] = useState(null);
   const [walkinSessions, setWalkinSessions] = useState({});
+  const [displayMode, setDisplayMode] = useState("selecting"); // selecting | paying
+  const [webcamOpen, setWebcamOpen] = useState(false);
   const pollRef = useRef(null);
+  const chanRef = useRef(null);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   const loadEvent = useCallback(async () => {
     try {
@@ -145,6 +151,67 @@ export default function WalkinPage() {
     pollRef.current = setInterval(() => { loadMap(sessionId, false); loadEvent(); }, 5000);
     return () => pollRef.current && clearInterval(pollRef.current);
   }, [authed, sessionId, loadMap, loadEvent]);
+
+  // ---- Sinkron Layar Monitor Pelanggan (BroadcastChannel, 1 laptop 2 jendela) ----
+  const displayPayload = useRef({ mode: "idle" });
+  useEffect(() => {
+    const ch = new BroadcastChannel(DISPLAY_CHANNEL);
+    chanRef.current = ch;
+    ch.onmessage = (e) => {
+      if (e.data?.type === "hello") ch.postMessage({ type: "state", payload: displayPayload.current });
+    };
+    return () => ch.close();
+  }, []);
+
+  useEffect(() => {
+    if (!authed) return;
+    const s = SESSIONS.find((x) => x.id === sessionId);
+    let payload;
+    if (result) {
+      payload = { mode: "done", result, sessionName: s?.name, sessionTime: s?.time };
+    } else {
+      payload = {
+        mode: displayMode === "welcome" ? "idle" : displayMode,
+        sessionId, sessionName: s?.name, sessionTime: s?.time,
+        rows: mapData?.rows || null, couples: mapData?.couples || {},
+        selected, method, amount: parseInt(amountText || "0", 10) || 0, transfer,
+        remaining: mapData ? (mapData.capacity - mapData.booked) : null,
+      };
+    }
+    displayPayload.current = payload;
+    chanRef.current?.postMessage({ type: "state", payload });
+  }, [authed, result, displayMode, sessionId, mapData, selected, method, amountText, transfer]);
+
+  const openMonitor = () => window.open("/display", "kbi_monitor", "width=1280,height=800");
+
+  const openWebcam = async () => {
+    setWebcamOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}); }
+    } catch (e) {
+      toast.error("Tidak bisa akses webcam. Izinkan kamera di browser, atau pakai Upload File.");
+      setWebcamOpen(false);
+    }
+  };
+  const stopWebcam = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setWebcamOpen(false);
+  };
+  const snapWebcam = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    const canvas = document.createElement("canvas");
+    const max = 1400;
+    let w = v.videoWidth || 1280, h = v.videoHeight || 720;
+    if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); }
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(v, 0, 0, w, h);
+    setProof(canvas.toDataURL("image/jpeg", 0.82));
+    stopWebcam();
+  };
 
   if (!authed) return <Login onLogin={() => { setUser(getAdminUser()); setAuthed(true); }} />;
 
@@ -215,7 +282,13 @@ export default function WalkinPage() {
               <p className="text-[11px] text-white/70 leading-tight">Petugas: {user?.name}</p>
             </div>
           </div>
-          <button onClick={() => { adminApi.post("/admin/logout").catch(() => {}); clearAdminSession(); setAuthed(false); }} data-testid="walkin-logout" className="text-xs text-white/80 underline">Keluar</button>
+          <div className="flex items-center gap-3">
+            <button onClick={openMonitor} data-testid="walkin-open-monitor"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors">
+              <Monitor className="h-4 w-4" /> Buka Layar Monitor
+            </button>
+            <button onClick={() => { adminApi.post("/admin/logout").catch(() => {}); clearAdminSession(); setAuthed(false); }} data-testid="walkin-logout" className="text-xs text-white/80 underline">Keluar</button>
+          </div>
         </div>
       </div>
 
@@ -243,6 +316,21 @@ export default function WalkinPage() {
             <button onClick={() => loadMap(sessionId, true)} className="inline-flex items-center gap-1 text-xs text-[#7A6A5E] hover:text-[#B26A1E]">
               <RefreshCw className="h-3.5 w-3.5" /> Perbarui
             </button>
+          </div>
+
+          <div className="flex items-center gap-2 mb-4 rounded-xl bg-[#7A241F]/[0.04] border border-[#7A241F]/10 p-2" data-testid="walkin-monitor-toggle">
+            <span className="text-[11px] font-semibold text-[#7A241F] flex items-center gap-1 pl-1"><Monitor className="h-3.5 w-3.5" /> Layar Monitor:</span>
+            {[
+              { k: "welcome", t: "Sambutan" },
+              { k: "selecting", t: "Kursi" },
+              { k: "paying", t: "Pembayaran" },
+            ].map((m) => (
+              <button key={m.k} data-testid={`walkin-display-${m.k}`} onClick={() => setDisplayMode(m.k)}
+                className={cn("text-xs font-medium rounded-lg px-3 py-1.5 transition-colors",
+                  displayMode === m.k ? "bg-[#7A241F] text-white" : "bg-white text-[#7A6A5E] border border-border hover:border-[#7A241F]/40")}>
+                {m.t}
+              </button>
+            ))}
           </div>
 
           {mapData && sessionWalkinOpen && (
@@ -353,20 +441,26 @@ export default function WalkinPage() {
                     className="mt-1.5 text-[11px] text-[#EF4444] underline">Ganti foto</button>
                 </div>
               ) : (
-                <label data-testid="walkin-proof-upload"
-                  className="flex flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-[#B26A1E]/40 bg-white py-4 cursor-pointer hover:border-[#B26A1E]">
-                  {uploadingProof ? <Loader2 className="h-5 w-5 animate-spin text-[#B26A1E]" /> : <UploadCloud className="h-5 w-5 text-[#B26A1E]" />}
-                  <span className="text-[11px] font-medium text-[#7A241F]">{uploadingProof ? "Memproses..." : "Ambil / Upload Foto"}</span>
-                  <input type="file" accept="image/*" capture="environment" className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      setUploadingProof(true);
-                      try { setProof(await compressImage(file)); }
-                      catch { toast.error("Gagal memproses foto"); }
-                      setUploadingProof(false);
-                    }} />
-                </label>
+                <div className="space-y-2">
+                  <button type="button" onClick={openWebcam} data-testid="walkin-proof-webcam"
+                    className="flex w-full items-center justify-center gap-2 rounded-md bg-[#7A241F] text-white py-3 font-semibold text-sm hover:bg-[#5E1B17] transition-colors">
+                    <Video className="h-5 w-5" /> Foto Struk pakai Webcam
+                  </button>
+                  <label data-testid="walkin-proof-upload"
+                    className="flex flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-[#B26A1E]/40 bg-white py-3 cursor-pointer hover:border-[#B26A1E]">
+                    {uploadingProof ? <Loader2 className="h-5 w-5 animate-spin text-[#B26A1E]" /> : <UploadCloud className="h-5 w-5 text-[#B26A1E]" />}
+                    <span className="text-[11px] font-medium text-[#7A241F]">{uploadingProof ? "Memproses..." : "atau Upload / Pilih File"}</span>
+                    <input type="file" accept="image/*" capture="environment" className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingProof(true);
+                        try { setProof(await compressImage(file)); }
+                        catch { toast.error("Gagal memproses foto"); }
+                        setUploadingProof(false);
+                      }} />
+                  </label>
+                </div>
               )}
             </div>
           )}
@@ -383,8 +477,25 @@ export default function WalkinPage() {
         </div>
       </div>
 
+      {/* Webcam capture dialog */}
+      <Dialog open={webcamOpen} onOpenChange={(o) => { if (!o) stopWebcam(); }}>
+        <DialogContent data-testid="walkin-webcam-dialog" className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif-display text-xl text-[#7A241F] flex items-center gap-2"><Video className="h-5 w-5" /> Foto Struk pakai Webcam</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-xl overflow-hidden bg-black">
+            <video ref={videoRef} playsInline muted className="w-full h-auto max-h-[50vh] object-contain" data-testid="walkin-webcam-video" />
+          </div>
+          <p className="text-xs text-[#7A6A5E]">Arahkan struk/bukti ke webcam, pastikan jelas terbaca, lalu tekan Jepret.</p>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={stopWebcam} className="flex-1">Batal</Button>
+            <Button onClick={snapWebcam} data-testid="walkin-webcam-snap" className="flex-1 bg-[#7A241F] hover:bg-[#5E1B17]"><Camera className="h-4 w-4 mr-1.5" /> Jepret</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Result popup */}
-      <Dialog open={!!result} onOpenChange={() => setResult(null)}>
+      <Dialog open={!!result} onOpenChange={() => { setResult(null); setDisplayMode("selecting"); }}>
         <DialogContent data-testid="walkin-result-dialog" className="max-w-3xl rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-3">
@@ -446,7 +557,7 @@ export default function WalkinPage() {
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setResult(null)} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
+            <Button onClick={() => { setResult(null); setDisplayMode("selecting"); }} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
