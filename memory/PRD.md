@@ -186,3 +186,8 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - PANITIA WAJIB PILIH SESI DULU: sessionId awal null → tampil prompt "Pilih Sesi Dulu" (data-testid walkin-pick-session), peta kursi tersembunyi & polling mati sampai sesi dipilih.
 - BANNER MONITOR (idle) diganti: judul "Pesan & Beli Tiket di Sini" + "NOBAR FILM DOKUMENTER" + "ASHIN JINARAKKHITA" + "Minggu, 13 September 2026" + "CGV Grand Batam Mall" + daftar 4 sesi (Sesi 1–4 + jam) di bawah (data-testid display-idle-sessions).
 - DIUJI 2-jendela: welcome default ✓; klik kursi→selecting ✓; CASH→LUNAS(#1626, 2 tiket)+monitor done→OK→welcome ✓; QRIS→dialog QRIS+monitor paying→upload proof→Konfirmasi LUNAS(#8971)→OK→welcome ✓; screenshot banner & prompt pilih-sesi bagus. Semua tiket uji dihapus (tickets kembali 31), semua sesi walk-in dikembalikan tertutup.
+
+## Update (Jun 2026 — Poster di banner + logo di Terima Kasih + reset pilih sesi)
+- Banner monitor idle kini tampilkan POSTER film (POSTER_URL) di kiri + info/sesi di kanan (layout 2 kolom). data-testid display-idle-poster. Screenshot bagus.
+- Layar "Terima Kasih" (done, hijau) kini ada logo KBI di atas checkmark.
+- Setelah panitia klik "Sudah Saya Serahkan" → sessionId di-reset null → panitia balik ke prompt "Pilih Sesi Dulu" (layar utama), monitor balik banner.

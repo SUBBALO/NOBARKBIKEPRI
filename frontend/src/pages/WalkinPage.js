@@ -550,7 +550,7 @@ export default function WalkinPage() {
       </Dialog>
 
       {/* Result popup */}
-      <Dialog open={!!result} onOpenChange={() => { setResult(null); setDisplayMode("welcome"); }}>
+      <Dialog open={!!result} onOpenChange={() => { setResult(null); setDisplayMode("welcome"); setSessionId(null); }}>
         <DialogContent data-testid="walkin-result-dialog" className="max-w-lg rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-3">
@@ -588,7 +588,7 @@ export default function WalkinPage() {
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => { setResult(null); setDisplayMode("welcome"); }} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
+            <Button onClick={() => { setResult(null); setDisplayMode("welcome"); setSessionId(null); }} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

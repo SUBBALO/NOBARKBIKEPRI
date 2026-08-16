@@ -5,6 +5,8 @@ import { Banknote, QrCode, Landmark, CheckCircle2, Armchair } from "lucide-react
 
 export const DISPLAY_CHANNEL = "kbi_walkin_display";
 
+const POSTER_URL = "https://customer-assets-lxgj4vgw.emergentagent.net/job_qris-payment-7/artifacts/h7ivo2nv_POSTER.webp";
+
 const SESSIONS = [
   { id: 1, name: "Sesi 1", time: "09.30–11.30" },
   { id: 2, name: "Sesi 2", time: "12.00–14.00" },
@@ -32,23 +34,29 @@ export default function DisplayPage() {
 
   if (mode === "idle" || !mode) {
     return (
-      <div className="min-h-screen bg-[#7A241F] flex flex-col items-center justify-center text-center px-8" data-testid="display-idle">
-        <img src={LOGOS.kbi} alt="KBI" className="h-24 bg-white/95 rounded-2xl p-4 mb-8 shadow-2xl" />
-        <h1 className="font-serif-display text-white text-5xl lg:text-7xl leading-tight">Pesan &amp; Beli Tiket di Sini</h1>
-        <div className="mt-8 mb-6 h-1 w-32 bg-[#B26A1E] rounded-full" />
-        <p className="text-[#F3E9DD] text-2xl lg:text-3xl font-light tracking-wide">NOBAR FILM DOKUMENTER</p>
-        <p className="font-serif-display text-[#F6C976] text-4xl lg:text-5xl mt-2">ASHIN JINARAKKHITA</p>
-        <p className="text-white/90 text-xl lg:text-2xl mt-6">Minggu, 13 September 2026</p>
-        <p className="text-white/80 text-lg lg:text-xl mt-1">CGV Grand Batam Mall</p>
-        <div className="mt-10 w-full max-w-4xl">
-          <p className="text-[#F3E9DD]/80 text-base uppercase tracking-widest mb-3">Pilihan Sesi</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="display-idle-sessions">
-            {SESSIONS.map((s) => (
-              <div key={s.id} className="rounded-xl bg-white/10 border border-white/20 px-3 py-3">
-                <p className="font-serif-display text-2xl text-[#F6C976]">{s.name}</p>
-                <p className="text-white/85 text-base">{s.time} WIB</p>
+      <div className="min-h-screen bg-[#7A241F] flex items-center justify-center px-8 py-8" data-testid="display-idle">
+        <div className="flex flex-col lg:flex-row items-center gap-10 max-w-6xl w-full">
+          <img src={POSTER_URL} alt="Poster Ashin Jinarakkhita" data-testid="display-idle-poster"
+            className="w-auto max-h-[80vh] rounded-2xl shadow-2xl border-4 border-white/10 object-contain shrink-0" />
+          <div className="text-center lg:text-left flex-1">
+            <img src={LOGOS.kbi} alt="KBI" className="h-16 bg-white/95 rounded-xl p-2.5 mb-6 shadow-xl mx-auto lg:mx-0" />
+            <h1 className="font-serif-display text-white text-4xl lg:text-6xl leading-tight">Pesan &amp; Beli Tiket di Sini</h1>
+            <div className="mt-5 mb-5 h-1 w-28 bg-[#B26A1E] rounded-full mx-auto lg:mx-0" />
+            <p className="text-[#F3E9DD] text-xl lg:text-2xl font-light tracking-wide">NOBAR FILM DOKUMENTER</p>
+            <p className="font-serif-display text-[#F6C976] text-3xl lg:text-4xl mt-1">ASHIN JINARAKKHITA</p>
+            <p className="text-white/90 text-lg lg:text-xl mt-4">Minggu, 13 September 2026</p>
+            <p className="text-white/80 text-base lg:text-lg mt-0.5">CGV Grand Batam Mall</p>
+            <div className="mt-7">
+              <p className="text-[#F3E9DD]/80 text-sm uppercase tracking-widest mb-2.5">Pilihan Sesi</p>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5" data-testid="display-idle-sessions">
+                {SESSIONS.map((s) => (
+                  <div key={s.id} className="rounded-xl bg-white/10 border border-white/20 px-3 py-2.5">
+                    <p className="font-serif-display text-xl text-[#F6C976]">{s.name}</p>
+                    <p className="text-white/85 text-sm">{s.time} WIB</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>
@@ -59,8 +67,9 @@ export default function DisplayPage() {
     const r = state.result;
     return (
       <div className="min-h-screen bg-[#2F703E] flex flex-col items-center justify-center text-center px-8" data-testid="display-done">
-        <CheckCircle2 className="h-24 w-24 text-white mb-6" />
-        <h1 className="font-serif-display text-white text-6xl lg:text-7xl">Terima Kasih 🙏</h1>
+        <img src={LOGOS.kbi} alt="KBI" className="h-20 bg-white/95 rounded-2xl p-3 mb-6 shadow-2xl" />
+        <CheckCircle2 className="h-20 w-20 text-white mb-4" />
+        <h1 className="font-serif-display text-white text-5xl lg:text-7xl">Terima Kasih 🙏</h1>
         <p className="text-white/90 text-2xl mt-4">{state.sessionName} · {state.sessionTime}</p>
         <p className="text-white/80 text-xl mt-8 mb-3">Nomor kursi Anda:</p>
         <div className="flex flex-wrap gap-3 justify-center max-w-4xl" data-testid="display-done-seats">
