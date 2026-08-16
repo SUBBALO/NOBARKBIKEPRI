@@ -105,7 +105,7 @@ const ComingSoonView = ({ event }) => (
           ASHIN JINARAKKHITA
         </h1>
         <p className="text-sm sm:text-base text-white/85 mt-3 max-w-md">
-          Film dokumenter — Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.
+          Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.
         </p>
         <span data-testid="coming-soon-badge"
           className="mt-6 inline-flex items-center gap-2 bg-[#B26A1E] text-white text-base sm:text-lg font-semibold px-6 py-2.5 rounded-full shadow-lg shadow-black/20">
@@ -256,7 +256,7 @@ export default function BookingPage() {
               ASHIN<br className="hidden sm:block" /> JINARAKKHITA
             </h1>
             <p className="text-sm sm:text-base text-white/85 mt-3 max-w-md">
-              Film dokumenter — Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.
+              Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-4">
               <span className="inline-flex items-center gap-2 bg-[#B26A1E] text-white text-sm font-semibold px-4 py-2 rounded-full">
