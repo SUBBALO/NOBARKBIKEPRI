@@ -299,7 +299,7 @@ export default function WalkinPage() {
     if (busy) return;
     const po = pendingOrder;
     setPayStep(null); setDisplayMode("selecting"); setPendingOrder(null); setProof(null);
-    if (po) { try { await adminApi.delete(`/admin/walkin/${po.id}`); } catch { /* ignore */ } loadMap(sessionId, false); }
+    if (po) { try { await adminApi.delete(`/admin/walkin/${po.id}`); } catch (err) { console.error("Gagal batalkan walk-in:", err); } loadMap(sessionId, false); }
   };
 
   const remaining = mapData ? (mapData.capacity - mapData.booked) : null;
