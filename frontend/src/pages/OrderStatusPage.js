@@ -142,7 +142,7 @@ export default function OrderStatusPage() {
       const ics = [
         "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MBI Kepri//Nonton Bersama//ID",
         "BEGIN:VEVENT", `UID:order-${order.order_no}@kbikepri`,
-        `SUMMARY:Nonton Bersama - Ashin Jinarakkhita (${order.session?.name})`,
+        `SUMMARY:Film Dokumenter - Ashin Jinarakkhita (${order.session?.name})`,
         `DESCRIPTION:Tiket #${order.order_no} a.n ${order.name}. Kursi ${order.seats.join(", ")}. Tunjukkan saat check-in.`,
         `LOCATION:${event?.location || "CGV Grand Batam"}`,
         `DTSTART:${start}`, `DTEND:${end}`,

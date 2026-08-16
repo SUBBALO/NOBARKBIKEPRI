@@ -42,7 +42,7 @@ export default function DisplayPage() {
             <img src={LOGOS.kbi} alt="KBI" className="h-16 bg-white/95 rounded-xl p-2.5 mb-6 shadow-xl mx-auto lg:mx-0" />
             <h1 className="font-serif-display text-white text-4xl lg:text-6xl leading-tight">Pesan &amp; Beli Tiket di Sini</h1>
             <div className="mt-5 mb-5 h-1 w-28 bg-[#B26A1E] rounded-full mx-auto lg:mx-0" />
-            <p className="text-[#F3E9DD] text-xl lg:text-2xl font-light tracking-wide">NOBAR FILM DOKUMENTER</p>
+            <p className="text-[#F3E9DD] text-xl lg:text-2xl font-light tracking-wide">FILM DOKUMENTER</p>
             <p className="font-serif-display text-[#F6C976] text-3xl lg:text-4xl mt-1">ASHIN JINARAKKHITA</p>
             <p className="text-white/90 text-lg lg:text-xl mt-4">Minggu, 13 September 2026</p>
             <p className="text-white/80 text-base lg:text-lg mt-0.5">CGV Grand Batam Mall</p>

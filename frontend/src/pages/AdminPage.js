@@ -85,7 +85,7 @@ const sendReminderWA = (o) => {
   const link = `${window.location.origin}/order/${o.id}`;
   const msg =
 `Namo Buddhaya, ${o.name}
-Terima kasih sudah memesan tiket Nonton Bersama Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara".
+Terima kasih sudah memesan tiket Film Dokumenter "Y.A. MNS. Ashin Jinarakkhita: Jejak Langkah Sang Pelopor di Nusantara".
 
 Namun kami *BELUM menerima bukti pembayaran* Anda untuk:
 No. Order: #${o.order_no}

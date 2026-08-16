@@ -115,7 +115,7 @@ export default function CheckinPage() {
             <img src={LOGOS.kbi} alt="KBI" className="h-8 bg-white/95 rounded p-1" />
             <div>
               <p className="text-sm font-semibold leading-tight">Check-in Peserta</p>
-              <p className="text-[11px] text-white/70 leading-tight">Nonton Bersama · MBI Kepri</p>
+              <p className="text-[11px] text-white/70 leading-tight">Film Dokumenter · MBI Kepri</p>
             </div>
           </div>
           <button onClick={() => { adminApi.post("/admin/logout").catch(() => {}); clearAdminSession(); setAuthed(false); }}

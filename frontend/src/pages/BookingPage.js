@@ -100,7 +100,7 @@ const ComingSoonView = ({ event }) => (
         <span className="mt-6 inline-flex items-center gap-2 text-xs sm:text-sm font-medium bg-white/10 px-4 py-1.5 rounded-full backdrop-blur">
           <CalendarDays className="h-4 w-4" /> {event?.date || "Minggu, 13 September 2026"} · {event?.location || "CGV Grand Batam"}
         </span>
-        <p className="font-cursive text-2xl sm:text-3xl text-[#E4C57E] mt-4 leading-none">Nonton Bersama</p>
+        <p className="font-cursive text-2xl sm:text-3xl text-[#E4C57E] mt-4 leading-none">Film Dokumenter</p>
         <h1 className="font-serif-display text-3xl sm:text-5xl font-extrabold leading-[1.05] mt-1">
           ASHIN JINARAKKHITA
         </h1>
@@ -251,7 +251,7 @@ export default function BookingPage() {
             <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/10 px-3 py-1 rounded-full backdrop-blur">
               <CalendarDays className="h-3.5 w-3.5" /> {event?.date || "Minggu, 13 September 2026"} · {event?.location || "CGV Grand Batam"}
             </span>
-            <p className="font-cursive text-2xl sm:text-3xl text-[#E4C57E] mt-3 leading-none">Nonton Bersama</p>
+            <p className="font-cursive text-2xl sm:text-3xl text-[#E4C57E] mt-3 leading-none">Film Dokumenter</p>
             <h1 className="font-serif-display text-3xl sm:text-5xl font-extrabold leading-[1.05] mt-1">
               ASHIN<br className="hidden sm:block" /> JINARAKKHITA
             </h1>
