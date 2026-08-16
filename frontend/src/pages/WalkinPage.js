@@ -97,7 +97,7 @@ function Login({ onLogin }) {
 export default function WalkinPage() {
   const [authed, setAuthed] = useState(!!getAdminUser());
   const [user, setUser] = useState(getAdminUser());
-  const [sessionId, setSessionId] = useState(1);
+  const [sessionId, setSessionId] = useState(null);
   const [mapData, setMapData] = useState(null);
   const [loadingMap, setLoadingMap] = useState(true);
   const [selected, setSelected] = useState([]);
@@ -115,8 +115,9 @@ export default function WalkinPage() {
   const [result, setResult] = useState(null);
   const [transfer, setTransfer] = useState(null);
   const [walkinSessions, setWalkinSessions] = useState({});
-  const [displayMode, setDisplayMode] = useState("selecting"); // selecting | paying
+  const [displayMode, setDisplayMode] = useState("welcome"); // welcome | selecting | paying
   const [webcamOpen, setWebcamOpen] = useState(false);
+  const [payStep, setPayStep] = useState(null); // null | "pay"
   const pollRef = useRef(null);
   const chanRef = useRef(null);
   const videoRef = useRef(null);
@@ -146,6 +147,7 @@ export default function WalkinPage() {
   useEffect(() => {
     if (!authed) return;
     setSelected([]);
+    if (!sessionId) { setMapData(null); if (pollRef.current) clearInterval(pollRef.current); return; }
     loadMap(sessionId, true);
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(() => { loadMap(sessionId, false); loadEvent(); }, 5000);
@@ -226,6 +228,7 @@ export default function WalkinPage() {
   }
 
   const toggle = (label, partner = null) => {
+    setDisplayMode("selecting");
     setSelected((p) => {
       const pair = partner ? [label, partner] : [label];
       if (p.includes(label)) return p.filter((x) => !pair.includes(x));
@@ -238,12 +241,6 @@ export default function WalkinPage() {
   const total = amount;
 
   const submit = async () => {
-    if (!walkinSessions[sessionId]) { toast.error("Sesi ini belum dibuka untuk panitia (lokasi)"); return; }
-    if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
-    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
-    if (amount <= 0) { toast.error("Isi nominal dana sukarela"); return; }
-    if (!location.trim()) { toast.error("Isi lokasi penjualan"); return; }
-    if (method !== "cash" && !proof) { toast.error("Untuk QRIS/Transfer wajib upload foto bukti pembayaran"); return; }
     setBusy(true);
     try {
       const { data } = await adminApi.post("/admin/walkin", {
@@ -256,6 +253,7 @@ export default function WalkinPage() {
       const nextHist = [loc, ...locHistory.filter((l) => l.toLowerCase() !== loc.toLowerCase())].slice(0, 12);
       setLocHistory(nextHist);
       localStorage.setItem("walkin_locations", JSON.stringify(nextHist));
+      setPayStep(null);
       setResult(data);
       setName(""); setPhone(""); setSelected([]); setAmountText(""); setProof(null);
       loadMap(sessionId, false);
@@ -264,6 +262,18 @@ export default function WalkinPage() {
       loadMap(sessionId, false);
     }
     setBusy(false);
+  };
+
+  const startPayment = () => {
+    if (!walkinSessions[sessionId]) { toast.error("Sesi ini belum dibuka untuk panitia (lokasi)"); return; }
+    if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
+    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    if (amount <= 0) { toast.error("Isi nominal dana sukarela"); return; }
+    if (!location.trim()) { toast.error("Isi lokasi penjualan"); return; }
+    if (method === "cash") { submit(); return; }
+    setProof(null);
+    setDisplayMode("paying");
+    setPayStep("pay");
   };
 
   const remaining = mapData ? (mapData.capacity - mapData.booked) : null;
@@ -300,7 +310,7 @@ export default function WalkinPage() {
               {SESSIONS.map((s) => {
                 const isWalkinOpen = walkinSessions[s.id];
                 return (
-                  <button key={s.id} data-testid={`walkin-session-${s.id}`} onClick={() => setSessionId(s.id)}
+                  <button key={s.id} data-testid={`walkin-session-${s.id}`} onClick={() => { setSessionId(s.id); setDisplayMode("selecting"); }}
                     className={cn("px-3 py-1.5 rounded-full text-sm font-medium border transition-colors relative",
                       sessionId === s.id ? "bg-[#B26A1E] text-white border-[#B26A1E]"
                         : isWalkinOpen ? "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50"
@@ -333,14 +343,20 @@ export default function WalkinPage() {
             ))}
           </div>
 
-          {mapData && sessionWalkinOpen && (
+          {mapData && sessionId && sessionWalkinOpen && (
             <p className="text-sm mb-3" data-testid="walkin-remaining">
               {sold ? <span className="font-semibold text-[#EF4444]">Kursi sesi ini habis terjual</span>
                 : <>Sisa <b className="text-[#255E33] text-lg">{remaining}</b> kursi · {mapData.booked}/{mapData.capacity} terisi</>}
             </p>
           )}
 
-          {!sessionWalkinOpen ? (
+          {!sessionId ? (
+            <div className="rounded-xl border-2 border-dashed border-[#B26A1E]/40 bg-[#F3E9DD]/40 p-10 text-center" data-testid="walkin-pick-session">
+              <Store className="h-12 w-12 text-[#B26A1E] mx-auto mb-3" />
+              <p className="font-serif-display text-2xl text-[#7A241F]">Pilih Sesi Dulu</p>
+              <p className="text-sm text-[#7A6A5E] mt-1.5 max-w-sm mx-auto">Tekan salah satu <b>tombol sesi</b> di atas untuk menampilkan peta kursi.</p>
+            </div>
+          ) : !sessionWalkinOpen ? (
             <div className="rounded-xl border border-[#B26A1E]/40 bg-[#F3E9DD]/50 p-8 text-center" data-testid="walkin-session-closed">
               <Store className="h-10 w-10 text-[#B26A1E] mx-auto mb-3" />
               <p className="font-semibold text-[#7A241F]">Sesi ini belum dibuka untuk penjualan panitia</p>
@@ -429,16 +445,59 @@ export default function WalkinPage() {
           </div>
 
           {method !== "cash" && (
-            <div className="rounded-lg border border-[#7A241F]/30 bg-[#7A241F]/[0.03] p-3 mb-3" data-testid="walkin-proof-box">
-              <p className="text-xs font-semibold text-[#7A241F] flex items-center gap-1.5">
-                <Camera className="h-4 w-4" /> Foto Bukti Pembayaran <span className="text-[#EF4444]">(wajib)</span>
-              </p>
-              <p className="text-[11px] text-[#7A6A5E] mb-2">Untuk {method === "qris" ? "QRIS" : "Transfer"}, foto/screenshot bukti bayar pembeli.</p>
+            <p className="text-[11px] text-[#7A6A5E] mb-3 rounded-lg bg-[#7A241F]/[0.04] border border-[#7A241F]/10 p-2.5" data-testid="walkin-pay-hint">
+              Setelah klik <b>Lanjut Bayar</b>, layar {method === "qris" ? "QRIS" : "rekening transfer"} akan muncul untuk pembeli. Setelah pembeli membayar, foto struk pakai webcam, lalu nomor tiket muncul.
+            </p>
+          )}
+
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-[#7A6A5E]">Total {method === "cash" ? "(pas)" : "(+ kode unik)"}</span>
+            <span className="font-serif-display text-2xl text-[#B26A1E]" data-testid="walkin-total">{rupiah(total)}</span>
+          </div>
+
+          <Button onClick={startPayment} disabled={busy || selected.length === 0 || !sessionWalkinOpen || !location.trim()} data-testid="walkin-submit"
+            className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
+            {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} {method === "cash" ? "Buat Tiket (LUNAS)" : "Lanjut Bayar"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Payment step dialog (QRIS / Transfer) */}
+      <Dialog open={payStep === "pay"} onOpenChange={(o) => { if (!o && !busy) { setPayStep(null); setDisplayMode("selecting"); } }}>
+        <DialogContent data-testid="walkin-pay-dialog" className="max-w-md rounded-2xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">
+              {method === "qris" ? "Pembayaran QRIS" : "Pembayaran Transfer"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-xl bg-[#B26A1E] text-white p-4 text-center">
+              <p className="text-sm text-white/85">Nominal (WAJIB PAS)</p>
+              <p className="font-serif-display text-4xl leading-tight" data-testid="walkin-pay-amount">{rupiah(total)}</p>
+            </div>
+
+            {method === "qris" ? (
+              <div className="rounded-xl border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4 text-center">
+                <p className="text-sm text-[#7A241F] font-medium mb-2">1️⃣ Minta pembeli scan QRIS ini:</p>
+                <img src={LOGOS.qris} alt="QRIS" className="mx-auto w-full max-w-[240px] rounded-lg border border-border bg-white" />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4">
+                <p className="text-sm text-[#7A241F] font-medium mb-2">1️⃣ Minta pembeli transfer ke:</p>
+                <div className="rounded-md bg-white border border-border p-3 space-y-1 text-center">
+                  <p className="text-xs text-[#7A6A5E]">{transfer?.bank || "BCA"}</p>
+                  <p className="font-mono text-2xl font-bold text-[#7A241F] tracking-wide">{transfer?.account_number}</p>
+                  <p className="text-xs text-[#7A6A5E]">a.n. {transfer?.account_name}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-[#B26A1E]/30 bg-[#F3E9DD]/40 p-3">
+              <p className="text-sm text-[#8A3A12] font-medium mb-2">2️⃣ Setelah pembeli bayar, foto struk/bukti:</p>
               {proof ? (
-                <div className="relative">
-                  <img src={proof} alt="Bukti" className="w-full max-h-40 object-contain rounded-md border border-border bg-white" data-testid="walkin-proof-preview" />
-                  <button type="button" onClick={() => setProof(null)} data-testid="walkin-proof-remove"
-                    className="mt-1.5 text-[11px] text-[#EF4444] underline">Ganti foto</button>
+                <div className="text-center">
+                  <img src={proof} alt="Bukti" className="w-full max-h-40 object-contain rounded-md border border-border bg-white mx-auto" data-testid="walkin-proof-preview" />
+                  <button type="button" onClick={() => setProof(null)} data-testid="walkin-proof-remove" className="mt-1.5 text-[11px] text-[#EF4444] underline">Foto ulang</button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -447,8 +506,8 @@ export default function WalkinPage() {
                     <Video className="h-5 w-5" /> Foto Struk pakai Webcam
                   </button>
                   <label data-testid="walkin-proof-upload"
-                    className="flex flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-[#B26A1E]/40 bg-white py-3 cursor-pointer hover:border-[#B26A1E]">
-                    {uploadingProof ? <Loader2 className="h-5 w-5 animate-spin text-[#B26A1E]" /> : <UploadCloud className="h-5 w-5 text-[#B26A1E]" />}
+                    className="flex items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-[#B26A1E]/40 bg-white py-2.5 cursor-pointer hover:border-[#B26A1E]">
+                    {uploadingProof ? <Loader2 className="h-4 w-4 animate-spin text-[#B26A1E]" /> : <UploadCloud className="h-4 w-4 text-[#B26A1E]" />}
                     <span className="text-[11px] font-medium text-[#7A241F]">{uploadingProof ? "Memproses..." : "atau Upload / Pilih File"}</span>
                     <input type="file" accept="image/*" capture="environment" className="hidden"
                       onChange={async (e) => {
@@ -463,19 +522,15 @@ export default function WalkinPage() {
                 </div>
               )}
             </div>
-          )}
-
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-[#7A6A5E]">Total {method === "cash" ? "(pas)" : "(+ kode unik)"}</span>
-            <span className="font-serif-display text-2xl text-[#B26A1E]" data-testid="walkin-total">{rupiah(total)}</span>
           </div>
-
-          <Button onClick={submit} disabled={busy || selected.length === 0 || !sessionWalkinOpen || !location.trim() || (method !== "cash" && !proof)} data-testid="walkin-submit"
-            className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
-            {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} Buat Tiket & Check-in
-          </Button>
-        </div>
-      </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => { setPayStep(null); setDisplayMode("selecting"); }} disabled={busy} className="flex-1">Batal</Button>
+            <Button onClick={submit} disabled={busy || !proof} data-testid="walkin-pay-confirm" className="flex-1 bg-[#2F703E] hover:bg-[#255E33]">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />} Konfirmasi LUNAS
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Webcam capture dialog */}
       <Dialog open={webcamOpen} onOpenChange={(o) => { if (!o) stopWebcam(); }}>
@@ -495,69 +550,45 @@ export default function WalkinPage() {
       </Dialog>
 
       {/* Result popup */}
-      <Dialog open={!!result} onOpenChange={() => { setResult(null); setDisplayMode("selecting"); }}>
-        <DialogContent data-testid="walkin-result-dialog" className="max-w-3xl rounded-2xl max-h-[92vh] overflow-y-auto">
+      <Dialog open={!!result} onOpenChange={() => { setResult(null); setDisplayMode("welcome"); }}>
+        <DialogContent data-testid="walkin-result-dialog" className="max-w-lg rounded-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-full bg-[#2F703E]/15 flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#2F703E]" /></div>
+              <div className="h-12 w-12 rounded-full bg-[#2F703E]/15 flex items-center justify-center shrink-0"><CheckCircle2 className="h-6 w-6 text-[#2F703E]" /></div>
               <div>
-                <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Tiket Dibuat & Check-in ✅</DialogTitle>
-                {result && <p className="text-sm text-[#7A6A5E] mt-0.5"><b className="text-[#2C1E16]">{result.name}</b> · <span className="font-mono text-xs">#{result.order_no}</span></p>}
+                <DialogTitle className="font-serif-display text-3xl text-[#2F703E]">LUNAS ✅</DialogTitle>
+                {result && <p className="text-sm text-[#7A6A5E] mt-0.5"><b className="text-[#2C1E16]">{result.name}</b> · {rupiah(result.total_amount)} · {result.payment_method?.toUpperCase()}</p>}
               </div>
             </div>
           </DialogHeader>
           {result && (
-            <div className="grid sm:grid-cols-2 gap-4 items-start text-sm">
-              {/* Kolom kiri: instruksi pembayaran */}
-              {result.payment_method === "qris" ? (
-                <div className="rounded-lg border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4 text-center" data-testid="walkin-pay-qris-info">
-                  <p className="text-[#7A241F] font-medium mb-2">Silakan scan QRIS lalu bayar:</p>
-                  <img src={LOGOS.qris} alt="QRIS" className="mx-auto max-h-[42vh] w-auto rounded-lg border border-border bg-white" />
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-[#7A241F]/[0.05] border border-[#7A241F]/10 p-4 text-center">
+                  <p className="text-xs text-[#7A6A5E] mb-0.5">Nomor Tiket</p>
+                  <p className="font-mono text-3xl font-bold text-[#7A241F]" data-testid="walkin-result-orderno">#{result.order_no}</p>
                 </div>
-              ) : result.payment_method === "transfer" ? (
-                <div className="rounded-lg border border-[#7A241F]/15 bg-[#7A241F]/[0.03] p-4" data-testid="walkin-pay-transfer-info">
-                  <p className="text-[#7A241F] font-medium mb-2">Silakan transfer ke rekening:</p>
-                  <div className="rounded-md bg-white border border-border p-3 space-y-1">
-                    <p className="text-xs text-[#7A6A5E]">{transfer?.bank || "BCA"}</p>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-2xl font-bold text-[#7A241F] tracking-wide">{transfer?.account_number}</span>
-                      <button onClick={() => { navigator.clipboard?.writeText((transfer?.account_number || "").replace(/\s/g, "")); toast.success("No. rekening disalin"); }}
-                        data-testid="walkin-copy-rek" className="text-[#B26A1E] text-xs underline shrink-0">Salin</button>
-                    </div>
-                    <p className="text-xs text-[#7A6A5E]">a.n. {transfer?.account_name}</p>
-                  </div>
+                <div className="rounded-lg bg-[#B26A1E]/10 border border-[#B26A1E]/20 p-4 text-center">
+                  <p className="text-xs text-[#7A6A5E] mb-0.5">Jumlah Tiket</p>
+                  <p className="font-serif-display text-3xl text-[#B26A1E]" data-testid="walkin-result-qty">{result.seats.length} tiket</p>
                 </div>
-              ) : (
-                <div className="rounded-lg border border-[#2F703E]/20 bg-[#2F703E]/[0.05] p-4 text-center flex flex-col items-center justify-center" data-testid="walkin-pay-cash-info">
-                  <Banknote className="h-10 w-10 text-[#2F703E] mb-2" />
-                  <p className="text-[#255E33] font-medium">Terima pembayaran tunai</p>
-                </div>
-              )}
-
-              {/* Kolom kanan: nominal + kursi */}
-              <div className="space-y-4">
-                <div className="rounded-lg bg-[#B26A1E]/10 p-4 text-center">
-                  <p className="text-[#7A6A5E]">Nominal {result.payment_method === "cash" ? "(pas)" : "(WAJIB PAS)"}:</p>
-                  <p className="font-serif-display text-4xl text-[#B26A1E] leading-tight">{rupiah(result.total_amount)}</p>
-                  {result.unique_code ? <p className="text-xs text-[#7A6A5E]">termasuk kode unik {result.unique_code}</p> : null}
-                </div>
-                <div className="rounded-lg bg-[#7A241F]/[0.04] border border-[#7A241F]/10 p-4">
-                  <p className="text-[#8A3A12] font-medium mb-2">🎟️ Serahkan tiket:</p>
-                  <p className="font-serif-display text-2xl text-[#7A241F] mb-2" data-testid="walkin-result-session">
-                    {(SESSIONS.find((s) => s.id === result.session_id)?.name || `Sesi ${result.session_id}`).toUpperCase()} · {SESSIONS.find((s) => s.id === result.session_id)?.time}
-                  </p>
-                  <p className="text-xs text-[#7A6A5E] mb-1">Nomor kursi:</p>
-                  <div className="flex flex-wrap gap-2" data-testid="walkin-result-seats">
-                    {result.seats.map((s) => (
-                      <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold text-lg border border-[#B26A1E]/30">{s}</span>
-                    ))}
-                  </div>
+              </div>
+              <div className="rounded-lg bg-[#7A241F]/[0.04] border border-[#7A241F]/10 p-4">
+                <p className="text-[#8A3A12] font-medium mb-2">🎟️ Serahkan tiket:</p>
+                <p className="font-serif-display text-2xl text-[#7A241F] mb-2" data-testid="walkin-result-session">
+                  {(SESSIONS.find((s) => s.id === result.session_id)?.name || `Sesi ${result.session_id}`).toUpperCase()} · {SESSIONS.find((s) => s.id === result.session_id)?.time}
+                </p>
+                <p className="text-xs text-[#7A6A5E] mb-1">Nomor kursi:</p>
+                <div className="flex flex-wrap gap-2" data-testid="walkin-result-seats">
+                  {result.seats.map((s) => (
+                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold text-lg border border-[#B26A1E]/30">{s}</span>
+                  ))}
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => { setResult(null); setDisplayMode("selecting"); }} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
+            <Button onClick={() => { setResult(null); setDisplayMode("welcome"); }} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

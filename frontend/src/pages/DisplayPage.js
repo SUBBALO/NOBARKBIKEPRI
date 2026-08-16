@@ -5,6 +5,13 @@ import { Banknote, QrCode, Landmark, CheckCircle2, Armchair } from "lucide-react
 
 export const DISPLAY_CHANNEL = "kbi_walkin_display";
 
+const SESSIONS = [
+  { id: 1, name: "Sesi 1", time: "09.30–11.30" },
+  { id: 2, name: "Sesi 2", time: "12.00–14.00" },
+  { id: 3, name: "Sesi 3", time: "14.30–16.30" },
+  { id: 4, name: "Sesi 4", time: "17.00–19.00" },
+];
+
 const initial = { mode: "idle" };
 
 export default function DisplayPage() {
@@ -26,10 +33,24 @@ export default function DisplayPage() {
   if (mode === "idle" || !mode) {
     return (
       <div className="min-h-screen bg-[#7A241F] flex flex-col items-center justify-center text-center px-8" data-testid="display-idle">
-        <img src={LOGOS.kbi} alt="KBI" className="h-28 bg-white/95 rounded-2xl p-4 mb-10 shadow-2xl" />
-        <h1 className="font-serif-display text-white text-6xl lg:text-7xl leading-tight">Selamat Datang</h1>
-        <p className="text-[#F3E9DD] text-3xl lg:text-4xl mt-4 font-light tracking-wide">Nonton Bareng</p>
-        <div className="mt-10 h-1 w-32 bg-[#B26A1E] rounded-full" />
+        <img src={LOGOS.kbi} alt="KBI" className="h-24 bg-white/95 rounded-2xl p-4 mb-8 shadow-2xl" />
+        <h1 className="font-serif-display text-white text-5xl lg:text-7xl leading-tight">Pesan &amp; Beli Tiket di Sini</h1>
+        <div className="mt-8 mb-6 h-1 w-32 bg-[#B26A1E] rounded-full" />
+        <p className="text-[#F3E9DD] text-2xl lg:text-3xl font-light tracking-wide">NOBAR FILM DOKUMENTER</p>
+        <p className="font-serif-display text-[#F6C976] text-4xl lg:text-5xl mt-2">ASHIN JINARAKKHITA</p>
+        <p className="text-white/90 text-xl lg:text-2xl mt-6">Minggu, 13 September 2026</p>
+        <p className="text-white/80 text-lg lg:text-xl mt-1">CGV Grand Batam Mall</p>
+        <div className="mt-10 w-full max-w-4xl">
+          <p className="text-[#F3E9DD]/80 text-base uppercase tracking-widest mb-3">Pilihan Sesi</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="display-idle-sessions">
+            {SESSIONS.map((s) => (
+              <div key={s.id} className="rounded-xl bg-white/10 border border-white/20 px-3 py-3">
+                <p className="font-serif-display text-2xl text-[#F6C976]">{s.name}</p>
+                <p className="text-white/85 text-base">{s.time} WIB</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
