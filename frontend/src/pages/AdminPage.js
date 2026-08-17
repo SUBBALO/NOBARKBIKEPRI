@@ -1545,11 +1545,33 @@ function ManualPanel() {
     try {
       let logo = null;
       await new Promise((res) => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { logo = img; res(); }; img.onerror = () => res(); img.src = LOGOS.kbi; });
-      let url;
-      try { url = draw(logo).toDataURL("image/png"); }
-      catch (e) { url = draw(null).toDataURL("image/png"); }
-      const a = document.createElement("a"); a.href = url; a.download = `e-ticket-${o.order_no}.png`;
+      let canvas;
+      try { canvas = draw(logo); } catch (e) { canvas = draw(null); }
+      const fileName = `e-ticket-${o.order_no}.png`;
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      // 1) Web Share API dgn file (paling baik di iPhone -> muncul "Simpan ke Foto")
+      if (blob && navigator.canShare) {
+        try {
+          const file = new File([blob], fileName, { type: "image/png" });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: `E-Ticket #${o.order_no}` });
+            toast.success("E-ticket siap dibagikan/disimpan");
+            return;
+          }
+        } catch (err) { if (err?.name === "AbortError") return; /* user batal */ }
+      }
+      const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL("image/png");
+      // 2) iOS: buka gambar di tab baru -> tekan lama -> "Simpan ke Foto"
+      if (isIOS) {
+        window.open(url, "_blank");
+        toast.info("Tekan lama gambar lalu pilih \u201CSimpan ke Foto\u201D", { duration: 6000 });
+        return;
+      }
+      // 3) Desktop/Android: download biasa
+      const a = document.createElement("a"); a.href = url; a.download = fileName;
       document.body.appendChild(a); a.click(); a.remove();
+      if (blob) setTimeout(() => URL.revokeObjectURL(url), 4000);
       toast.success("E-ticket tersimpan sebagai gambar");
     } catch (e) { console.error("save ticket:", e); toast.error("Gagal membuat e-ticket"); }
   };
