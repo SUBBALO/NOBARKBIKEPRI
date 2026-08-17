@@ -1271,7 +1271,7 @@ function VIPPanel() {
               ) : list.map((o) => (
                 <tr key={o.id} className="border-t border-border" data-testid={`vip-row-${o.order_no}`}>
                   <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
-                  <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name} · {o.seats?.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.qty} kursi)</span></td>
+                  <td className="px-3 py-2 text-[#5B4636] align-top"><span className="block font-medium">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name}</span><span className="text-[13px] leading-snug break-words">{o.seats?.join(", ")} <span className="text-[10px] text-[#7A6A5E]">({o.qty} kursi)</span></span></td>
                   <td className="px-3 py-2 text-[#7A6A5E]">{o.note || "—"}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button onClick={() => openEdit({ ...o })} data-testid={`vip-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit Kursi</button>
@@ -1567,7 +1567,7 @@ function ManualPanel() {
                 <tr key={o.id} className="border-t border-border" data-testid={`manual-row-${o.order_no}`}>
                   <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
                   <td className="px-3 py-2 text-center font-bold text-[#7A241F] whitespace-nowrap">{o.qty}</td>
-                  <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name} · {o.seats?.join(", ")}</td>
+                  <td className="px-3 py-2 text-[#5B4636] align-top"><span className="block font-medium">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name}</span><span className="text-[13px] leading-snug break-words">{o.seats?.join(", ")}</span></td>
                   <td className="px-3 py-2">
                     <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", o.paid ? "bg-[#2F703E]/15 text-[#255E33]" : "bg-[#EF4444]/15 text-[#B91C1C]")}>
                       {o.paid ? "Sudah Bayar" : "Belum Bayar"}
@@ -1742,7 +1742,7 @@ function MasterlistPanel() {
                 <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}{isManual && o.seller ? ` · input: ${o.seller}` : ""}</span></td>
                 <td className="px-3 py-2 text-center font-bold text-[#7A241F] whitespace-nowrap">{o.tickets}</td>
                 <td className="px-3 py-2 text-[#5B4636]">{o.phone || "-"}</td>
-                <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap">{o.session_name} · {o.seats.join(", ")}</td>
+                <td className="px-3 py-2 text-[#5B4636] align-top"><span className="block font-medium">{o.session_name}</span><span className="text-[13px] leading-snug break-words">{o.seats.join(", ")}</span></td>
                 {isManual && <td className="px-3 py-2 whitespace-nowrap">{o.paid === false
                   ? <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-[#B26A1E]/15 text-[#8A3A12]">Belum Berdana</span>
                   : <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-[#2F703E]/15 text-[#255E33]">Sudah Berdana</span>}</td>}
