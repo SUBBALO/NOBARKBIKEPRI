@@ -209,6 +209,12 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - FRONTEND: helper canDeleteRow(o)=isSuper||(canDelete&&status!==verified). Baris verified untuk admin biasa tampil ikon Lock/"Super Admin" (bukan tombol hapus), mobile & desktop. Dialog konfirmasi hapus (deleteTarget) sudah ada sejak dulu (double-confirm). Import Lock ditambah.
 - DIUJI: chelyn (admin+can_delete) DELETE verified → 403 + order tidak terhapus ✓; screenshot: 10 baris verified tampil gembok, baris pending tetap ada trash ✓.
 
-## Update (Jun 2026 — Nomor kursi wrap (turun ke bawah) biar enak dibaca di HP)
+## Update (Jun 2026 — Tampilan HP panel admin: kartu bertumpuk)
+- Tabel yang paling dipakai dari HP kini punya tampilan KARTU bertumpuk di layar kecil (md:hidden) + tabel biasa di desktop (hidden md:block), tanpa scroll horizontal:
+  - Masterlist Pembelian (shared Table: umum/VIP/manual) — kartu: nama+#order, badge jumlah tiket, sesi·kursi (wrap), HP/kanal/status/tgl, nominal.
+  - Order Manual (ManualPanel list) — kartu + tombol Edit/Hapus besar (data-testid manual-card-{no}).
+  - Tiket VIP (VIPPanel list) — kartu + tombol Edit Kursi/Hapus (data-testid vip-card-{no}).
+  - Verifikasi Pembayaran: sudah punya kartu HP dari sebelumnya (tidak diubah).
+- Diuji viewport 414px: kartu manual muncul, PAGE_H_OVERFLOW=False. Data uji dibersihkan.
 - Kolom "Sesi / Kursi" di tabel Order Manual, Masterlist (umum/vip/manual), & daftar VIP: hapus `whitespace-nowrap` → format jadi nama sesi (bold, block) di atas + nomor kursi wrap (break-words) di bawah. Nomor kursi tidak lagi memanjang ke samping (fix scroll horizontal di HP). Diuji viewport 430px: 10 kursi wrap rapi, tanpa overflow horizontal.
 - Tambah kolom "Tiket" (jumlah tiket) tepat SETELAH kolom Nama di: (a) tabel Order Manual (ManualPanel, pakai o.qty), (b) semua tabel Masterlist (umum/VIP/manual, pakai o.tickets). Angka "(N tkt)" inline di kolom Sesi/Kursi dihapus (dipindah ke kolom sendiri) agar qty selalu kelihatan walau kursi banyak. colSpan manual 6→7; nCols Masterlist isVip 3→4, manual 6→7, umum 5→6. Diuji screenshot: row manual "5" tampil setelah nama.

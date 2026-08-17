@@ -1255,7 +1255,30 @@ function VIPPanel() {
           <h3 className="font-serif-display text-xl text-[#7A241F]">Daftar Tiket VIP</h3>
           <span className="text-sm font-semibold text-[#7A6A5E]">{list.length} tiket</span>
         </div>
-        <div className="overflow-x-auto">
+        {/* Mobile: kartu */}
+        <div className="md:hidden divide-y divide-border">
+          {list.length === 0 ? (
+            <p className="px-4 py-8 text-center text-[#7A6A5E] text-sm">Belum ada tiket VIP.</p>
+          ) : list.map((o) => (
+            <div key={o.id} className="p-3.5 space-y-1.5" data-testid={`vip-card-${o.order_no}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#2C1E16] truncate">{o.name}</p>
+                  <p className="font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-[#7A241F]/10 px-2.5 py-1 text-xs font-bold text-[#7A241F]">{o.qty} kursi</span>
+              </div>
+              <p className="text-sm text-[#5B4636]"><span className="font-medium">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name}</span> · <span className="break-words">{o.seats?.join(", ")}</span></p>
+              {o.note ? <p className="text-xs text-[#7A6A5E]">Catatan: {o.note}</p> : null}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => openEdit({ ...o })} className="flex-1 inline-flex items-center justify-center gap-1 h-9 rounded-lg bg-[#2F703E]/10 text-[#2F703E] text-sm font-medium"><Pencil className="h-4 w-4" /> Edit Kursi</button>
+                <button onClick={() => delItem(o)} className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-[#EF4444]/10 text-[#EF4444] text-sm font-medium"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Desktop: tabel */}
+        <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-[#7A6A5E] text-xs">
               <tr>
@@ -1547,7 +1570,33 @@ function ManualPanel() {
           <h3 className="font-serif-display text-xl text-[#7A241F]">Daftar Order Manual</h3>
           <span className="text-sm font-semibold text-[#7A6A5E]">{list.length} order</span>
         </div>
-        <div className="overflow-x-auto">
+        {/* Mobile: kartu */}
+        <div className="md:hidden divide-y divide-border">
+          {list.length === 0 ? (
+            <p className="px-4 py-8 text-center text-[#7A6A5E] text-sm">Belum ada order manual.</p>
+          ) : list.map((o) => (
+            <div key={o.id} className="p-3.5 space-y-1.5" data-testid={`manual-card-${o.order_no}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#2C1E16] truncate">{o.name}</p>
+                  <p className="font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-[#7A241F]/10 px-2.5 py-1 text-xs font-bold text-[#7A241F]">{o.qty} tiket</span>
+              </div>
+              <p className="text-sm text-[#5B4636]"><span className="font-medium">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name}</span> · <span className="break-words">{o.seats?.join(", ")}</span></p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", o.paid ? "bg-[#2F703E]/15 text-[#255E33]" : "bg-[#EF4444]/15 text-[#B91C1C]")}>{o.paid ? "Sudah Bayar" : "Belum Bayar"}</span>
+                <span className="font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</span>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => openEdit(o)} className="flex-1 inline-flex items-center justify-center gap-1 h-9 rounded-lg bg-[#2F703E]/10 text-[#2F703E] text-sm font-medium"><Pencil className="h-4 w-4" /> Edit</button>
+                <button onClick={() => removeOrder(o)} className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-[#EF4444]/10 text-[#EF4444] text-sm font-medium"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Desktop: tabel */}
+        <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-[#7A6A5E] text-xs">
               <tr>
@@ -1720,7 +1769,34 @@ function MasterlistPanel() {
           </button>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      {/* Mobile: kartu bertumpuk */}
+      <div className="md:hidden divide-y divide-border">
+        {rows.length === 0 ? (
+          <p className="px-4 py-8 text-center text-[#7A6A5E] text-sm">Belum ada.</p>
+        ) : rows.map((o, i) => (
+          <div key={o.order_no ?? i} className="p-3.5 space-y-1.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-[#2C1E16] truncate">{o.name}</p>
+                <p className="font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}{isManual && o.seller ? ` · input: ${o.seller}` : ""}</p>
+              </div>
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#7A241F]/10 px-2.5 py-1 text-xs font-bold text-[#7A241F]">{o.tickets} tiket</span>
+            </div>
+            <p className="text-sm text-[#5B4636]"><span className="font-medium">{o.session_name}</span> · <span className="break-words">{o.seats.join(", ")}</span></p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#7A6A5E]">
+              {o.phone && o.phone !== "-" ? <span>📱 {o.phone}</span> : null}
+              {!isVip && !isManual ? <span className="rounded-full bg-[#7A241F]/10 text-[#7A241F] px-1.5 py-0.5 font-medium">{o.channel === "panitia" ? "Panitia" : "Website"}</span> : null}
+              {isManual ? (o.paid === false
+                ? <span className="rounded-full bg-[#B26A1E]/15 text-[#8A3A12] px-1.5 py-0.5 font-semibold">Belum Berdana</span>
+                : <span className="rounded-full bg-[#2F703E]/15 text-[#255E33] px-1.5 py-0.5 font-semibold">Sudah Berdana</span>) : null}
+              {isManual ? <span>order: {o.date}{o.transfer_date ? ` · transfer: ${o.transfer_date}` : ""}</span> : null}
+            </div>
+            {!isVip && <p className="text-right font-semibold text-[#7A241F]">{rupiah(o.amount)}</p>}
+          </div>
+        ))}
+      </div>
+      {/* Desktop: tabel */}
+      <div className="overflow-x-auto hidden md:block">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-[#7A6A5E] text-xs">
             <tr>
