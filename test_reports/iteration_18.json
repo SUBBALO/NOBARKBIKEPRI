@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 18 — Order Manual (no amount/paid on create) + E-Ticket download flow. Backend pytest 4/4 PASS (create with amount:0/paid:false, seats held → 409, PUT paid+transfer_amount → total_amount=250000 & status=verified, DELETE releases seat and re-create succeeds). Frontend Playwright 8/8 PASS on /admin as admin1: (1) Manual tab loads, (2) create form has NO amount input and NO paid toggle (only Nama, No HP, kursi display, info text, submit) — verified via absence of manual-amount/manual-paid testids, (3) create manual order 'ZZ ETIKET UI …' on Sesi 1 seat M21 with amount=0/paid=false succeeds and appears in list with 'Belum Bayar' status, (4) E-Ticket button triggers browser download → e-ticket-{order_no}.png (~133 KB PNG saved), (5) Edit dialog: toggle paid + amount 250000 + transfer_date 2026-01-15 → row updates to 'Sudah Bayar' Rp 250.000, (6) 2nd E-Ticket download after paid succeeds (Status Pembayaran row inclusion is code-verified at AdminPage.js:1516), (7) Delete order removes row and releases seat. No console errors during flow (only harmless DialogContent aria-describedby warning).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Edit Order Manual dialog", "issues": ["DialogContent missing Description/aria-describedby (accessibility warning, non-blocking)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter18_manual_eticket.py",
+    "/app/test_reports/pytest/iter18_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminPage.js saveTicket() draws the e-ticket entirely client-side; the 'Status Pembayaran' row is only pushed when o.paid is true (line 1516) — matches spec. Consider extracting the canvas ticket renderer into a small utility (~65 LOC) to keep AdminPage.js under limit (currently 2842 lines).",
+    "Backend POST /admin/manual still accepts full amount/paid/transfer_date/transfer_amount from the payload even though the new UI only sends amount:0/paid:false. That is fine for backward-compat, but no server-side guard prevents future callers from bypassing the 'unpaid on create' contract. Not a bug; documentation-only concern.",
+    "server.py is still ~2156 lines and would benefit from splitting into routers (carryover from prior iterations)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter18_manual_eticket.py"],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (all manual + e-ticket + edit + delete flows)"},
+  "test_credentials": "admin1/admin123 (superadmin) — valid.",
+  "seed_data_creation": "Test manual orders were created with prefix 'ZZ ETIKET …' and deleted at end of each test run. No residual data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Order Manual create form now has no amount/paid inputs (spec-compliant). E-Ticket PNG downloads via browser canvas, filename e-ticket-{order_no}.png. Backend contract: POST /admin/manual {name, phone, session_id, seats[], amount:0, paid:false} → order with total_amount=0 status=manual_unpaid; PUT /admin/manual/{id} with paid=true+transfer_amount promotes to status=verified and total_amount picks transfer_amount. E-ticket 'Status Pembayaran' row only rendered when paid=true (AdminPage.js:1516)."
+}

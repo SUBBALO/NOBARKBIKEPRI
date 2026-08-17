@@ -1411,18 +1411,13 @@ function ManualPanel() {
   const submit = async () => {
     if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
     if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
-    if (!amount || parseInt(amount, 10) <= 0) { toast.error("Isi nominal order"); return; }
-    if (paid && !tgl) { toast.error("Isi tanggal transfer"); return; }
     setBusy(true);
     try {
       await adminApi.post("/admin/manual", {
         name, phone, session_id: sessionId, seats: selected,
-        amount: parseInt(amount, 10),
-        paid, transfer_date: paid ? tgl : null,
-        transfer_amount: paid && tfAmount ? parseInt(tfAmount, 10) : null,
-        proof_image: proof || null, note,
+        amount: 0, paid: false, note,
       });
-      toast.success("Order manual dibuat");
+      toast.success("Order manual dibuat (nominal diisi nanti saat upload bukti)");
       setName(""); setPhone(""); setAmount(""); setPaid(false); setTgl(""); setTfAmount(""); setProof(null); setNote(""); setSelected([]);
       loadMap(sessionId, false); loadList();
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal membuat order manual"); loadMap(sessionId, false); }
@@ -1475,6 +1470,91 @@ function ManualPanel() {
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal hapus"); }
   };
 
+  const fmtDateTime = (iso) => {
+    try { return new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) + " WIB"; }
+    catch { return "-"; }
+  };
+  const saveTicket = async (o) => {
+    const session = SESSIONS_STATIC.find((s) => s.id === o.session_id);
+    const paid = !!o.paid;
+    const by = o.created_by || o.seller || o.sold_by || "-";
+    const W = 820, H = 1180;
+    const draw = (logoImg) => {
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const x = c.getContext("2d");
+      x.fillStyle = "#7A241F"; x.fillRect(0, 0, W, H);
+      x.fillStyle = "#FDFBF7"; x.fillRect(30, 30, W - 60, H - 60);
+      x.fillStyle = "#B26A1E"; x.fillRect(30, 30, W - 60, 12);
+      const cx = W / 2; x.textAlign = "center";
+      let top = 130;
+      if (logoImg) {
+        try {
+          const maxH = 92, maxW = 300;
+          let lw = logoImg.naturalWidth || logoImg.width || 1, lh = logoImg.naturalHeight || logoImg.height || 1;
+          const r = Math.min(maxW / lw, maxH / lh);
+          lw = lw * r; lh = lh * r;
+          x.drawImage(logoImg, cx - lw / 2, 52, lw, lh);
+          top = 52 + lh + 40;
+        } catch (e) { /* skip logo */ }
+      }
+      x.fillStyle = "#B26A1E"; x.font = "bold 26px Georgia"; x.fillText("E-TICKET · FILM DOKUMENTER", cx, top);
+      x.fillStyle = "#7A241F"; x.font = "bold 38px Georgia"; x.fillText("ASHIN JINARAKKHITA", cx, top + 48);
+      const wrap = (text, maxW) => {
+        const words = text.split(" "); const lines = []; let line = "";
+        words.forEach((w) => {
+          const t = line ? line + " " + w : w;
+          if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
+        });
+        if (line) lines.push(line);
+        return lines;
+      };
+      x.fillStyle = "#8A6A3E"; x.font = "italic 17px Georgia";
+      let sy = top + 80;
+      wrap("Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.", W - 200).forEach((ln) => { x.fillText(ln, cx, sy); sy += 24; });
+      x.fillStyle = "#5B4636"; x.font = "18px Arial";
+      x.fillText("Minggu, 13 September 2026", cx, sy + 10);
+      x.fillText("CGV Grand Batam Mall", cx, sy + 36);
+      let y0 = sy + 68;
+      x.strokeStyle = "#B26A1E"; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(70, y0); x.lineTo(W - 70, y0); x.stroke(); x.setLineDash([]);
+      const rows = [
+        ["No. Order", `#${o.order_no}`],
+        ["Nama", o.name],
+        ["Sesi", `${session?.name || "-"} · ${session?.time || ""}`],
+        ["Nomor Kursi", (o.seats || []).join(", ")],
+        ["Jumlah", `${o.qty} tiket`],
+        ["Tgl & Jam Pesan", fmtDateTime(o.created_at)],
+        ["Diinput oleh", by],
+      ];
+      if (paid) rows.push(["Status Pembayaran", rupiah(o.total_amount)]);
+      let y = y0 + 52; x.textAlign = "left";
+      rows.forEach(([k, v]) => {
+        x.fillStyle = "#7A6A5E"; x.font = "17px Arial"; x.fillText(k, 80, y);
+        x.fillStyle = k === "Status Pembayaran" ? (paid ? "#255E33" : "#8A3A12") : "#2C1E16";
+        x.font = "bold 21px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
+        x.textAlign = "left"; y += 54;
+      });
+      x.textAlign = "center";
+      x.fillStyle = "#7A241F"; x.font = "bold 28px Georgia"; x.fillText(`#${o.order_no}`, cx, y + 24);
+      x.fillStyle = "#8A3A12"; x.font = "15px Arial";
+      x.fillText("Tunjukkan e-ticket ini kepada petugas di lokasi", cx, H - 96);
+      x.fillText("untuk menukar tiket fisik (hardcopy) asli.", cx, H - 74);
+      x.fillStyle = "#B26A1E"; x.font = "13px Arial";
+      x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 46);
+      return c;
+    };
+    try {
+      let logo = null;
+      await new Promise((res) => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { logo = img; res(); }; img.onerror = () => res(); img.src = LOGOS.kbi; });
+      let url;
+      try { url = draw(logo).toDataURL("image/png"); }
+      catch (e) { url = draw(null).toDataURL("image/png"); }
+      const a = document.createElement("a"); a.href = url; a.download = `e-ticket-${o.order_no}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast.success("E-ticket tersimpan sebagai gambar");
+    } catch (e) { console.error("save ticket:", e); toast.error("Gagal membuat e-ticket"); }
+  };
+
+
   return (
     <div className="no-print" data-testid="manual-panel">
       <div className="rounded-2xl border border-[#B26A1E]/25 bg-gradient-to-br from-[#B26A1E]/[0.07] to-transparent p-4 mb-4">
@@ -1516,48 +1596,13 @@ function ManualPanel() {
             <Label htmlFor="mphone">No HP <span className="text-[#9CA3AF]">(opsional)</span></Label>
             <Input id="mphone" data-testid="manual-phone" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))} placeholder="08xxx" className="mt-1.5" />
           </div>
-          <div>
-            <Label htmlFor="mamount">Nominal Order (Rp) <span className="text-[#EF4444]">*</span></Label>
-            <Input id="mamount" data-testid="manual-amount" inputMode="numeric"
-              value={amount ? Number(amount).toLocaleString("id-ID") : ""}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="mis. 500.000" className="mt-1.5" />
-          </div>
           <div className="rounded-lg bg-muted/40 p-2.5">
             <p className="text-xs text-[#7A6A5E]">Kursi dipilih ({selected.length}):</p>
             <p className="text-sm font-semibold text-[#7A241F] break-words" data-testid="manual-selected">{selected.length ? selected.join(", ") : "— belum ada —"}</p>
           </div>
-          <div>
-            <Label className="mb-1.5 block">Status Pembayaran</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" data-testid="manual-status-unpaid" onClick={() => setPaid(false)}
-                className={cn("rounded-lg border px-3 py-2 text-sm font-medium transition-colors", !paid ? "border-[#EF4444] bg-[#EF4444]/10 text-[#B91C1C]" : "border-border bg-white text-[#7A6A5E]")}>
-                Belum Bayar
-              </button>
-              <button type="button" data-testid="manual-status-paid" onClick={() => setPaid(true)}
-                className={cn("rounded-lg border px-3 py-2 text-sm font-medium transition-colors", paid ? "border-[#2F703E] bg-[#2F703E]/10 text-[#255E33]" : "border-border bg-white text-[#7A6A5E]")}>
-                Sudah Bayar
-              </button>
-            </div>
-          </div>
-          {paid && (
-            <div className="space-y-3 rounded-lg bg-[#2F703E]/5 border border-[#2F703E]/20 p-3">
-              <div>
-                <Label htmlFor="mtgl">Tanggal Transfer <span className="text-[#EF4444]">*</span></Label>
-                <Input id="mtgl" type="date" data-testid="manual-transfer-date" value={tgl} onChange={(e) => setTgl(e.target.value)} className="mt-1.5" />
-              </div>
-              <div>
-                <Label htmlFor="mtf">Nominal Transfer (Rp)</Label>
-                <Input id="mtf" data-testid="manual-transfer-amount" inputMode="numeric"
-                  value={tfAmount ? Number(tfAmount).toLocaleString("id-ID") : ""}
-                  onChange={(e) => setTfAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="kosong = pakai nominal order" className="mt-1.5" />
-              </div>
-              <div>
-                <Label className="block mb-1.5">Foto Bukti Transfer <span className="text-[#9CA3AF]">(opsional)</span></Label>
-                <input type="file" accept="image/*" onChange={onProof} data-testid="manual-proof" className="text-xs" />
-                {proof && <p className="text-[11px] text-[#255E33] mt-1">Foto siap diunggah ✓</p>}
-              </div>
-            </div>
-          )}
+          <p className="text-xs text-[#7A6A5E] rounded-lg bg-[#B26A1E]/[0.07] border border-[#B26A1E]/20 p-2.5">
+            Order dibuat dengan status <b>Belum Berdana</b>. Nominal & bukti transfer diisi nanti lewat tombol <b>Edit</b> saat pembeli sudah berdana.
+          </p>
           <Button onClick={submit} disabled={busy || selected.length === 0 || !name.trim()} data-testid="manual-submit"
             className="w-full h-12 bg-[#B26A1E] hover:bg-[#8A3A12] text-base">
             {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <ClipboardList className="h-5 w-5 mr-1.5" />} Buat Order Manual
@@ -1578,7 +1623,7 @@ function ManualPanel() {
             <div key={o.id} className="p-3.5 space-y-1.5" data-testid={`manual-card-${o.order_no}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-[#2C1E16] truncate">{o.name}</p>
+                  <button onClick={() => saveTicket(o)} title="Klik untuk unduh E-Ticket" data-testid={`manual-name-ticket-${o.order_no}`} className="text-left font-semibold text-[#7A241F] underline decoration-dotted underline-offset-2 truncate hover:text-[#B26A1E]">{o.name}</button>
                   <p className="font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</p>
                 </div>
                 <span className="shrink-0 rounded-full bg-[#7A241F]/10 px-2.5 py-1 text-xs font-bold text-[#7A241F]">{o.qty} tiket</span>
@@ -1589,6 +1634,7 @@ function ManualPanel() {
                 <span className="font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</span>
               </div>
               <div className="flex gap-2 pt-1">
+                <button onClick={() => saveTicket(o)} className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-lg bg-[#B26A1E]/10 text-[#B26A1E] text-sm font-medium"><Ticket className="h-4 w-4" /> E-Ticket</button>
                 <button onClick={() => openEdit(o)} className="flex-1 inline-flex items-center justify-center gap-1 h-9 rounded-lg bg-[#2F703E]/10 text-[#2F703E] text-sm font-medium"><Pencil className="h-4 w-4" /> Edit</button>
                 <button onClick={() => removeOrder(o)} className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-[#EF4444]/10 text-[#EF4444] text-sm font-medium"><Trash2 className="h-4 w-4" /></button>
               </div>
@@ -1614,7 +1660,7 @@ function ManualPanel() {
                 <tr><td colSpan={7} className="px-3 py-8 text-center text-[#7A6A5E]">Belum ada order manual.</td></tr>
               ) : list.map((o) => (
                 <tr key={o.id} className="border-t border-border" data-testid={`manual-row-${o.order_no}`}>
-                  <td className="px-3 py-2 font-medium text-[#2C1E16]">{o.name}<span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
+                  <td className="px-3 py-2 font-medium text-[#2C1E16]"><button onClick={() => saveTicket(o)} title="Klik untuk unduh E-Ticket" data-testid={`manual-nameclick-${o.order_no}`} className="text-left text-[#7A241F] underline decoration-dotted underline-offset-2 hover:text-[#B26A1E]">{o.name}</button><span className="block font-mono text-[10px] text-[#7A6A5E]">#{o.order_no}</span></td>
                   <td className="px-3 py-2 text-center font-bold text-[#7A241F] whitespace-nowrap">{o.qty}</td>
                   <td className="px-3 py-2 text-[#5B4636] align-top"><span className="block font-medium">{SESSIONS_STATIC.find((s) => s.id === o.session_id)?.name}</span><span className="text-[13px] leading-snug break-words">{o.seats?.join(", ")}</span></td>
                   <td className="px-3 py-2">
@@ -1625,6 +1671,7 @@ function ManualPanel() {
                   <td className="px-3 py-2 text-[#5B4636] whitespace-nowrap"><span className="block text-[10px] text-[#7A6A5E]">order: {o.created_at ? new Date(o.created_at).toLocaleDateString("id-ID") : "-"}</span>transfer: {o.transfer_date || "-"}</td>
                   <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => saveTicket(o)} data-testid={`manual-ticket-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#B26A1E] hover:bg-[#B26A1E]/10 text-xs font-medium"><Ticket className="h-3.5 w-3.5" /> E-Ticket</button>
                     <button onClick={() => openEdit(o)} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
                     <button onClick={() => removeOrder(o)} data-testid={`manual-del-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 text-xs font-medium"><Trash2 className="h-3.5 w-3.5" /></button>
                   </td>
