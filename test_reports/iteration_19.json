@@ -1,0 +1,18 @@
+{
+  "summary": "Frontend-only verification of Order Manual E-Ticket revisions: (a) subtitle italic 'Jejak Langkah Sang Pelopor...' added under 'ASHIN JINARAKKHITA' in saveTicket canvas (verified in code lines 1511-1513), (b) clicking pembeli name in daftar order (desktop + mobile) auto-downloads e-ticket PNG same as tombol E-Ticket. Login admin1 -> Order Manual tab -> created order 'ZZ NAMECLICK TEST' (order 9232, seat M21). Tested downloads on desktop nameclick, desktop E-Ticket button, and mobile nameclick — all produced e-ticket-9232.png with 'E-ticket tersimpan sebagai gambar' toast. Deleted test order successfully. Regression: manual-amount and manual-paid remain absent (0 count). No fatal console errors (only unrelated CSP warnings for cloudflare beacon).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AdminPage.js is 2854 lines — should be split into smaller focused modules (ManualOrderPanel, EticketRenderer, etc). File-size violates 700-line guideline.",
+    "saveTicket() text rendering does not sanitize/limit name length beyond .slice(0,40); consider similar wrap for very long names to avoid overflow off canvas."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "admin1 / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created + deleted test manual order 'ZZ NAMECLICK TEST' (order_no 9232, seat M21 Sesi 1). Data bersih setelah test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Order Manual E-Ticket flow confirmed working: subtitle in canvas + click-name auto-download for desktop (manual-nameclick-{order_no}) and mobile (manual-name-ticket-{order_no}). manual-ticket-{order_no} button still works. manual-amount & manual-paid absent from create form (regression OK). Login form uses placeholder='username' (no type=text)."
+}

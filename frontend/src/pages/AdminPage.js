@@ -1526,20 +1526,20 @@ function ManualPanel() {
         ["Diinput oleh", by],
       ];
       if (paid) rows.push(["Status Pembayaran", rupiah(o.total_amount)]);
-      let y = y0 + 52; x.textAlign = "left";
+      let y = y0 + 54; x.textAlign = "left";
       rows.forEach(([k, v]) => {
-        x.fillStyle = "#7A6A5E"; x.font = "17px Arial"; x.fillText(k, 80, y);
+        x.fillStyle = "#7A6A5E"; x.font = "20px Arial"; x.fillText(k, 80, y);
         x.fillStyle = k === "Status Pembayaran" ? (paid ? "#255E33" : "#8A3A12") : "#2C1E16";
-        x.font = "bold 21px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
-        x.textAlign = "left"; y += 54;
+        x.font = "bold 25px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
+        x.textAlign = "left"; y += 60;
       });
       x.textAlign = "center";
-      x.fillStyle = "#7A241F"; x.font = "bold 28px Georgia"; x.fillText(`#${o.order_no}`, cx, y + 24);
-      x.fillStyle = "#8A3A12"; x.font = "15px Arial";
-      x.fillText("Tunjukkan e-ticket ini kepada petugas di lokasi", cx, H - 96);
-      x.fillText("untuk menukar tiket fisik (hardcopy) asli.", cx, H - 74);
-      x.fillStyle = "#B26A1E"; x.font = "13px Arial";
-      x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 46);
+      x.fillStyle = "#7A241F"; x.font = "bold 30px Georgia"; x.fillText(`#${o.order_no}`, cx, y + 28);
+      x.fillStyle = "#8A3A12"; x.font = "bold 21px Arial";
+      x.fillText("Tunjukkan e-ticket ini kepada petugas di lokasi", cx, H - 108);
+      x.fillText("untuk menukar tiket fisik (hardcopy) asli.", cx, H - 80);
+      x.fillStyle = "#B26A1E"; x.font = "16px Arial";
+      x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 48);
       return c;
     };
     try {
