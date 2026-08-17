@@ -202,3 +202,9 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 ## Update (Jun 2026 — Ganti wording "Nonton Bersama" → "Film Dokumenter")
 - Hapus "NOBAR/Nonton Bersama", pakai "Film Dokumenter" di semua tempat: BookingPage hero (coming-soon & aktif) "Film Dokumenter" → ASHIN JINARAKKHITA; DisplayPage banner monitor "FILM DOKUMENTER"; index.html meta description; AdminPage template WhatsApp; OrderStatusPage kalender .ics SUMMARY; CheckinPage badge. Diverifikasi screenshot halaman utama (Film Dokumenter tampil, Nonton Bersama hilang).
 - Catatan: coming_soon di PREVIEW saat ini = False (OFF). Sebelumnya diset ON; kemungkinan diubah saat testing. Belum diflip balik (hindari override intent user).
+
+## Update (Jun 2026 — Proteksi hapus pesanan TERVERIFIKASI)
+- Pesanan online berstatus "verified" kini HANYA bisa dihapus Super Admin (admin utama). Admin biasa walau punya can_delete DITOLAK (403) — menghindari salah klik hapus data pembayaran yang sudah sah. Pesanan belum-verified (pending/expired/ditolak) tetap bisa dihapus oleh can_delete admin (perilaku lama).
+- BACKEND delete_order (/admin/orders/{id}): cek status verified → wajib superadmin; else superadmin/can_delete. Pesan 403: "Pesanan sudah TERVERIFIKASI. Hanya Super Admin (admin utama) yang dapat menghapus." (delete_vip/delete_manual tidak berubah.)
+- FRONTEND: helper canDeleteRow(o)=isSuper||(canDelete&&status!==verified). Baris verified untuk admin biasa tampil ikon Lock/"Super Admin" (bukan tombol hapus), mobile & desktop. Dialog konfirmasi hapus (deleteTarget) sudah ada sejak dulu (double-confirm). Import Lock ditambah.
+- DIUJI: chelyn (admin+can_delete) DELETE verified → 403 + order tidak terhapus ✓; screenshot: 10 baris verified tampil gembok, baris pending tetap ada trash ✓.

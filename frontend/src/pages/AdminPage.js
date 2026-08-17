@@ -14,7 +14,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown, Pencil, ClipboardList,
+  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown, Pencil, ClipboardList, Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -1786,6 +1786,7 @@ export default function AdminPage() {
   const isSuper = currentUser?.role === "superadmin";
   const isStaff = currentUser?.role === "superadmin" || currentUser?.role === "admin";
   const canDelete = isSuper || !!currentUser?.can_delete;
+  const canDeleteRow = (o) => isSuper || (canDelete && o.status !== "verified");
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState(null);
   const [event, setEvent] = useState(null);
@@ -2298,12 +2299,14 @@ export default function AdminPage() {
                         <MessageCircle className="h-3.5 w-3.5 mr-1" /> Ingatkan Upload
                       </Button>
                     ) : null}
-                    {canDelete && (
+                    {canDeleteRow(o) ? (
                       <button onClick={() => setDeleteTarget(o)} title="Hapus pesanan"
                         className="ml-auto inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
                         <Trash2 className="h-4 w-4" />
                       </button>
-                    )}
+                    ) : (canDelete && o.status === "verified") ? (
+                      <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-[#7A6A5E]" title="Terverifikasi — hanya Super Admin yang dapat menghapus"><Lock className="h-3 w-3" /> Super Admin</span>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -2410,11 +2413,19 @@ export default function AdminPage() {
                       {/* Hapus */}
                       {canDelete && (
                         <td className="px-4 py-3 text-center">
-                          <button onClick={() => setDeleteTarget(o)} data-testid={`delete-open-${o.id.slice(0, 8)}`}
-                            title="Hapus pesanan"
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canDeleteRow(o) ? (
+                            <button onClick={() => setDeleteTarget(o)} data-testid={`delete-open-${o.id.slice(0, 8)}`}
+                              title="Hapus pesanan"
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : o.status === "verified" ? (
+                            <span className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-[#7A6A5E]" title="Terverifikasi — hanya Super Admin yang dapat menghapus">
+                              <Lock className="h-4 w-4" />
+                            </span>
+                          ) : (
+                            <span className="text-xs text-[#7A6A5E]">—</span>
+                          )}
                         </td>
                       )}
                     </tr>

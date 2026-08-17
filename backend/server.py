@@ -1208,11 +1208,16 @@ async def update_order_phone(order_id: str, payload: PhonePayload, user: dict = 
 
 @api_router.delete("/admin/orders/{order_id}")
 async def delete_order(order_id: str, user: dict = Depends(get_current_user)):
-    if not (user["role"] == "superadmin" or user.get("can_delete")):
-        raise HTTPException(status_code=403, detail="Akun Anda tidak diizinkan menghapus data")
     o = await db.orders.find_one({"id": order_id})
     if not o or o.get("deleted"):
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    is_super = user["role"] == "superadmin"
+    if o.get("status") == "verified":
+        # Pembayaran sudah TERVERIFIKASI — hanya Super Admin (admin utama) yang boleh hapus
+        if not is_super:
+            raise HTTPException(status_code=403, detail="Pesanan sudah TERVERIFIKASI. Hanya Super Admin (admin utama) yang dapat menghapus.")
+    elif not (is_super or user.get("can_delete")):
+        raise HTTPException(status_code=403, detail="Akun Anda tidak diizinkan menghapus data")
     actor = user.get("name") or user.get("username")
     await db.orders.update_one({"id": order_id}, {"$set": {
         "deleted": True, "deleted_at": now_iso(), "deleted_by": actor, "updated_at": now_iso()}})
