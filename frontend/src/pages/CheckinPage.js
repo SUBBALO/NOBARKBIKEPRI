@@ -88,7 +88,7 @@ export default function CheckinPage() {
     setBusyId(o.id);
     try {
       const { data } = await adminApi.post(`/admin/orders/${o.id}/checkin`);
-      setPopup(data);
+      setPopup({ ...data, channel: o.channel, session: o.session });
       await load();
     } catch (err) { toast.error("Gagal check-in"); }
     setBusyId(null);
@@ -165,6 +165,11 @@ export default function CheckinPage() {
                   </div>
                   <p className="text-xs text-[#7A6A5E]">{o.phone}</p>
                   <p className="text-xs text-[#7A6A5E] mt-0.5">{o.session?.name} · {o.session?.time} · {o.qty} tiket</p>
+                  {o.channel === "manual" && (
+                    <p className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-[#8A3A12] bg-[#B26A1E]/15 border border-[#B26A1E]/30 rounded-md px-2 py-1" data-testid={`checkin-manual-hint-${o.id.slice(0, 8)}`}>
+                      → Arahkan ke Counter Tiket Manual
+                    </p>
+                  )}
                 </div>
                 {o.checked_in ? (
                   <span className="shrink-0 inline-flex items-center gap-1 text-xs text-[#255E33] font-medium bg-[#2F703E]/15 px-2 py-1 rounded-full">
@@ -210,16 +215,24 @@ export default function CheckinPage() {
             <div className="text-sm space-y-3">
               <p><b>{popup.name}</b> — {popup.session?.name} · {popup.session?.time}</p>
               <p className="text-xs text-[#2F703E] font-medium">✓ Check-in: {fmtTime(popup.checked_in_at || new Date().toISOString())}</p>
-              <div className="rounded-lg bg-[#B26A1E]/10 p-4">
-                <p className="text-[#8A3A12] font-medium mb-2">Serahkan tiket:</p>
-                <p className="font-serif-display text-2xl text-[#7A241F] mb-2" data-testid="checkin-mobile-session">{popup.session?.name?.toUpperCase()} · {popup.session?.time}</p>
-                <p className="text-xs text-[#7A6A5E] mb-1">Nomor kursi <b className="text-[#8A3A12]">({popup.seats.length} tiket)</b>:</p>
-                <div className="flex flex-wrap gap-2">
-                  {popup.seats.map((s) => (
-                    <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold border border-[#B26A1E]/30">{s}</span>
-                  ))}
+              {popup.channel === "manual" ? (
+                <div className="rounded-lg bg-[#7A241F]/[0.06] border-2 border-[#7A241F]/30 p-4 text-center" data-testid="checkin-manual-counter-box">
+                  <p className="text-[#8A3A12] font-medium mb-1">Order Manual (Rombongan)</p>
+                  <p className="font-serif-display text-2xl text-[#7A241F] leading-tight mb-2">Arahkan ke<br />COUNTER TIKET MANUAL</p>
+                  <p className="text-xs text-[#7A6A5E]">Tiket fisik ({popup.seats?.length || popup.qty} tiket) sudah disiapkan di stand manual. Peserta menukar tiket di sana.</p>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-lg bg-[#B26A1E]/10 p-4">
+                  <p className="text-[#8A3A12] font-medium mb-2">Serahkan tiket:</p>
+                  <p className="font-serif-display text-2xl text-[#7A241F] mb-2" data-testid="checkin-mobile-session">{popup.session?.name?.toUpperCase()} · {popup.session?.time}</p>
+                  <p className="text-xs text-[#7A6A5E] mb-1">Nomor kursi <b className="text-[#8A3A12]">({popup.seats.length} tiket)</b>:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {popup.seats.map((s) => (
+                      <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold border border-[#B26A1E]/30">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

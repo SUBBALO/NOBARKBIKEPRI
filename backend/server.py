@@ -1701,7 +1701,7 @@ async def set_coming_soon(payload: SetComingSoon, user: dict = Depends(require_r
 
 @api_router.get("/admin/participants")
 async def list_participants(user: dict = Depends(require_any)):
-    docs = await db.orders.find({"status": "verified", "deleted": {"$ne": True}}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
+    docs = await db.orders.find({"deleted": {"$ne": True}, "$or": [{"status": "verified"}, {"manual": True}]}, {"proof_image": 0}).sort("created_at", -1).to_list(3000)
     result = []
     for o in docs:
         session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
