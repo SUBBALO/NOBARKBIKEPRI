@@ -82,7 +82,7 @@ export default function OrderStatusPage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get("/event").then(({ data }) => setEvent(data)).catch(() => {}); }, []);
 
-  const saveTicketImage = () => {
+  const saveTicketImage = async () => {
     try {
       const W = 820, H = 1080;
       const c = document.createElement("canvas");
@@ -93,7 +93,7 @@ export default function OrderStatusPage() {
       x.fillStyle = "#B26A1E"; x.fillRect(30, 30, W - 60, 12);
       const cx = W / 2;
       x.textAlign = "center";
-      x.fillStyle = "#B26A1E"; x.font = "bold 26px Georgia"; x.fillText("E-TIKET  ·  NONTON BERSAMA", cx, 110);
+      x.fillStyle = "#B26A1E"; x.font = "bold 26px Georgia"; x.fillText("E-TIKET  ·  FILM DOKUMENTER", cx, 110);
       x.fillStyle = "#7A241F"; x.font = "bold 40px Georgia";
       x.fillText("ASHIN JINARAKKHITA", cx, 165);
       x.fillStyle = "#5B4636"; x.font = "18px Arial";
@@ -123,15 +123,40 @@ export default function OrderStatusPage() {
       x.fillText("Tunjukkan tiket ini saat check-in di lokasi acara.", cx, H - 90);
       x.fillStyle = "#B26A1E"; x.font = "13px Arial";
       x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 62);
+      const fileName = `tiket-${order.order_no}.png`;
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      // Buat file & blob SINKRON dari dataURL (jangan pakai await toBlob) supaya izin gesture iOS
+      // tetap valid saat navigator.share dipanggil.
+      const dataUrl = c.toDataURL("image/png");
+      let arr = null;
+      try {
+        const bin = atob(dataUrl.split(",")[1]);
+        arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      } catch (e) { /* ignore */ }
+      const file = arr ? new File([arr], fileName, { type: "image/png" }) : null;
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: `Tiket #${order.order_no}` });
+          toast.success("Tiket siap disimpan / dibagikan"); return;
+        } catch (err) { if (err?.name === "AbortError") return; }
+      }
+      const url = arr ? URL.createObjectURL(new Blob([arr], { type: "image/png" })) : dataUrl;
+      if (isIOS) {
+        window.open(url, "_blank");
+        toast.info("Tekan lama gambar lalu pilih \u201CSimpan ke Foto\u201D", { duration: 7000 });
+        return;
+      }
       const a = document.createElement("a");
-      a.href = c.toDataURL("image/png");
-      a.download = `tiket-${order.order_no}.png`;
+      a.href = url;
+      a.download = fileName;
       document.body.appendChild(a); a.click(); a.remove();
+      if (arr) setTimeout(() => URL.revokeObjectURL(url), 4000);
       toast.success("Tiket tersimpan sebagai gambar");
     } catch (e) { console.error("save ticket:", e); toast.error("Gagal menyimpan tiket"); }
   };
 
-  const addToCalendar = () => {
+  const addToCalendar = async () => {
     try {
       // Tanggal acara tetap: 13 September 2026. Ambil jam mulai dari sesi (mis. "09.30–11.30").
       const tm = (order.session?.time || "").match(/(\d{1,2})[.:](\d{2})\s*[–\-]\s*(\d{1,2})[.:](\d{2})/);
@@ -139,21 +164,40 @@ export default function OrderStatusPage() {
       const base = "20260913";
       const start = tm ? `${base}T${pad(tm[1])}${tm[2]}00` : `${base}T090000`;
       const end = tm ? `${base}T${pad(tm[3])}${tm[4]}00` : `${base}T113000`;
+      const title = `Film Dokumenter - Ashin Jinarakkhita (${order.session?.name})`;
+      const details = `Tiket #${order.order_no} a.n ${order.name}. Kursi ${order.seats.join(", ")}. Tunjukkan saat check-in.`;
+      const loc = event?.location || "CGV Grand Batam";
+      const isMobile = /iP(hone|ad|od)|Android/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      // Di HP (iOS Chrome/Safari & Android): buka Google Kalender (halaman web, langsung bisa
+      // "Simpan" tanpa unduh file). Ini paling reliabel — .ics sering hanya ter-download tanpa efek.
+      if (isMobile) {
+        const g = "https://calendar.google.com/calendar/render?action=TEMPLATE"
+          + `&text=${encodeURIComponent(title)}`
+          + `&dates=${start}/${end}`
+          + `&details=${encodeURIComponent(details)}`
+          + `&location=${encodeURIComponent(loc)}`
+          + "&ctz=Asia/Jakarta";
+        window.open(g, "_blank");
+        toast.success("Membuka Google Kalender — tap Simpan untuk menambah acara", { duration: 6000 });
+        return;
+      }
+      // Desktop: unduh file .ics (bisa dibuka di Outlook/Apple Calendar)
       const ics = [
-        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MBI Kepri//Nonton Bersama//ID",
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MBI Kepri//Film Dokumenter//ID",
         "BEGIN:VEVENT", `UID:order-${order.order_no}@kbikepri`,
-        `SUMMARY:Film Dokumenter - Ashin Jinarakkhita (${order.session?.name})`,
-        `DESCRIPTION:Tiket #${order.order_no} a.n ${order.name}. Kursi ${order.seats.join(", ")}. Tunjukkan saat check-in.`,
-        `LOCATION:${event?.location || "CGV Grand Batam"}`,
+        `SUMMARY:${title}`,
+        `DESCRIPTION:${details}`,
+        `LOCATION:${loc}`,
         `DTSTART:${start}`, `DTEND:${end}`,
         "END:VEVENT", "END:VCALENDAR",
       ].join("\r\n");
       const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = `acara-nonton-${order.order_no}.ics`;
       document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(a.href);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
       toast.success("Reminder acara ditambahkan ke kalender");
     } catch (e) { console.error("calendar:", e); toast.error("Gagal menambahkan ke kalender"); }
   };
@@ -204,6 +248,7 @@ export default function OrderStatusPage() {
   const mm = remaining != null ? Math.floor(remaining / 60000) : null;
   const ss = remaining != null ? Math.floor((remaining % 60000) / 1000) : null;
   const canUpload = order.status === "pending_payment" || order.status === "waiting_verification";
+  const inAppBrowser = /(Instagram|FBAN|FBAV|FB_IAB|Line|TikTok|Twitter)/i.test(navigator.userAgent || "");
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
@@ -214,6 +259,16 @@ export default function OrderStatusPage() {
         </div>
         <StatusBadge status={order.status} />
       </div>
+
+      {inAppBrowser && (
+        <div className="rounded-2xl border-2 border-[#B26A1E]/50 bg-[#FBF1DE] p-3 sm:p-4 mb-4 flex items-start gap-2.5" data-testid="inapp-browser-hint">
+          <AlertTriangle className="h-5 w-5 text-[#8A3A12] shrink-0 mt-0.5" />
+          <p className="text-sm text-[#5E1B17] leading-relaxed">
+            Anda membuka lewat browser dalam-aplikasi (mis. Instagram) yang sering <b>memblokir simpan gambar &amp; kalender</b>.
+            Tap menu <b>•••</b> di pojok lalu pilih <b>&ldquo;Buka di Safari/Chrome&rdquo;</b> supaya tombol di bawah berfungsi normal.
+          </p>
+        </div>
+      )}
 
       {/* Aksi cepat: simpan tiket & kalender (selalu tampil) */}
       <div className="rounded-2xl border border-[#B26A1E]/30 bg-white p-3 sm:p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="ticket-actions-bar">
