@@ -234,3 +234,9 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - BANNER BROWSER DALAM-APLIKASI: OrderStatusPage deteksi UA Instagram/FB/Line/TikTok/Twitter → tampilkan banner (`inapp-browser-hint`) menyarankan buka di Safari/Chrome, karena in-app webview memblokir simpan gambar & kalender. (Kasus user: buka kbikepri.com dari dalam Instagram.)
 - Wording e-tiket buyer diperbaiki "NONTON BERSAMA" → "FILM DOKUMENTER".
 - CATATAN: fix iOS berbasis logika standar WebKit (compile PASS, render OK di preview) — belum diuji di iPhone fisik. Perubahan masih di PREVIEW; perlu REDEPLOY agar live di kbikepri.com.
+
+## Update (Jun 2026 — E-ticket pembeli disamakan dengan format e-ticket Order Manual)
+- OrderStatusPage.js saveTicketImage: canvas dijadikan 820x1180 dgn format SAMA seperti e-ticket manual (AdminPage): logo KBI proporsional (Math.min, di-preload via useEffect+logoRef supaya izin gesture iOS tetap valid & canvas tidak ter-taint — CDN kirim access-control-allow-origin:*), label "E-TICKET · FILM DOKUMENTER", judul "ASHIN JINARAKKHITA", subtitle italic wrap "Jejak Langkah...", tanggal/venue, garis putus, rows [No.Order, Nama, Sesi, Nomor Kursi, Jumlah, Status] font besar (label 20px/nilai bold 25px), no order besar, catatan "Tunjukkan tiket ini kepada petugas saat check-in di lokasi acara.", footer organisasi. Status hijau bila verified.
+- DIUJI (iteration_20.json, frontend 100%): tombol "Simpan Tiket (Gambar)" & "Tambah ke Kalender HP" di desktop -> unduh berhasil, tanpa error konsol, tanpa SecurityError/taint. Order verified #9835.
+- CATATAN: perilaku iOS (Web Share simpan foto / Google Calendar di HP) berbasis logika standar, belum diuji di iPhone fisik. Perlu REDEPLOY agar live di kbikepri.com.
+

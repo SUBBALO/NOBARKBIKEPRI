@@ -64,6 +64,14 @@ export default function OrderStatusPage() {
   const [remaining, setRemaining] = useState(null);
   const fileRef = useRef(null);
   const remindedRef = useRef(false);
+  const logoRef = useRef(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => { logoRef.current = img; };
+    img.src = LOGOS.kbi;
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -84,7 +92,7 @@ export default function OrderStatusPage() {
 
   const saveTicketImage = async () => {
     try {
-      const W = 820, H = 1080;
+      const W = 820, H = 1180;
       const c = document.createElement("canvas");
       c.width = W; c.height = H;
       const x = c.getContext("2d");
@@ -93,36 +101,60 @@ export default function OrderStatusPage() {
       x.fillStyle = "#B26A1E"; x.fillRect(30, 30, W - 60, 12);
       const cx = W / 2;
       x.textAlign = "center";
-      x.fillStyle = "#B26A1E"; x.font = "bold 26px Georgia"; x.fillText("E-TIKET  ·  FILM DOKUMENTER", cx, 110);
-      x.fillStyle = "#7A241F"; x.font = "bold 40px Georgia";
-      x.fillText("ASHIN JINARAKKHITA", cx, 165);
+      let top = 130;
+      const logoImg = logoRef.current;
+      if (logoImg) {
+        try {
+          const maxH = 92, maxW = 300;
+          let lw = logoImg.naturalWidth || logoImg.width || 1, lh = logoImg.naturalHeight || logoImg.height || 1;
+          const r = Math.min(maxW / lw, maxH / lh);
+          lw = lw * r; lh = lh * r;
+          x.drawImage(logoImg, cx - lw / 2, 52, lw, lh);
+          top = 52 + lh + 40;
+        } catch (e) { /* skip logo */ }
+      }
+      x.fillStyle = "#B26A1E"; x.font = "bold 26px Georgia"; x.fillText("E-TICKET · FILM DOKUMENTER", cx, top);
+      x.fillStyle = "#7A241F"; x.font = "bold 38px Georgia"; x.fillText("ASHIN JINARAKKHITA", cx, top + 48);
+      const wrap = (text, maxW) => {
+        const words = text.split(" "); const lines = []; let line = "";
+        words.forEach((w) => {
+          const t = line ? line + " " + w : w;
+          if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
+        });
+        if (line) lines.push(line);
+        return lines;
+      };
+      x.fillStyle = "#8A6A3E"; x.font = "italic 17px Georgia";
+      let sy = top + 80;
+      wrap("Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.", W - 200).forEach((ln) => { x.fillText(ln, cx, sy); sy += 24; });
       x.fillStyle = "#5B4636"; x.font = "18px Arial";
-      x.fillText(event?.date || "Minggu, 13 September 2026", cx, 205);
-      x.fillText(event?.location || "CGV Grand Batam", cx, 232);
-      x.strokeStyle = "#B26A1E"; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(70, 270); x.lineTo(W - 70, 270); x.stroke(); x.setLineDash([]);
+      x.fillText(event?.date || "Minggu, 13 September 2026", cx, sy + 10);
+      x.fillText(event?.location || "CGV Grand Batam", cx, sy + 36);
+      let y0 = sy + 68;
+      x.strokeStyle = "#B26A1E"; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(70, y0); x.lineTo(W - 70, y0); x.stroke(); x.setLineDash([]);
+      const verified = order.status === "verified";
       const rows = [
         ["No. Order", `#${order.order_no}`],
         ["Nama", order.name],
-        ["Sesi", `${order.session?.name} · ${order.session?.time}`],
-        ["Kursi", order.seats.join(", ")],
-        ["Jumlah", `${order.qty} kursi`],
-        ["Status", order.status === "verified" ? "TERVERIFIKASI ✓" : "MENUNGGU VERIFIKASI"],
+        ["Sesi", `${order.session?.name || "-"} · ${order.session?.time || ""}`],
+        ["Nomor Kursi", order.seats.join(", ")],
+        ["Jumlah", `${order.qty} tiket`],
+        ["Status", verified ? "TERVERIFIKASI \u2713" : "MENUNGGU VERIFIKASI"],
       ];
-      let y = 330;
-      x.textAlign = "left";
+      let y = y0 + 54; x.textAlign = "left";
       rows.forEach(([k, v]) => {
-        x.fillStyle = "#7A6A5E"; x.font = "18px Arial"; x.fillText(k, 80, y);
-        x.fillStyle = k === "Status" ? (order.status === "verified" ? "#255E33" : "#8A3A12") : "#2C1E16"; x.font = "bold 22px Arial";
-        x.textAlign = "right"; x.fillText(String(v).slice(0, 34), W - 80, y);
-        x.textAlign = "left"; y += 56;
+        x.fillStyle = "#7A6A5E"; x.font = "20px Arial"; x.fillText(k, 80, y);
+        x.fillStyle = k === "Status" ? (verified ? "#255E33" : "#8A3A12") : "#2C1E16";
+        x.font = "bold 25px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
+        x.textAlign = "left"; y += 60;
       });
       x.textAlign = "center";
-      x.fillStyle = "#7A241F"; x.font = "bold 30px Georgia";
-      x.fillText(`#${order.order_no}`, cx, y + 30);
-      x.fillStyle = "#7A6A5E"; x.font = "15px Arial";
-      x.fillText("Tunjukkan tiket ini saat check-in di lokasi acara.", cx, H - 90);
-      x.fillStyle = "#B26A1E"; x.font = "13px Arial";
-      x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 62);
+      x.fillStyle = "#7A241F"; x.font = "bold 30px Georgia"; x.fillText(`#${order.order_no}`, cx, y + 28);
+      x.fillStyle = "#8A3A12"; x.font = "bold 21px Arial";
+      x.fillText("Tunjukkan tiket ini kepada petugas", cx, H - 108);
+      x.fillText("saat check-in di lokasi acara.", cx, H - 80);
+      x.fillStyle = "#B26A1E"; x.font = "16px Arial";
+      x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 48);
       const fileName = `tiket-${order.order_no}.png`;
       const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
       // Buat file & blob SINKRON dari dataURL (jangan pakai await toBlob) supaya izin gesture iOS

@@ -1,0 +1,29 @@
+{
+  "summary": "Verified buyer e-ticket (OrderStatusPage /order/{id}) 'Simpan Tiket (Gambar)' and 'Tambah ke Kalender HP' buttons work on desktop. Both downloads succeed with no console errors. Tested with verified order #9835 (id e98924ec-a033-40ea-99fa-ad5a0daca887).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "OrderStatusPage.js is ~450+ lines with inline canvas drawing logic mirrored from ManualOrder page — consider extracting drawTicketCanvas() into a shared util (/utils/eticket.js) to avoid drift between buyer & manual e-tickets.",
+    "Logo preload useEffect ties Image().crossOrigin='anonymous' to CDN CORS response; if the CDN header ever changes, canvas will taint silently — add a try/catch around toDataURL with a user-facing toast."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "admin1/admin123 (not needed; /order/{id} public)",
+  "seed_data_creation": "None — used existing verified order #9835",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Buyer e-ticket download verified: tiket-9835.png ~141KB, acara-nonton-9835.ics 340B with valid BEGIN:VCALENDAR. No console errors, no SecurityError/tainted canvas. Logo CDN sends access-control-allow-origin:* so crossOrigin='anonymous' preload works. Mobile Web Share / Google Calendar paths NOT tested (desktop-only path verified as requested).",
+  "verification_details": {
+    "url": "https://qris-payment-7.preview.emergentagent.com/order/e98924ec-a033-40ea-99fa-ad5a0daca887",
+    "save_ticket": {"file": "tiket-9835.png", "size_bytes": 140893, "status": "PASS"},
+    "add_calendar": {"file": "acara-nonton-9835.ics", "size_bytes": 340, "content_head": "BEGIN:VCALENDAR VERSION:2.0 PRODID:-//MBI Kepri//Film Dokumenter//ID", "status": "PASS"},
+    "console_errors": 0,
+    "page_errors": 0
+  }
+}
