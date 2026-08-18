@@ -139,7 +139,6 @@ export default function OrderStatusPage() {
       x.fillText(event?.location || "CGV Grand Batam", cx, sy + 36);
       let y0 = sy + 68;
       x.strokeStyle = "#B26A1E"; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(70, y0); x.lineTo(W - 70, y0); x.stroke(); x.setLineDash([]);
-      const verified = order.status === "verified";
       const rows = [
         ["No. Order", `#${order.order_no}`],
         ["Nama", order.name],
@@ -147,12 +146,11 @@ export default function OrderStatusPage() {
         ["Nomor Kursi", order.seats.join(", ")],
         ["Jumlah", `${order.qty} tiket`],
         ["Tgl & Jam Pesan", fmtDateTime(order.created_at)],
-        ["Status", verified ? "TERVERIFIKASI \u2713" : "MENUNGGU VERIFIKASI"],
       ];
       let y = y0 + 54; x.textAlign = "left";
       rows.forEach(([k, v]) => {
         x.fillStyle = "#7A6A5E"; x.font = "20px Arial"; x.fillText(k, 80, y);
-        x.fillStyle = k === "Status" ? (verified ? "#255E33" : "#8A3A12") : "#2C1E16";
+        x.fillStyle = "#2C1E16";
         x.font = "bold 25px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
         x.textAlign = "left"; y += 60;
       });
