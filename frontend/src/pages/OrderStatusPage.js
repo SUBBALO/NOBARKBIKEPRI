@@ -38,6 +38,13 @@ const compressImage = (file) =>
     reader.readAsDataURL(file);
   });
 
+const fmtDateTime = (iso) => {
+  try {
+    return new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) + " WIB";
+  } catch { return "-"; }
+};
+
+
 const StatusBadge = ({ status }) => {
   const map = {
     pending_payment: { t: "Menunggu Pembayaran", c: "bg-[#B26A1E]/15 text-[#8A3A12]", i: Clock },
@@ -139,6 +146,7 @@ export default function OrderStatusPage() {
         ["Sesi", `${order.session?.name || "-"} · ${order.session?.time || ""}`],
         ["Nomor Kursi", order.seats.join(", ")],
         ["Jumlah", `${order.qty} tiket`],
+        ["Tgl & Jam Pesan", fmtDateTime(order.created_at)],
         ["Status", verified ? "TERVERIFIKASI \u2713" : "MENUNGGU VERIFIKASI"],
       ];
       let y = y0 + 54; x.textAlign = "left";
@@ -151,8 +159,8 @@ export default function OrderStatusPage() {
       x.textAlign = "center";
       x.fillStyle = "#7A241F"; x.font = "bold 30px Georgia"; x.fillText(`#${order.order_no}`, cx, y + 28);
       x.fillStyle = "#8A3A12"; x.font = "bold 21px Arial";
-      x.fillText("Tunjukkan tiket ini kepada petugas", cx, H - 108);
-      x.fillText("saat check-in di lokasi acara.", cx, H - 80);
+      x.fillText("Tunjukkan e-ticket ini kepada petugas di lokasi", cx, H - 108);
+      x.fillText("untuk menukar tiket fisik (hardcopy) asli.", cx, H - 80);
       x.fillStyle = "#B26A1E"; x.font = "16px Arial";
       x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 48);
       const fileName = `tiket-${order.order_no}.png`;
