@@ -1478,7 +1478,21 @@ function ManualPanel() {
     const session = SESSIONS_STATIC.find((s) => s.id === o.session_id);
     const paid = !!o.paid;
     const by = o.created_by || o.seller || o.sold_by || "-";
-    const W = 820, H = 1180;
+    const W = 820;
+    // Wrap nomor kursi (bisa banyak) + tinggi kanvas dinamis
+    const seats = o.seats || [];
+    const _m = document.createElement("canvas").getContext("2d");
+    _m.font = "bold 25px Arial";
+    const seatMaxW = 470;
+    const seatLines = [];
+    let _cur = "";
+    seats.forEach((s) => {
+      const t = _cur ? _cur + ", " + s : s;
+      if (_m.measureText(t).width > seatMaxW && _cur) { seatLines.push(_cur); _cur = s; } else _cur = t;
+    });
+    if (_cur) seatLines.push(_cur);
+    if (seatLines.length === 0) seatLines.push("-");
+    const H = 1180 + (seatLines.length - 1) * 38;
     const draw = (logoImg) => {
       const c = document.createElement("canvas"); c.width = W; c.height = H;
       const x = c.getContext("2d");
@@ -1520,7 +1534,7 @@ function ManualPanel() {
         ["No. Order", `#${o.order_no}`],
         ["Nama", o.name],
         ["Sesi", `${session?.name || "-"} · ${session?.time || ""}`],
-        ["Nomor Kursi", (o.seats || []).join(", ")],
+        ["Nomor Kursi", null],
         ["Jumlah", `${o.qty} tiket`],
         ["Tgl & Jam Pesan", fmtDateTime(o.created_at)],
         ["Diinput oleh", by],
@@ -1529,9 +1543,15 @@ function ManualPanel() {
       let y = y0 + 54; x.textAlign = "left";
       rows.forEach(([k, v]) => {
         x.fillStyle = "#7A6A5E"; x.font = "20px Arial"; x.fillText(k, 80, y);
-        x.fillStyle = k === "Status Pembayaran" ? (paid ? "#255E33" : "#8A3A12") : "#2C1E16";
-        x.font = "bold 25px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
-        x.textAlign = "left"; y += 60;
+        if (k === "Nomor Kursi") {
+          x.fillStyle = "#2C1E16"; x.font = "bold 25px Arial"; x.textAlign = "right";
+          seatLines.forEach((ln, i) => { x.fillText(ln, W - 80, y + i * 38); });
+          x.textAlign = "left"; y += 60 + (seatLines.length - 1) * 38;
+        } else {
+          x.fillStyle = k === "Status Pembayaran" ? (paid ? "#255E33" : "#8A3A12") : "#2C1E16";
+          x.font = "bold 25px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
+          x.textAlign = "left"; y += 60;
+        }
       });
       x.textAlign = "center";
       x.fillStyle = "#7A241F"; x.font = "bold 30px Georgia"; x.fillText(`#${o.order_no}`, cx, y + 28);
