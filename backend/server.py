@@ -239,20 +239,7 @@ async def is_coming_soon():
 
 async def taken_seats(session_id: int):
     """Occupied seats for a session, sourced from atomic seat_locks.
-    Expired locks (unpaid > HOLD_MINUTES) are auto-released and their orders marked expired."""
-    now = datetime.now(timezone.utc)
-    expired = await db.seat_locks.find(
-        {"session_id": session_id, "expires_at": {"$ne": None, "$lt": now}}, {"order_id": 1}
-    ).to_list(2000)
-    if expired:
-        order_ids = list({e["order_id"] for e in expired})
-        await db.seat_locks.delete_many(
-            {"session_id": session_id, "expires_at": {"$ne": None, "$lt": now}}
-        )
-        await db.orders.update_many(
-            {"id": {"$in": order_ids}, "status": "pending_payment"},
-            {"$set": {"status": "expired"}},
-        )
+    Kursi TIDAK dilepas otomatis — hanya panitia yang melepas (hapus pesanan)."""
     locks = await db.seat_locks.find({"session_id": session_id}, {"seat": 1}).to_list(2000)
     return set(l["seat"] for l in locks)
 
@@ -534,7 +521,7 @@ async def create_order(payload: OrderCreate):
     code, total = await gen_unique_total(base)
     order_no = await gen_order_no()
     order_id = str(uuid.uuid4())
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=HOLD_MINUTES)
+    expires_at = None  # kursi dikunci permanen; hanya panitia yang bisa melepas (hapus pesanan)
 
     # Atomic seat claim: unique _id per (session, seat) prevents double booking
     claimed = []
@@ -613,13 +600,7 @@ async def get_order(order_id: str):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
-    # lazily expire if unpaid and too old (also releases its seat locks)
-    if o.get("status") == "pending_payment":
-        created = datetime.fromisoformat(o["created_at"])
-        if created < datetime.now(timezone.utc) - timedelta(minutes=HOLD_MINUTES):
-            await db.orders.update_one({"id": order_id}, {"$set": {"status": "expired"}})
-            await db.seat_locks.delete_many({"order_id": order_id})
-            o["status"] = "expired"
+    # Kursi tidak lagi kadaluarsa otomatis — status dipertahankan sampai bukti diunggah / panitia bertindak.
     session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
     o = clean(o)
     o["session"] = session

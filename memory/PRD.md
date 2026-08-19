@@ -241,3 +241,9 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - CATATAN: perilaku iOS (Web Share simpan foto / Google Calendar di HP) berbasis logika standar, belum diuji di iPhone fisik. Perlu REDEPLOY agar live di kbikepri.com.
 - (Lanjutan) User minta e-ticket website benar-benar seragam dgn manual: ditambah baris "Tgl & Jam Pesan" (fmtDateTime created_at WIB) + catatan bawah diganti "Tunjukkan e-ticket ini kepada petugas di lokasi / untuk menukar tiket fisik (hardcopy) asli." (sama persis manual). Rows buyer kini: No.Order, Nama, Sesi, Nomor Kursi, Jumlah, Tgl & Jam Pesan, Status. Compile PASS. Perlu REDEPLOY.
 
+
+## Update (Jun 2026 — Booking payment UX + kursi TIDAK lepas otomatis)
+- BookingPage step Pembayaran: urutan diubah -> input NOMINAL dulu (kartu Dana Sukarela, badge "1") lalu PILIH METODE (badge "2"). Metode Transfer BCA di ATAS, QRIS di BAWAH. Metode WAJIB dipilih (default method="" , validasi di btn-confirm-open: toast bila belum pilih). Heading "Pilih Metode Pembayaran (wajib dipilih)".
+- HILANGKAN AUTO-LEPAS KURSI (permintaan user, opsi b): kursi online dikunci PERMANEN sejak order dibuat (expires_at=None), TIDAK kadaluarsa otomatis. Hanya panitia yang melepas via hapus pesanan (soft delete -> seat_locks dilepas). Backend: taken_seats() tak lagi expire; POST /orders expires_at=None; GET /orders/{id} tak lazily-expire. HOLD_MINUTES tak dipakai lagi utk online (konstanta tetap ada).
+- Frontend OrderStatusPage: hitung mundur (countdown) DIHAPUS; teks reminder diganti "Kursi Anda sudah dikunci atas nama Anda. Jangan lupa unggah bukti..." (tanpa "15 menit/dilepas otomatis"). Status "expired" lama tetap ditangani utk data lama.
+- DIUJI via curl: order dibuat -> status pending_payment tetap, kursi M18 booked, hapus admin -> 200 (kursi lepas). Compile FE PASS. Perlu REDEPLOY agar live di kbikepri.com.

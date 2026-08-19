@@ -68,7 +68,6 @@ export default function OrderStatusPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
-  const [remaining, setRemaining] = useState(null);
   const fileRef = useRef(null);
   const remindedRef = useRef(false);
   const logoRef = useRef(null);
@@ -241,19 +240,6 @@ export default function OrderStatusPage() {
   };
 
 
-  // countdown for pending payment
-  useEffect(() => {
-    if (!order || order.status !== "pending_payment") return;
-    const created = new Date(order.created_at).getTime();
-    const deadline = created + 15 * 60 * 1000;
-    const t = setInterval(() => {
-      const diff = deadline - Date.now();
-      if (diff <= 0) { setRemaining(0); load(); clearInterval(t); }
-      else setRemaining(diff);
-    }, 1000);
-    return () => clearInterval(t);
-  }, [order, load]);
-
   const copyTotal = () => {
     navigator.clipboard.writeText(String(order.total_amount));
     toast.success("Nominal disalin");
@@ -283,8 +269,6 @@ export default function OrderStatusPage() {
     </div>
   );
 
-  const mm = remaining != null ? Math.floor(remaining / 60000) : null;
-  const ss = remaining != null ? Math.floor((remaining % 60000) / 1000) : null;
   const canUpload = order.status === "pending_payment" || order.status === "waiting_verification";
   const inAppBrowser = /(Instagram|FBAN|FBAV|FB_IAB|Line|TikTok|Twitter)/i.test(navigator.userAgent || "");
 
@@ -383,11 +367,6 @@ export default function OrderStatusPage() {
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-serif-display text-2xl text-[#7A241F]">Pembayaran</h2>
-                {order.status === "pending_payment" && remaining != null && (
-                  <span data-testid="countdown" className="text-sm font-mono px-2.5 py-1 rounded-full bg-[#B26A1E]/10 text-[#8A3A12]">
-                    {String(mm).padStart(2, "0")}:{String(ss).padStart(2, "0")}
-                  </span>
-                )}
               </div>
 
               <Tabs defaultValue={order.payment_method} className="w-full">
@@ -486,7 +465,7 @@ export default function OrderStatusPage() {
             <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Segera Upload Bukti Bayar!</DialogTitle>
             <DialogDescription className="text-[#7A6A5E]">
               Bayar tepat <b>{rupiah(order.total_amount)}</b> lalu <b>wajib upload bukti transfer/QRIS</b> di halaman ini.
-              Kursi hanya dikunci 15 menit — jika tidak, kursi akan dilepas otomatis.
+              Kursi Anda sudah dikunci atas nama Anda. Jangan lupa unggah bukti supaya panitia bisa memverifikasi pembayaran Anda.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
