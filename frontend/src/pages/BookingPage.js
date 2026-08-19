@@ -382,8 +382,36 @@ export default function BookingPage() {
         {step === 4 && (
           <div className="grid md:grid-cols-2 gap-8">
             <div>
-              <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Metode Pembayaran</h2>
-              <p className="text-sm text-[#7A6A5E] mb-6">Pilih cara pembayaran Anda.</p>
+              <h2 className="font-serif-display text-3xl text-[#7A241F] mb-1">Kontribusi &amp; Pembayaran</h2>
+              <p className="text-sm text-[#7A6A5E] mb-6">Isi nominal dana sukarela dulu, lalu pilih metode pembayaran.</p>
+
+              {/* 1) Dana Sukarela (input nominal DULU) */}
+              <div className="rounded-xl border border-[#B26A1E]/40 bg-[#F3E9DD]/50 p-5" data-testid="donation-card">
+                <h3 className="font-semibold text-[#7A241F] flex items-center gap-2">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#B26A1E] text-white text-xs font-bold">1</span>
+                  <HandHeart className="h-5 w-5 text-[#B26A1E]" /> Kontribusi Tiket: Dana Sukarela
+                </h3>
+                <p className="text-xs text-[#7A6A5E] mt-1.5">
+                  Biaya pengadaan rata-rata <b>{rupiah(REF_COST)}/orang</b>, sebagai acuan untuk 1 tiket.
+                </p>
+                <p className="text-base sm:text-lg font-semibold text-[#7A241F] mt-2 leading-snug" data-testid="donation-free-note">
+                  Nominal kontribusi <span className="text-[#B26A1E]">bebas</span>, sesuai Dana Paramita Anda. 🙏
+                </p>
+                <Label htmlFor="donation" className="text-xs text-[#5B4636] mt-4 block">Nominal dana sukarela (Rp)</Label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                  <Input id="donation" data-testid="donation-input" inputMode="numeric"
+                    value={amount ? amount.toLocaleString("id-ID") : ""}
+                    onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="0" className="pl-10 h-12 text-lg font-semibold bg-white" />
+                </div>
+              </div>
+
+              {/* 2) Metode Pembayaran (pilih SETELAH input nominal) */}
+              <h3 className="mt-6 mb-3 font-semibold text-[#7A241F] flex items-center gap-2">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#B26A1E] text-white text-xs font-bold">2</span>
+                Pilih Metode Pembayaran
+              </h3>
               <div className="space-y-3">
                 {[
                   { k: "qris", label: "QRIS", desc: "Scan & bayar via e-wallet / m-banking", icon: QrCode },
@@ -406,27 +434,6 @@ export default function BookingPage() {
                     </button>
                   );
                 })}
-              </div>
-
-              {/* Dana Sukarela */}
-              <div className="mt-6 rounded-xl border border-[#B26A1E]/40 bg-[#F3E9DD]/50 p-5" data-testid="donation-card">
-                <h3 className="font-semibold text-[#7A241F] flex items-center gap-2">
-                  <HandHeart className="h-5 w-5 text-[#B26A1E]" /> Kontribusi Tiket: Dana Sukarela
-                </h3>
-                <p className="text-xs text-[#7A6A5E] mt-1.5">
-                  Biaya pengadaan rata-rata <b>{rupiah(REF_COST)}/orang</b>, sebagai acuan untuk 1 tiket.
-                </p>
-                <p className="text-base sm:text-lg font-semibold text-[#7A241F] mt-2 leading-snug" data-testid="donation-free-note">
-                  Nominal kontribusi <span className="text-[#B26A1E]">bebas</span>, sesuai Dana Paramita Anda. 🙏
-                </p>
-                <Label htmlFor="donation" className="text-xs text-[#5B4636] mt-4 block">Nominal dana sukarela (Rp)</Label>
-                <div className="relative mt-1.5">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
-                  <Input id="donation" data-testid="donation-input" inputMode="numeric"
-                    value={amount ? amount.toLocaleString("id-ID") : ""}
-                    onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))}
-                    placeholder="0" className="pl-10 h-12 text-lg font-semibold bg-white" />
-                </div>
               </div>
             </div>
             <div className="rounded-xl border border-border bg-[#FDFBF7] p-6">
