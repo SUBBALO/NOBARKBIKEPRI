@@ -128,7 +128,7 @@ export default function BookingPage() {
   const [couples, setCouples] = useState({});
   const [seatsLoading, setSeatsLoading] = useState(false);
   const [selected, setSelected] = useState([]);
-  const [method, setMethod] = useState("qris");
+  const [method, setMethod] = useState("");
   const [amountText, setAmountText] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -410,12 +410,12 @@ export default function BookingPage() {
               {/* 2) Metode Pembayaran (pilih SETELAH input nominal) */}
               <h3 className="mt-6 mb-3 font-semibold text-[#7A241F] flex items-center gap-2">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#B26A1E] text-white text-xs font-bold">2</span>
-                Pilih Metode Pembayaran
+                Pilih Metode Pembayaran <span className="text-[#EF4444] text-sm font-normal">(wajib dipilih)</span>
               </h3>
               <div className="space-y-3">
                 {[
-                  { k: "qris", label: "QRIS", desc: "Scan & bayar via e-wallet / m-banking", icon: QrCode },
                   { k: "transfer", label: "Transfer Bank BCA", desc: "Transfer ke Rek. PD MBI Kepri", icon: Landmark },
+                  { k: "qris", label: "QRIS", desc: "Scan & bayar via e-wallet / m-banking", icon: QrCode },
                 ].map((m) => {
                   const Icon = m.icon;
                   return (
@@ -473,6 +473,7 @@ export default function BookingPage() {
             <Button data-testid="btn-confirm-open"
               onClick={() => {
                 if (amount <= 0) { toast.error("Isi nominal dana sukarela terlebih dahulu"); return; }
+                if (!method) { toast.error("Pilih metode pembayaran (Transfer BCA atau QRIS) dulu"); return; }
                 setConfirmOpen(true);
               }}
               className="bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full px-6">
