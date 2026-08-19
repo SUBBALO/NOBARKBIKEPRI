@@ -1570,8 +1570,9 @@ function ManualPanel() {
       const fileName = `e-ticket-${o.order_no}.png`;
       const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
       const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      // 1) Web Share API dgn file (paling baik di iPhone -> muncul "Simpan ke Foto")
-      if (blob && navigator.canShare) {
+      const isMobile = isIOS || /Android/i.test(navigator.userAgent);
+      // 1) Web Share API HANYA di HP (iPhone/Android) -> muncul "Simpan ke Foto". Desktop dilewati.
+      if (isMobile && blob && navigator.canShare) {
         try {
           const file = new File([blob], fileName, { type: "image/png" });
           if (navigator.canShare({ files: [file] })) {
@@ -1588,7 +1589,7 @@ function ManualPanel() {
         toast.info("Tekan lama gambar lalu pilih \u201CSimpan ke Foto\u201D", { duration: 6000 });
         return;
       }
-      // 3) Desktop/Android: download biasa
+      // 3) Desktop / Android: download langsung
       const a = document.createElement("a"); a.href = url; a.download = fileName;
       document.body.appendChild(a); a.click(); a.remove();
       if (blob) setTimeout(() => URL.revokeObjectURL(url), 4000);

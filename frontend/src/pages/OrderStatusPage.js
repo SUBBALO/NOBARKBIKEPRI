@@ -162,6 +162,7 @@ export default function OrderStatusPage() {
       x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 48);
       const fileName = `tiket-${order.order_no}.png`;
       const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const isMobile = isIOS || /Android/i.test(navigator.userAgent);
       // Buat file & blob SINKRON dari dataURL (jangan pakai await toBlob) supaya izin gesture iOS
       // tetap valid saat navigator.share dipanggil.
       const dataUrl = c.toDataURL("image/png");
@@ -172,7 +173,8 @@ export default function OrderStatusPage() {
         for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
       } catch (e) { /* ignore */ }
       const file = arr ? new File([arr], fileName, { type: "image/png" }) : null;
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      // Web Share HANYA di HP; desktop selalu unduh langsung.
+      if (isMobile && file && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: `Tiket #${order.order_no}` });
           toast.success("Tiket siap disimpan / dibagikan"); return;
