@@ -8,9 +8,147 @@ import { SeatMap } from "@/components/SeatMap";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin, Monitor, Video } from "lucide-react";
+import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin, Monitor, Video, Search, UserCheck, ScanLine, X, ArrowLeft, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DISPLAY_CHANNEL } from "./DisplayPage";
+
+const fmtTimeWIB = (iso) => {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + " WIB";
+  } catch { return ""; }
+};
+
+const CHANNELS = {
+  umum: { label: "WEBSITE", cls: "bg-[#1E6F8B]/15 text-[#155A73] border-[#1E6F8B]/30" },
+  manual: { label: "ORDER MANUAL", cls: "bg-[#B26A1E]/15 text-[#8A3A12] border-[#B26A1E]/30" },
+  vip: { label: "TAMU VIP", cls: "bg-[#7A241F]/15 text-[#7A241F] border-[#7A241F]/30" },
+  panitia: { label: "PANITIA (LOKASI)", cls: "bg-[#2F703E]/15 text-[#255E33] border-[#2F703E]/30" },
+};
+
+function CheckinPanel() {
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState(null);
+  const [popup, setPopup] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await adminApi.get("/admin/participants");
+      setParticipants(data);
+    } catch (err) { toast.error("Gagal memuat data peserta"); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const doCheckin = async (o) => {
+    setBusyId(o.id);
+    try {
+      const { data } = await adminApi.post(`/admin/orders/${o.id}/checkin`);
+      setPopup({ ...data, channel: o.channel, session: o.session });
+      await load();
+    } catch (err) { toast.error("Gagal check-in"); }
+    setBusyId(null);
+  };
+
+  const q = query.trim().toLowerCase();
+  const nq = q.replace(/[\s-]/g, "");
+  const results = q.length === 0 ? participants : participants.filter(
+    (o) => o.name.toLowerCase().includes(q) || (o.phone || "").replace(/[\s-]/g, "").includes(nq) || String(o.order_no || "").includes(nq)
+  );
+  const totalHadir = participants.filter((o) => o.checked_in).length;
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-5" data-testid="walkin-checkin-panel">
+      <div className="rounded-2xl border border-border bg-white p-4 mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#7A6A5E]" />
+          <Input data-testid="walkin-checkin-search" value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari nama, nomor HP, atau no. order..." className="pl-9 pr-9 h-11" />
+          {query && (
+            <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A6A5E]"><X className="h-4 w-4" /></button>
+          )}
+        </div>
+        <p className="text-[11px] text-[#7A6A5E] mt-2">{totalHadir}/{participants.length} peserta sudah hadir</p>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
+      ) : results.length === 0 ? (
+        <p className="text-center text-sm text-[#7A6A5E] py-16">{participants.length === 0 ? "Belum ada peserta." : "Tidak ada peserta yang cocok."}</p>
+      ) : (
+        <div className="space-y-3">
+          {results.map((o) => {
+            const ch = CHANNELS[o.channel] || CHANNELS.umum;
+            return (
+              <div key={o.id} data-testid={`walkin-checkin-card-${o.id.slice(0, 8)}`}
+                className={cn("rounded-2xl border bg-white p-4 shadow-sm", o.checked_in ? "border-[#2F703E]/40 bg-[#2F703E]/5" : "border-border")}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <p className="font-semibold text-[#2C1E16] truncate">{o.name}</p>
+                      {o.order_no ? <span className="shrink-0 text-[11px] font-bold text-[#7A241F] bg-[#7A241F]/10 px-2 py-0.5 rounded-md">#{o.order_no}</span> : null}
+                    </div>
+                    <span className={cn("inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md border", ch.cls)}>{ch.label}</span>
+                    <p className="text-xs text-[#7A6A5E] mt-1">{o.session?.name} · {o.session?.time} · {o.qty} tiket</p>
+                    {o.channel === "manual" && <p className="mt-1.5 inline-flex text-xs font-bold text-[#8A3A12] bg-[#B26A1E]/15 border border-[#B26A1E]/30 rounded-md px-2 py-1">→ Arahkan ke Counter Tiket Manual</p>}
+                  </div>
+                  {o.checked_in ? (
+                    <span className="shrink-0 inline-flex items-center gap-1 text-xs text-[#255E33] font-medium bg-[#2F703E]/15 px-2 py-1 rounded-full"><CheckCircle2 className="h-3.5 w-3.5" /> Hadir</span>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(o.seats || []).map((s) => <span key={s} className="px-3 py-1.5 rounded-lg bg-[#B26A1E]/10 text-[#8A3A12] text-base font-bold">{s}</span>)}
+                </div>
+                {o.checked_in ? (
+                  <p className="text-[11px] text-[#7A6A5E] mt-3">Check-in: {fmtTimeWIB(o.checked_in_at)}{o.checked_in_by ? <> · oleh <b className="text-[#255E33]">{o.checked_in_by}</b></> : null}</p>
+                ) : (
+                  <Button onClick={() => doCheckin(o)} disabled={busyId === o.id} data-testid={`walkin-checkin-btn-${o.id.slice(0, 8)}`}
+                    className="w-full mt-3 h-11 bg-[#7A241F] hover:bg-[#5E1B17] rounded-xl">
+                    {busyId === o.id ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserCheck className="h-4 w-4 mr-1.5" />} Tandai Sudah Datang
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={!!popup} onOpenChange={() => setPopup(null)}>
+        <DialogContent data-testid="walkin-checkin-popup" className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="h-11 w-11 rounded-full bg-[#2F703E]/15 flex items-center justify-center mb-2"><Ticket className="h-5 w-5 text-[#2F703E]" /></div>
+            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Peserta Sudah Datang</DialogTitle>
+          </DialogHeader>
+          {popup && (
+            <div className="text-sm space-y-3">
+              <p><b>{popup.name}</b> — {popup.session?.name} · {popup.session?.time}</p>
+              {popup.channel === "manual" ? (
+                <div className="rounded-lg bg-[#7A241F]/[0.06] border-2 border-[#7A241F]/30 p-4 text-center">
+                  <p className="text-[#8A3A12] font-medium mb-1">Order Manual (Rombongan)</p>
+                  <p className="font-serif-display text-2xl text-[#7A241F] leading-tight mb-2">Arahkan ke<br />COUNTER TIKET MANUAL</p>
+                  <p className="text-xs text-[#7A6A5E]">Tiket fisik ({popup.seats?.length || popup.qty} tiket) sudah disiapkan di stand manual.</p>
+                </div>
+              ) : (
+                <div className="rounded-lg bg-[#B26A1E]/10 p-4">
+                  <p className="text-[#8A3A12] font-medium mb-2">Serahkan tiket:</p>
+                  <p className="font-serif-display text-2xl text-[#7A241F] mb-2">{popup.session?.name?.toUpperCase()} · {popup.session?.time}</p>
+                  <p className="text-xs text-[#7A6A5E] mb-1">Nomor kursi <b className="text-[#8A3A12]">({popup.seats?.length} tiket)</b>:</p>
+                  <div className="flex flex-wrap gap-2">{(popup.seats || []).map((s) => <span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold border border-[#B26A1E]/30">{s}</span>)}</div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setPopup(null)} className="bg-[#7A241F] hover:bg-[#5E1B17] w-full h-11" data-testid="walkin-checkin-ok">Selesai</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 const compressImage = (file) =>
   new Promise((resolve, reject) => {
@@ -97,6 +235,7 @@ function Login({ onLogin }) {
 export default function WalkinPage() {
   const [authed, setAuthed] = useState(!!getAdminUser());
   const [user, setUser] = useState(getAdminUser());
+  const [panitiaMode, setPanitiaMode] = useState("menu"); // menu | order | checkin
   const [sessionId, setSessionId] = useState(null);
   const [mapData, setMapData] = useState(null);
   const [loadingMap, setLoadingMap] = useState(true);
@@ -312,22 +451,67 @@ export default function WalkinPage() {
       <div className="sticky top-0 z-40 bg-[#7A241F] text-white">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {panitiaMode !== "menu" && (
+              <button onClick={() => { setPanitiaMode("menu"); setSessionId(null); setDisplayMode("welcome"); setResult(null); }}
+                data-testid="walkin-back-menu" className="mr-1 inline-flex items-center gap-1 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-full px-2.5 py-1.5 transition-colors">
+                <ArrowLeft className="h-4 w-4" /> Menu
+              </button>
+            )}
             <img src={LOGOS.kbi} alt="KBI" className="h-8 bg-white/95 rounded p-1" />
             <div>
-              <p className="text-sm font-semibold leading-tight flex items-center gap-1.5"><Store className="h-4 w-4" /> Jual Tiket di Tempat</p>
+              <p className="text-sm font-semibold leading-tight flex items-center gap-1.5">
+                {panitiaMode === "checkin" ? <><ScanLine className="h-4 w-4" /> Check-in Peserta</> : <><Store className="h-4 w-4" /> Jual Tiket di Tempat</>}
+              </p>
               <p className="text-[11px] text-white/70 leading-tight">Petugas: {user?.name}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={openMonitor} data-testid="walkin-open-monitor"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors">
-              <Monitor className="h-4 w-4" /> Buka Layar Monitor
-            </button>
+            {panitiaMode === "order" && (
+              <button onClick={openMonitor} data-testid="walkin-open-monitor"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors">
+                <Monitor className="h-4 w-4" /> Buka Layar Monitor
+              </button>
+            )}
             <button onClick={() => { adminApi.post("/admin/logout").catch(() => {}); clearAdminSession(); setAuthed(false); }} data-testid="walkin-logout" className="text-xs text-white/80 underline">Keluar</button>
           </div>
         </div>
       </div>
 
+      {/* Menu utama panitia */}
+      {panitiaMode === "menu" && (
+        <div className="max-w-3xl mx-auto px-4 py-8" data-testid="walkin-menu">
+          <div className="rounded-3xl overflow-hidden border border-[#B26A1E]/30 bg-gradient-to-br from-[#7A241F] to-[#5E1B17] text-white p-8 sm:p-10 text-center shadow-lg">
+            <img src={LOGOS.kbi} alt="KBI" className="h-16 mx-auto bg-white/95 rounded-xl p-2 mb-5" />
+            <p className="text-xs tracking-widest text-white/70 uppercase">Panitia · Hari Acara</p>
+            <h1 className="font-serif-display text-3xl sm:text-4xl mt-1">Film Dokumenter</h1>
+            <h2 className="font-serif-display text-2xl sm:text-3xl text-[#E4C57E]">ASHIN JINARAKKHITA</h2>
+            <p className="text-sm text-white/80 mt-2">Minggu, 13 September 2026 · CGV Grand Batam</p>
+          </div>
+          <p className="text-center text-sm text-[#7A6A5E] mt-8 mb-4">Pilih tugas Anda:</p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <button onClick={() => { setPanitiaMode("order"); setDisplayMode("welcome"); }} data-testid="walkin-menu-order"
+              className="group rounded-2xl border-2 border-[#B26A1E]/40 bg-white p-7 text-center hover:border-[#B26A1E] hover:bg-[#B26A1E]/5 transition-colors shadow-sm">
+              <span className="h-16 w-16 mx-auto rounded-2xl bg-[#B26A1E]/10 group-hover:bg-[#B26A1E]/20 flex items-center justify-center mb-4 transition-colors">
+                <Store className="h-8 w-8 text-[#B26A1E]" />
+              </span>
+              <p className="font-serif-display text-2xl text-[#7A241F]">Pesan Tiket</p>
+              <p className="text-sm text-[#7A6A5E] mt-1.5">Jual tiket di tempat: pilih sesi, pilih kursi, bayar.</p>
+            </button>
+            <button onClick={() => setPanitiaMode("checkin")} data-testid="walkin-menu-checkin"
+              className="group rounded-2xl border-2 border-[#2F703E]/40 bg-white p-7 text-center hover:border-[#2F703E] hover:bg-[#2F703E]/5 transition-colors shadow-sm">
+              <span className="h-16 w-16 mx-auto rounded-2xl bg-[#2F703E]/10 group-hover:bg-[#2F703E]/20 flex items-center justify-center mb-4 transition-colors">
+                <ScanLine className="h-8 w-8 text-[#2F703E]" />
+              </span>
+              <p className="font-serif-display text-2xl text-[#7A241F]">Check In</p>
+              <p className="text-sm text-[#7A6A5E] mt-1.5">Catat kehadiran peserta & serahkan tiket.</p>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {panitiaMode === "checkin" && <CheckinPanel />}
+
+      {panitiaMode === "order" && (
       <div className="max-w-6xl mx-auto px-4 py-5 grid lg:grid-cols-3 gap-6">
         {/* Seat map — the big monitor area */}
         <div className="lg:col-span-2 rounded-2xl border border-border bg-white p-5">
@@ -487,6 +671,7 @@ export default function WalkinPage() {
           </Button>
         </div>
       </div>
+      )}
 
       {/* Payment step dialog (QRIS / Transfer) */}
       <Dialog open={payStep === "pay"} onOpenChange={(o) => { if (!o) cancelPayment(); }}>

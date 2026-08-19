@@ -247,3 +247,10 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - HILANGKAN AUTO-LEPAS KURSI (permintaan user, opsi b): kursi online dikunci PERMANEN sejak order dibuat (expires_at=None), TIDAK kadaluarsa otomatis. Hanya panitia yang melepas via hapus pesanan (soft delete -> seat_locks dilepas). Backend: taken_seats() tak lagi expire; POST /orders expires_at=None; GET /orders/{id} tak lazily-expire. HOLD_MINUTES tak dipakai lagi utk online (konstanta tetap ada).
 - Frontend OrderStatusPage: hitung mundur (countdown) DIHAPUS; teks reminder diganti "Kursi Anda sudah dikunci atas nama Anda. Jangan lupa unggah bukti..." (tanpa "15 menit/dilepas otomatis"). Status "expired" lama tetap ditangani utk data lama.
 - DIUJI via curl: order dibuat -> status pending_payment tetap, kursi M18 booked, hapus admin -> 200 (kursi lepas). Compile FE PASS. Perlu REDEPLOY agar live di kbikepri.com.
+
+## Update (Jun 2026 — /walkin ditata ulang: Menu panitia + Check-in + badge kanal)
+- WalkinPage.js: state panitiaMode ("menu"|"order"|"checkin"). Setelah login tampil MENU banner (logo + judul acara) dgn 2 tombol: "Pesan Tiket" (walkin-menu-order) & "Check In" (walkin-menu-checkin). Tombol "← Menu" (walkin-back-menu) di top bar untuk kembali.
+- "Pesan Tiket" -> alur lama (pilih sesi -> peta kursi -> bayar). "Buka Layar Monitor" hanya tampil di mode order.
+- "Check In" -> komponen CheckinPanel di dalam /walkin (panitia bisa bantu check-in): search nama/HP/no order, tombol "Tandai Sudah Datang" (POST /admin/orders/{id}/checkin), popup hasil. Order manual -> popup "Arahkan ke COUNTER TIKET MANUAL".
+- BADGE KANAL di tiap kartu check-in (map CHANNELS): umum->"WEBSITE" (biru), manual->"ORDER MANUAL" (gold) + hint "→ Arahkan ke Counter Tiket Manual", vip->"TAMU VIP" (maroon), panitia->"PANITIA (LOKASI)" (hijau). Data dari GET /admin/participants field channel.
+- DIUJI (iteration_21.json, frontend 100%): login admin1, menu tampil, Pesan Tiket buka SeatMap, Check-in render + badge WEBSITE/ORDER MANUAL/PANITIA benar (tak ada VIP di data preview tapi mapping benar), back-menu bekerja. Perlu REDEPLOY agar live di kbikepri.com.
