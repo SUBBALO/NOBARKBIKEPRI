@@ -31,7 +31,7 @@ ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'mbi-nonton-2026-admin')
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGO = "HS256"
 TOKEN_TTL_HOURS = 12
-ROLE_LABELS = {"superadmin": "Super Admin", "admin": "Admin", "checkin": "Petugas Check-in", "seller": "Petugas Penjual Tiket"}
+ROLE_LABELS = {"superadmin": "Super Admin", "admin": "Admin", "checkin": "Petugas Check-in", "seller": "Petugas Penjual Tiket", "loket": "Loket (Jual Tiket + Check-in)", "checkin_web": "Check-in Website"}
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -137,7 +137,7 @@ class UserCreate(BaseModel):
     username: str
     password: str
     name: Optional[str] = ""
-    role: Literal["superadmin", "admin", "checkin", "seller"] = "checkin"
+    role: Literal["superadmin", "admin", "checkin", "seller", "loket", "checkin_web"] = "checkin"
     can_delete: bool = False
 
 
@@ -147,7 +147,7 @@ class UserPermission(BaseModel):
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    role: Optional[Literal["superadmin", "admin", "checkin", "seller"]] = None
+    role: Optional[Literal["superadmin", "admin", "checkin", "seller", "loket", "checkin_web"]] = None
     can_delete: Optional[bool] = None
 
 
@@ -418,7 +418,7 @@ def require_roles(*roles):
 
 require_any = get_current_user
 require_staff = require_roles("superadmin", "admin")
-require_walkin = require_roles("superadmin", "admin", "seller")
+require_walkin = require_roles("superadmin", "admin", "seller", "loket")
 require_super = require_roles("superadmin")
 
 
@@ -1284,6 +1284,9 @@ async def checkin_order(order_id: str, user: dict = Depends(require_any)):
     o = await db.orders.find_one({"id": order_id})
     if not o:
         raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    # Role "Check-in Website" TIDAK boleh check-in Order Manual (harus di Counter Tiket Manual / Loket)
+    if user["role"] == "checkin_web" and o.get("manual"):
+        raise HTTPException(status_code=403, detail="Order Manual harus di-check-in di Counter Tiket Manual (Loket).")
     already = o.get("checked_in", False)
     update = {"checked_in": True, "checked_in_at": now_iso(), "updated_at": now_iso()}
     if not already:
@@ -1834,13 +1837,18 @@ async def export_orders(_: bool = Depends(require_staff)):
 
 # ---------------- User management (superadmin) ----------------
 @api_router.get("/admin/users")
-async def list_users(user: dict = Depends(require_super)):
+async def list_users(user: dict = Depends(require_staff)):
     docs = await db.admin_users.find({}).sort("created_at", 1).to_list(200)
     return [public_user(u) for u in docs]
 
 
 @api_router.post("/admin/users")
-async def create_user(payload: UserCreate, user: dict = Depends(require_super)):
+async def create_user(payload: UserCreate, user: dict = Depends(require_staff)):
+    # Admin biasa (non-superadmin) hanya boleh membuat role "loket" & "checkin_web", tanpa izin hapus.
+    if user["role"] != "superadmin":
+        if payload.role not in ("loket", "checkin_web"):
+            raise HTTPException(status_code=403, detail="Admin hanya boleh menambah role Loket atau Check-in Website")
+        payload.can_delete = False
     uname = payload.username.strip().lower()
     if len(uname) < 3:
         raise HTTPException(status_code=400, detail="Username minimal 3 karakter")

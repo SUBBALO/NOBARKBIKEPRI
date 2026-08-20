@@ -98,12 +98,13 @@ export default function CheckinPage() {
 
   const q = query.trim().toLowerCase();
   const nq = q.replace(/[\s-]/g, "");
-  const results = q.length === 0 ? participants : participants.filter(
+  // Cari-dulu: tidak menampilkan seluruh daftar (berat). Hasil muncul saat mengetik ≥ 2 karakter.
+  const results = q.length < 2 ? [] : participants.filter(
     (o) =>
       o.name.toLowerCase().includes(q) ||
       o.phone.replace(/[\s-]/g, "").includes(nq) ||
       String(o.order_no || "").includes(nq)
-  );
+  ).slice(0, 15);
   const totalHadir = participants.filter((o) => o.checked_in).length;
 
   return (
@@ -141,10 +142,13 @@ export default function CheckinPage() {
       <div className="px-4 py-4 max-w-lg mx-auto space-y-3 pb-20">
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
+        ) : q.length < 2 ? (
+          <div className="text-center py-16" data-testid="checkin-prompt">
+            <Search className="h-8 w-8 text-[#B26A1E]/40 mx-auto mb-3" />
+            <p className="text-sm text-[#7A6A5E]">Ketik <b>nomor order</b>, <b>nama</b>, atau <b>no. HP</b> untuk mencari peserta.</p>
+          </div>
         ) : results.length === 0 ? (
-          <p className="text-center text-sm text-[#7A6A5E] py-16">
-            {participants.length === 0 ? "Belum ada peserta terverifikasi." : "Tidak ada peserta yang cocok."}
-          </p>
+          <p className="text-center text-sm text-[#7A6A5E] py-16">Tidak ada peserta yang cocok dengan "{query}".</p>
         ) : (
           results.map((o) => (
             <motion.div key={o.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}

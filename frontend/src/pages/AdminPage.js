@@ -182,6 +182,8 @@ const ROLE_BADGE = {
   admin: { t: "Admin", c: "bg-[#7A241F]/15 text-[#7A241F]" },
   checkin: { t: "Petugas Check-in", c: "bg-[#2F703E]/15 text-[#255E33]" },
   seller: { t: "Petugas Penjual Tiket", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  loket: { t: "Loket (Jual + Check-in)", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  checkin_web: { t: "Check-in Website", c: "bg-[#1E6F8B]/15 text-[#155A73]" },
 };
 
 const StatCard = ({ icon: Icon, label, value, color }) => (
@@ -488,9 +490,10 @@ function LogsPanel() {
 }
 
 function UsersPanel({ currentUser }) {
+  const isSuper = currentUser?.role === "superadmin";
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ username: "", name: "", password: "", role: "checkin" });
+  const [form, setForm] = useState({ username: "", name: "", password: "", role: isSuper ? "checkin" : "loket" });
   const [busy, setBusy] = useState(false);
   const [delTarget, setDelTarget] = useState(null);
   const load = useCallback(async () => {
@@ -507,7 +510,7 @@ function UsersPanel({ currentUser }) {
     try {
       await adminApi.post("/admin/users", form);
       toast.success(`User "${form.username}" dibuat`);
-      setForm({ username: "", name: "", password: "", role: "checkin" });
+      setForm({ username: "", name: "", password: "", role: isSuper ? "checkin" : "loket" });
       await load();
     } catch (err) { toast.error(err?.response?.data?.detail || "Gagal membuat user"); }
     setBusy(false);
@@ -590,10 +593,14 @@ function UsersPanel({ currentUser }) {
             <select id="nr" data-testid="user-role" value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
               className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-              <option value="checkin">Petugas Check-in (hanya check-in)</option>
-              <option value="seller">Petugas Penjual Tiket (jual di tempat + check-in)</option>
-              <option value="admin">Admin (verifikasi + hapus + check-in)</option>
-              <option value="superadmin">Super Admin (semua + kelola user)</option>
+              <option value="checkin_web">Check-in Website (check-in tiket website; manual diarahkan)</option>
+              <option value="loket">Loket (jual tiket + check-in SEMUA termasuk manual)</option>
+              {isSuper && <>
+                <option value="checkin">Petugas Check-in (hanya check-in semua)</option>
+                <option value="seller">Petugas Penjual Tiket (jual di tempat + check-in)</option>
+                <option value="admin">Admin (verifikasi + hapus + check-in)</option>
+                <option value="superadmin">Super Admin (semua + kelola user)</option>
+              </>}
             </select>
           </div>
           <Button type="submit" disabled={busy} data-testid="user-create-btn" className="w-full bg-[#7A241F] hover:bg-[#5E1B17]">
@@ -623,6 +630,7 @@ function UsersPanel({ currentUser }) {
                       <span className={cn("inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full font-medium", rb.c)}>{rb.t}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      {isSuper ? (<>
                       <button onClick={() => openEdit(u)} data-testid={`user-edit-${u.username}`}
                         title="Edit nama & peran" className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium">
                         <Pencil className="h-3.5 w-3.5" /> Edit
@@ -639,9 +647,12 @@ function UsersPanel({ currentUser }) {
                           <Trash2 className="h-4 w-4" />
                         </button>
                       )}
+                      </>) : (
+                        <span className="text-[11px] text-[#7A6A5E]">{u.id === currentUser?.id ? "Anda" : "Hanya Super Admin yang dapat mengelola"}</span>
+                      )}
                     </div>
                   </div>
-                  {!isSuperUser && (
+                  {isSuper && !isSuperUser && (
                     <div className="mt-2.5 flex items-center justify-between gap-2 rounded-lg bg-[#FDFBF7] border border-border px-2.5 py-2">
                       <span className="text-[11px] font-medium text-[#5B4636] flex items-center gap-1.5">
                         <Trash2 className="h-3.5 w-3.5 text-[#EF4444]" /> Boleh hapus data pesanan
@@ -725,7 +736,9 @@ function UsersPanel({ currentUser }) {
                 <Label className="mb-1.5 block">Peran / Akses</Label>
                 <div className="space-y-2">
                   {[
-                    { v: "checkin", t: "Petugas Check-in", d: "Hanya halaman check-in" },
+                    { v: "checkin_web", t: "Check-in Website", d: "Check-in tiket Website; order manual hanya diarahkan (tidak bisa tandai hadir)" },
+                    { v: "loket", t: "Loket", d: "Jual tiket di tempat + check-in SEMUA (termasuk Order Manual)" },
+                    { v: "checkin", t: "Petugas Check-in", d: "Check-in semua peserta" },
                     { v: "seller", t: "Petugas Penjual Tiket", d: "Jual tiket di tempat + check-in" },
                     { v: "admin", t: "Admin", d: "Verifikasi + hapus + check-in + jual" },
                     { v: "superadmin", t: "Super Admin", d: "Semua akses + kelola user" },
@@ -2304,7 +2317,7 @@ export default function AdminPage() {
             tab === "logs" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
           <History className="h-4 w-4" /> Log Aktivitas
         </button>
-        {isSuper && (
+        {isStaff && (
           <button data-testid="admin-tab-users" onClick={() => setTab("users")}
             className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
               tab === "users" ? "bg-[#7A241F] text-white border-[#7A241F]" : "bg-white text-[#7A6A5E] border-border hover:border-[#7A241F]/50")}>
@@ -2666,7 +2679,7 @@ export default function AdminPage() {
 
       {tab === "masterlist" && <MasterlistPanel />}
 
-      {tab === "users" && isSuper && <UsersPanel currentUser={currentUser} />}
+      {tab === "users" && isStaff && <UsersPanel currentUser={currentUser} />}
 
       {tab === "trash" && isSuper && (
         <TrashPanel orders={deletedOrders} loading={trashLoading} onRefresh={loadTrash}

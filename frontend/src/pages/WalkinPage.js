@@ -44,6 +44,10 @@ function CheckinPanel({ onCheckinDisplay, onFinish }) {
   useEffect(() => { load(); }, [load]);
 
   const doCheckin = async (o) => {
+    if (isCheckinWeb && o.channel === "manual") {
+      toast.error("Order Manual harus di-check-in di Counter Tiket Manual (Loket).");
+      return;
+    }
     setBusyId(o.id);
     try {
       const { data } = await adminApi.post(`/admin/orders/${o.id}/checkin`);
@@ -57,11 +61,14 @@ function CheckinPanel({ onCheckinDisplay, onFinish }) {
 
   const finishPopup = () => { setPopup(null); onFinish?.(); };
 
+  const role = getAdminUser()?.role;
+  const isCheckinWeb = role === "checkin_web";
   const q = query.trim().toLowerCase();
   const nq = q.replace(/[\s-]/g, "");
-  const results = q.length === 0 ? participants : participants.filter(
+  // Cari-dulu: tidak menampilkan seluruh daftar (berat). Hasil muncul hanya saat mengetik.
+  const results = q.length < 2 ? [] : participants.filter(
     (o) => o.name.toLowerCase().includes(q) || (o.phone || "").replace(/[\s-]/g, "").includes(nq) || String(o.order_no || "").includes(nq)
-  );
+  ).slice(0, 12);
   const totalHadir = participants.filter((o) => o.checked_in).length;
 
   return (
@@ -80,8 +87,13 @@ function CheckinPanel({ onCheckinDisplay, onFinish }) {
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-[#B26A1E]" /></div>
+      ) : q.length < 2 ? (
+        <div className="text-center py-16" data-testid="walkin-checkin-prompt">
+          <Search className="h-8 w-8 text-[#B26A1E]/40 mx-auto mb-3" />
+          <p className="text-sm text-[#7A6A5E]">Ketik <b>nomor order</b>, <b>nama</b>, atau <b>no. HP</b> untuk menampilkan peserta.</p>
+        </div>
       ) : results.length === 0 ? (
-        <p className="text-center text-sm text-[#7A6A5E] py-16">{participants.length === 0 ? "Belum ada peserta." : "Tidak ada peserta yang cocok."}</p>
+        <p className="text-center text-sm text-[#7A6A5E] py-16">Tidak ada peserta yang cocok dengan "{query}".</p>
       ) : (
         <div className="space-y-3">
           {results.map((o) => {
@@ -108,6 +120,11 @@ function CheckinPanel({ onCheckinDisplay, onFinish }) {
                 </div>
                 {o.checked_in ? (
                   <p className="text-[11px] text-[#7A6A5E] mt-3">Check-in: {fmtTimeWIB(o.checked_in_at)}{o.checked_in_by ? <> · oleh <b className="text-[#255E33]">{o.checked_in_by}</b></> : null}</p>
+                ) : (isCheckinWeb && o.channel === "manual") ? (
+                  <div className="mt-3 rounded-xl bg-[#B26A1E]/10 border-2 border-[#B26A1E]/30 p-3 text-center" data-testid={`walkin-manual-redirect-${o.id.slice(0, 8)}`}>
+                    <p className="font-bold text-[#8A3A12]">→ Arahkan ke Counter Tiket Manual</p>
+                    <p className="text-[11px] text-[#7A6A5E] mt-0.5">Order manual (rombongan) tidak di-check-in di sini. Tidak ditandai hadir.</p>
+                  </div>
                 ) : (
                   <Button onClick={() => doCheckin(o)} disabled={busyId === o.id} data-testid={`walkin-checkin-btn-${o.id.slice(0, 8)}`}
                     className="w-full mt-3 h-11 bg-[#7A241F] hover:bg-[#5E1B17] rounded-xl">
@@ -200,8 +217,8 @@ function Login({ onLogin }) {
     setLoading(true);
     try {
       const { data } = await api.post("/admin/login", { username, password });
-      if (!["admin", "superadmin", "seller"].includes(data.user.role)) {
-        toast.error("Akun ini tidak boleh menjual tiket di tempat");
+      if (!["admin", "superadmin", "seller", "loket", "checkin_web", "checkin"].includes(data.user.role)) {
+        toast.error("Akun ini tidak punya akses panitia");
         setLoading(false);
         return;
       }
@@ -240,6 +257,8 @@ export default function WalkinPage() {
   const [authed, setAuthed] = useState(!!getAdminUser());
   const [user, setUser] = useState(getAdminUser());
   const [panitiaMode, setPanitiaMode] = useState("menu"); // menu | order | checkin
+  const role = user?.role;
+  const canSell = ["superadmin", "admin", "seller", "loket"].includes(role);
   const [checkinView, setCheckinView] = useState(null); // data peserta yg baru di-check-in (utk layar monitor)
   const [sessionId, setSessionId] = useState(null);
   const [mapData, setMapData] = useState(null);
@@ -492,7 +511,8 @@ export default function WalkinPage() {
             <p className="text-xs text-white/80 mt-1">Minggu, 13 September 2026 · CGV Grand Batam</p>
           </div>
           <p className="text-center text-sm text-[#7A6A5E] mt-4 mb-3">Pilih tugas Anda:</p>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className={cn("grid gap-3 sm:gap-4", canSell ? "grid-cols-2" : "grid-cols-1 max-w-md mx-auto w-full")}>
+            {canSell && (
             <button onClick={() => { setPanitiaMode("order"); setDisplayMode("welcome"); }} data-testid="walkin-menu-order"
               className="group rounded-2xl border-2 border-[#B26A1E]/40 bg-white px-4 py-6 text-center hover:border-[#B26A1E] hover:bg-[#B26A1E]/5 transition-colors shadow-sm">
               <span className="h-14 w-14 mx-auto rounded-2xl bg-[#B26A1E]/10 group-hover:bg-[#B26A1E]/20 flex items-center justify-center mb-3 transition-colors">
@@ -501,6 +521,7 @@ export default function WalkinPage() {
               <p className="font-serif-display text-xl sm:text-2xl text-[#7A241F]">Pesan Tiket</p>
               <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">Jual tiket di tempat: pilih sesi, kursi, bayar.</p>
             </button>
+            )}
             <button onClick={() => setPanitiaMode("checkin")} data-testid="walkin-menu-checkin"
               className="group rounded-2xl border-2 border-[#2F703E]/40 bg-white px-4 py-6 text-center hover:border-[#2F703E] hover:bg-[#2F703E]/5 transition-colors shadow-sm">
               <span className="h-14 w-14 mx-auto rounded-2xl bg-[#2F703E]/10 group-hover:bg-[#2F703E]/20 flex items-center justify-center mb-3 transition-colors">
