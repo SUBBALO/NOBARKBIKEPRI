@@ -26,7 +26,7 @@ const CHANNELS = {
   panitia: { label: "PANITIA (LOKASI)", cls: "bg-[#2F703E]/15 text-[#255E33] border-[#2F703E]/30" },
 };
 
-function CheckinPanel() {
+function CheckinPanel({ onCheckinDisplay, onFinish }) {
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -47,11 +47,15 @@ function CheckinPanel() {
     setBusyId(o.id);
     try {
       const { data } = await adminApi.post(`/admin/orders/${o.id}/checkin`);
-      setPopup({ ...data, channel: o.channel, session: o.session });
+      const info = { ...data, channel: o.channel, session: o.session };
+      setPopup(info);
+      onCheckinDisplay?.({ name: o.name, channel: o.channel, qty: o.qty, seats: o.seats || [], sessionName: o.session?.name, sessionTime: o.session?.time });
       await load();
     } catch (err) { toast.error("Gagal check-in"); }
     setBusyId(null);
   };
+
+  const finishPopup = () => { setPopup(null); onFinish?.(); };
 
   const q = query.trim().toLowerCase();
   const nq = q.replace(/[\s-]/g, "");
@@ -116,7 +120,7 @@ function CheckinPanel() {
         </div>
       )}
 
-      <Dialog open={!!popup} onOpenChange={() => setPopup(null)}>
+      <Dialog open={!!popup} onOpenChange={(o) => { if (!o) finishPopup(); }}>
         <DialogContent data-testid="walkin-checkin-popup" className="max-w-sm rounded-2xl">
           <DialogHeader>
             <div className="h-11 w-11 rounded-full bg-[#2F703E]/15 flex items-center justify-center mb-2"><Ticket className="h-5 w-5 text-[#2F703E]" /></div>
@@ -142,7 +146,7 @@ function CheckinPanel() {
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setPopup(null)} className="bg-[#7A241F] hover:bg-[#5E1B17] w-full h-11" data-testid="walkin-checkin-ok">Selesai</Button>
+            <Button onClick={finishPopup} className="bg-[#7A241F] hover:bg-[#5E1B17] w-full h-11" data-testid="walkin-checkin-ok">Selesai &amp; Kembali ke Menu</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -236,6 +240,7 @@ export default function WalkinPage() {
   const [authed, setAuthed] = useState(!!getAdminUser());
   const [user, setUser] = useState(getAdminUser());
   const [panitiaMode, setPanitiaMode] = useState("menu"); // menu | order | checkin
+  const [checkinView, setCheckinView] = useState(null); // data peserta yg baru di-check-in (utk layar monitor)
   const [sessionId, setSessionId] = useState(null);
   const [mapData, setMapData] = useState(null);
   const [loadingMap, setLoadingMap] = useState(true);
@@ -309,7 +314,9 @@ export default function WalkinPage() {
     if (!authed) return;
     const s = SESSIONS.find((x) => x.id === sessionId);
     let payload;
-    if (result) {
+    if (panitiaMode === "checkin") {
+      payload = checkinView ? { mode: "checkin", ...checkinView } : { mode: "idle" };
+    } else if (result) {
       payload = { mode: "done", result, sessionName: s?.name, sessionTime: s?.time };
     } else {
       const paying = displayMode === "paying" && pendingOrder;
@@ -327,7 +334,7 @@ export default function WalkinPage() {
     }
     displayPayload.current = payload;
     chanRef.current?.postMessage({ type: "state", payload });
-  }, [authed, result, displayMode, sessionId, mapData, selected, method, amountText, transfer, pendingOrder]);
+  }, [authed, panitiaMode, checkinView, result, displayMode, sessionId, mapData, selected, method, amountText, transfer, pendingOrder]);
 
   const openMonitor = () => window.open("/display", "kbi_monitor", "width=1280,height=800");
 
@@ -452,7 +459,7 @@ export default function WalkinPage() {
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {panitiaMode !== "menu" && (
-              <button onClick={() => { setPanitiaMode("menu"); setSessionId(null); setDisplayMode("welcome"); setResult(null); }}
+              <button onClick={() => { setPanitiaMode("menu"); setSessionId(null); setDisplayMode("welcome"); setResult(null); setCheckinView(null); }}
                 data-testid="walkin-back-menu" className="mr-1 inline-flex items-center gap-1 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-full px-2.5 py-1.5 transition-colors">
                 <ArrowLeft className="h-4 w-4" /> Menu
               </button>
@@ -466,12 +473,10 @@ export default function WalkinPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {panitiaMode === "order" && (
-              <button onClick={openMonitor} data-testid="walkin-open-monitor"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors">
-                <Monitor className="h-4 w-4" /> Buka Layar Monitor
-              </button>
-            )}
+            <button onClick={openMonitor} data-testid="walkin-open-monitor"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors">
+              <Monitor className="h-4 w-4" /> Buka Layar Monitor
+            </button>
             <button onClick={() => { adminApi.post("/admin/logout").catch(() => {}); clearAdminSession(); setAuthed(false); }} data-testid="walkin-logout" className="text-xs text-white/80 underline">Keluar</button>
           </div>
         </div>
@@ -508,7 +513,12 @@ export default function WalkinPage() {
         </div>
       )}
 
-      {panitiaMode === "checkin" && <CheckinPanel />}
+      {panitiaMode === "checkin" && (
+        <CheckinPanel
+          onCheckinDisplay={(v) => setCheckinView(v)}
+          onFinish={() => { setCheckinView(null); setPanitiaMode("menu"); }}
+        />
+      )}
 
       {panitiaMode === "order" && (
       <div className="max-w-6xl mx-auto px-4 py-5 grid lg:grid-cols-3 gap-6">
@@ -535,21 +545,6 @@ export default function WalkinPage() {
             <button onClick={() => loadMap(sessionId, true)} className="inline-flex items-center gap-1 text-xs text-[#7A6A5E] hover:text-[#B26A1E]">
               <RefreshCw className="h-3.5 w-3.5" /> Perbarui
             </button>
-          </div>
-
-          <div className="flex items-center gap-2 mb-4 rounded-xl bg-[#7A241F]/[0.04] border border-[#7A241F]/10 p-2" data-testid="walkin-monitor-toggle">
-            <span className="text-[11px] font-semibold text-[#7A241F] flex items-center gap-1 pl-1"><Monitor className="h-3.5 w-3.5" /> Layar Monitor:</span>
-            {[
-              { k: "welcome", t: "Sambutan" },
-              { k: "selecting", t: "Kursi" },
-              { k: "paying", t: "Pembayaran" },
-            ].map((m) => (
-              <button key={m.k} data-testid={`walkin-display-${m.k}`} onClick={() => setDisplayMode(m.k)}
-                className={cn("text-xs font-medium rounded-lg px-3 py-1.5 transition-colors",
-                  displayMode === m.k ? "bg-[#7A241F] text-white" : "bg-white text-[#7A6A5E] border border-border hover:border-[#7A241F]/40")}>
-                {m.t}
-              </button>
-            ))}
           </div>
 
           {mapData && sessionId && sessionWalkinOpen && (

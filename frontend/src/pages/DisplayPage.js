@@ -63,6 +63,27 @@ export default function DisplayPage() {
     );
   }
 
+  if (mode === "checkin") {
+    const CH = { umum: "TIKET WEBSITE", manual: "ORDER MANUAL", vip: "TAMU VIP", panitia: "TIKET PANITIA" };
+    return (
+      <div className="h-screen overflow-hidden bg-[#2F703E] flex flex-col items-center justify-center text-center px-8" data-testid="display-checkin">
+        <img src={LOGOS.kbi} alt="KBI" className="h-16 bg-white/95 rounded-2xl p-2.5 mb-5 shadow-2xl" />
+        <CheckCircle2 className="h-16 w-16 text-white mb-3" />
+        <p className="text-white/80 text-lg uppercase tracking-widest">Selamat Datang</p>
+        <h1 className="font-serif-display text-white text-5xl lg:text-6xl mt-1 max-w-5xl leading-tight">{state.name}</h1>
+        {state.channel ? <p className="mt-3 inline-block text-[#2F703E] bg-[#F6C976] font-bold text-lg px-4 py-1.5 rounded-full">{CH[state.channel] || "TIKET"}</p> : null}
+        <p className="text-white/90 text-2xl mt-5">{state.sessionName} · {state.sessionTime}</p>
+        <p className="text-white/80 text-lg mt-6 mb-3">Nomor kursi Anda ({(state.seats || []).length} tiket):</p>
+        <div className="flex flex-wrap gap-3 justify-center max-w-4xl" data-testid="display-checkin-seats">
+          {(state.seats || []).map((s) => (
+            <span key={s} className="px-5 py-3 rounded-xl bg-white text-[#255E33] font-bold text-3xl shadow-lg">{s}</span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+
   if (mode === "done" && state.result) {
     const r = state.result;
     return (
