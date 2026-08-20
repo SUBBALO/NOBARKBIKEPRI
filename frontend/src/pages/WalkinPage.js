@@ -477,33 +477,32 @@ export default function WalkinPage() {
         </div>
       </div>
 
-      {/* Menu utama panitia */}
+      {/* Menu utama panitia — muat penuh 1 layar tanpa scroll */}
       {panitiaMode === "menu" && (
-        <div className="max-w-3xl mx-auto px-4 py-8" data-testid="walkin-menu">
-          <div className="rounded-3xl overflow-hidden border border-[#B26A1E]/30 bg-gradient-to-br from-[#7A241F] to-[#5E1B17] text-white p-8 sm:p-10 text-center shadow-lg">
-            <img src={LOGOS.kbi} alt="KBI" className="h-16 mx-auto bg-white/95 rounded-xl p-2 mb-5" />
-            <p className="text-xs tracking-widest text-white/70 uppercase">Panitia · Hari Acara</p>
-            <h1 className="font-serif-display text-3xl sm:text-4xl mt-1">Film Dokumenter</h1>
-            <h2 className="font-serif-display text-2xl sm:text-3xl text-[#E4C57E]">ASHIN JINARAKKHITA</h2>
-            <p className="text-sm text-white/80 mt-2">Minggu, 13 September 2026 · CGV Grand Batam</p>
+        <div className="h-[calc(100vh-58px)] overflow-hidden flex flex-col justify-center max-w-4xl mx-auto w-full px-4 py-4" data-testid="walkin-menu">
+          <div className="rounded-2xl overflow-hidden border border-[#B26A1E]/30 bg-gradient-to-br from-[#7A241F] to-[#5E1B17] text-white px-6 py-5 text-center shadow-lg">
+            <img src={LOGOS.kbi} alt="KBI" className="h-12 mx-auto bg-white/95 rounded-lg p-1.5 mb-2" />
+            <p className="text-[10px] tracking-widest text-white/70 uppercase">Panitia · Hari Acara</p>
+            <h1 className="font-serif-display text-2xl sm:text-3xl leading-tight">Film Dokumenter <span className="text-[#E4C57E]">Ashin Jinarakkhita</span></h1>
+            <p className="text-xs text-white/80 mt-1">Minggu, 13 September 2026 · CGV Grand Batam</p>
           </div>
-          <p className="text-center text-sm text-[#7A6A5E] mt-8 mb-4">Pilih tugas Anda:</p>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <p className="text-center text-sm text-[#7A6A5E] mt-4 mb-3">Pilih tugas Anda:</p>
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <button onClick={() => { setPanitiaMode("order"); setDisplayMode("welcome"); }} data-testid="walkin-menu-order"
-              className="group rounded-2xl border-2 border-[#B26A1E]/40 bg-white p-7 text-center hover:border-[#B26A1E] hover:bg-[#B26A1E]/5 transition-colors shadow-sm">
-              <span className="h-16 w-16 mx-auto rounded-2xl bg-[#B26A1E]/10 group-hover:bg-[#B26A1E]/20 flex items-center justify-center mb-4 transition-colors">
-                <Store className="h-8 w-8 text-[#B26A1E]" />
+              className="group rounded-2xl border-2 border-[#B26A1E]/40 bg-white px-4 py-6 text-center hover:border-[#B26A1E] hover:bg-[#B26A1E]/5 transition-colors shadow-sm">
+              <span className="h-14 w-14 mx-auto rounded-2xl bg-[#B26A1E]/10 group-hover:bg-[#B26A1E]/20 flex items-center justify-center mb-3 transition-colors">
+                <Store className="h-7 w-7 text-[#B26A1E]" />
               </span>
-              <p className="font-serif-display text-2xl text-[#7A241F]">Pesan Tiket</p>
-              <p className="text-sm text-[#7A6A5E] mt-1.5">Jual tiket di tempat: pilih sesi, pilih kursi, bayar.</p>
+              <p className="font-serif-display text-xl sm:text-2xl text-[#7A241F]">Pesan Tiket</p>
+              <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">Jual tiket di tempat: pilih sesi, kursi, bayar.</p>
             </button>
             <button onClick={() => setPanitiaMode("checkin")} data-testid="walkin-menu-checkin"
-              className="group rounded-2xl border-2 border-[#2F703E]/40 bg-white p-7 text-center hover:border-[#2F703E] hover:bg-[#2F703E]/5 transition-colors shadow-sm">
-              <span className="h-16 w-16 mx-auto rounded-2xl bg-[#2F703E]/10 group-hover:bg-[#2F703E]/20 flex items-center justify-center mb-4 transition-colors">
-                <ScanLine className="h-8 w-8 text-[#2F703E]" />
+              className="group rounded-2xl border-2 border-[#2F703E]/40 bg-white px-4 py-6 text-center hover:border-[#2F703E] hover:bg-[#2F703E]/5 transition-colors shadow-sm">
+              <span className="h-14 w-14 mx-auto rounded-2xl bg-[#2F703E]/10 group-hover:bg-[#2F703E]/20 flex items-center justify-center mb-3 transition-colors">
+                <ScanLine className="h-7 w-7 text-[#2F703E]" />
               </span>
-              <p className="font-serif-display text-2xl text-[#7A241F]">Check In</p>
-              <p className="text-sm text-[#7A6A5E] mt-1.5">Catat kehadiran peserta & serahkan tiket.</p>
+              <p className="font-serif-display text-xl sm:text-2xl text-[#7A241F]">Check In</p>
+              <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">Catat kehadiran peserta & serahkan tiket.</p>
             </button>
           </div>
         </div>
