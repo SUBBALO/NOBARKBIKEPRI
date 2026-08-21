@@ -1,0 +1,40 @@
+{
+  "summary": "Tested the new PRE-ORDER feature end-to-end (backend + UI). Backend: 9 pytest cases in /app/backend/tests/test_iter22_preorder.py all pass — POST /api/admin/preorder (Belum Berdana -> manual_unpaid/paid=false/amount 0; Sudah Berdana -> verified/paid=true/amount), validation (invalid seat, empty name, paid without amount), auth guard, POST /api/orders/{id}/preorder-pay (amount/method/proof -> waiting_verification, rejects amount<=0, non-image proof, double payment, 404 unknown order), verify -> verified + paid + transfer_amount, and /api/admin/walkin regression (verified + auto check-in). UI: /preorder login (admin1), Belum Berdana flow -> dialog 'PRE-ORDER TERSIMPAN' + WA button; Sudah Berdana flow (transfer + 100000) -> dialog 'PRE-ORDER · SUDAH BERDANA'; both orders appear in admin 'Order Manual' tab; buyer page /order/{id} shows 'Salurkan Dana Paramita' form (dana-amount, QRIS/Transfer tabs, upload) -> after image upload status becomes 'Menunggu Verifikasi' with preorder-pending-note and btn-save-ticket intact; admin Verifikasi Pembayaran tab shows the order, dialog verify succeeded (toast 'Pesanan diverifikasi', counters +1 verified, revenue +75.000, DB paid=true). /walkin regression verified (cash/QRIS/transfer options, label 'Buat Tiket (LUNAS)' / 'Lanjut Bayar', full cash sale created verified + checked_in=true, no preorder controls leaking). Auth hardening checks: bcrypt $2b$12$ hashes, httpOnly+Secure cookie on login, brute-force lockout returns 429 after 5 failures. All ZZTEST data deleted (verified 0 leftovers, seat locks released).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/preorder", "issue": "For 'Belum Berdana' the order still stores payment_method (frontend sends the default 'cash'), although spec says no method should be recorded until dana is submitted. Masterlist/Bendahara can therefore display 'Cash' for an unpaid pre-order."},
+      {"endpoint": "GET /api/admin/orders (CORS config)", "issue": "server.py uses os.environ.get('CORS_ORIGINS', '*') with an inline default; env guideline prefers no defaults. allow_credentials=False while login sets an httpOnly cookie — cookie auth would not work cross-origin (works today only because preview FE/BE share the origin)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "WalkinPage (preorder + walkin form)", "issue": "Focus ring on the status/method toggle buttons makes an unselected button look selected (e.g. after submit, 'Sudah Berdana' keeps a green ring while state resets to Belum; on /walkin both Cash and QRIS look highlighted). Cosmetic only.", "selector": "[data-testid=\"preorder-sudah\"], [data-testid=\"walkin-pay-qris\"]", "priority": "LOW"},
+      {"component": "WalkinPage /preorder", "issue": "'Lokasi Penjualan' is rendered with a red required asterisk but submitPreorder does not require it (pre-order created with empty location). Either drop the asterisk in preorder mode or enforce it.", "selector": "[data-testid=\"walkin-location\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin → Order Manual / Masterlist table", "issues": ["Status column shows 'Belum Bayar' / 'Sudah Bayar' while the requested wording (and the create form) uses 'Belum Berdana' / 'Sudah Berdana' — inconsistent terminology for the same state."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter22_preorder.py", "/app/test_reports/pytest/iter22.xml"],
+  "action_items": [
+    "Do not send/store payment_method for 'Belum Berdana' pre-orders (send null from WalkinPage.submitPreorder and keep it empty in the backend until dana is recorded).",
+    "Align Order Manual/Masterlist status labels with 'Belum Berdana'/'Sudah Berdana'.",
+    "Remove the required '*' on Lokasi Penjualan in /preorder mode (or validate it).",
+    "Optional: suppress the focus ring on toggle buttons (focus-visible only) so selection state is unambiguous."
+  ],
+  "critical_code_review_comments": [
+    "WalkinPage.js (973 lines) and AdminPage.js (2958 lines) exceed the 700-line guideline — AdminPage should be split into per-tab modules (ManualPanel, MasterlistPanel, VerifyPanel) to stay maintainable.",
+    "preorder_create duplicates a lot of seat-claim/validation logic from walkin_create; extract a shared helper to avoid divergence.",
+    "Walk-in orders are created without a `paid` flag (only status='verified'), while manual/pre-order rows rely on `paid`; any future report that filters on `paid` will silently miss walk-in sales."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter22_preorder.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% (core flows), 3 cosmetic/wording issues"},
+  "seed_data_creation": "Created and deleted ZZTEST pre-orders (session 4 M18/M17) and one ZZTEST walk-in (session 2 L18). Verified 0 ZZTEST orders remain and seat locks released. Pre-existing data (SS/a/aa/susanti/candi/TEST/testT/VIHARA) untouched.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin1 / admin123 (superadmin) from /app/memory/test_credentials.md",
+  "context_for_next_testing_agent": "Reusable suite: /app/backend/tests/test_iter22_preorder.py (helper free_seats() parses rows->blocks->seat objects; note seats are NEVER auto-released, so always clean up created orders via DELETE /api/admin/manual/{id} or /api/admin/walkin/{id}). Only sessions 1-4 exist. /preorder ignores session open/closed state; /walkin needs walkin_sessions (sessions 2,3,4 currently open, 1 closed). Admin login testids: admin-username/admin-password/admin-login-btn; walkin/preorder: walkin-login-*.",
+  "rca_of_the_issue": "No functional defect found. The payment_method='cash' on unpaid pre-orders comes from WalkinPage sending the local `method` state unconditionally in submitPreorder (payment_method: method) while the backend defaults unknown methods to 'transfer' and stores whatever is sent, regardless of paid=false."
+}

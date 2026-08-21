@@ -201,6 +201,24 @@ class ManualUpdate(BaseModel):
     seats: Optional[List[str]] = None
 
 
+class PreorderCreate(BaseModel):
+    name: str
+    phone: Optional[str] = ""
+    session_id: int
+    seats: List[str]
+    paid: bool = False
+    amount: int = 0
+    payment_method: Optional[str] = "transfer"  # cash/qris/transfer (bila sudah berdana)
+    proof_image: Optional[str] = None
+    location: Optional[str] = ""
+
+
+class PreorderPay(BaseModel):
+    amount: int
+    payment_method: Literal["qris", "transfer"]
+    proof_image: str
+
+
 class SetActiveSession(BaseModel):
     session_id: int
 
@@ -637,6 +655,41 @@ async def upload_proof(order_id: str, payload: ProofUpload):
         {"id": order_id},
         {"$set": {"proof_image": payload.proof_image, "status": "waiting_verification", "updated_at": now_iso()}},
     )
+    o = await db.orders.find_one({"id": order_id})
+    session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
+    o = clean(o)
+    o["session"] = session
+    o["transfer"] = TRANSFER_INFO
+    return o
+
+
+@api_router.post("/orders/{order_id}/preorder-pay")
+async def preorder_pay(order_id: str, payload: PreorderPay):
+    """Pembeli menyalurkan Dana Paramita sendiri untuk pre-order yang belum berdana (via link WhatsApp).
+    Nominal + metode + bukti disimpan; order masuk antrian verifikasi panitia (kursi tetap dikunci)."""
+    o = await db.orders.find_one({"id": order_id})
+    if not o or o.get("deleted"):
+        raise HTTPException(status_code=404, detail="Pesanan tidak ditemukan")
+    if not (o.get("manual") and o.get("preorder")):
+        raise HTTPException(status_code=400, detail="Link ini bukan untuk pembayaran dana pre-order")
+    if o.get("paid") or o.get("status") == "verified":
+        raise HTTPException(status_code=400, detail="Dana untuk pre-order ini sudah tercatat")
+    amount = int(payload.amount or 0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Isi nominal dana terlebih dahulu")
+    if amount > 100_000_000:
+        raise HTTPException(status_code=400, detail="Nominal terlalu besar")
+    proof = (payload.proof_image or "").strip()
+    if not proof.startswith("data:image"):
+        raise HTTPException(status_code=400, detail="Bukti harus berupa gambar")
+    if len(proof) > MAX_PROOF_BYTES:
+        raise HTTPException(status_code=400, detail="Ukuran gambar bukti terlalu besar (maks ~6MB)")
+    await db.orders.update_one({"id": order_id}, {"$set": {
+        "order_amount": amount, "base_amount": amount, "total_amount": amount,
+        "transfer_amount": amount, "transfer_date": now_iso()[:10],
+        "payment_method": payload.payment_method, "proof_image": proof,
+        "status": "waiting_verification", "buyer_submitted": True, "updated_at": now_iso(),
+    }})
     o = await db.orders.find_one({"id": order_id})
     session = next((s for s in SESSIONS if s["id"] == o["session_id"]), None)
     o = clean(o)
@@ -1134,6 +1187,15 @@ async def verify_order(order_id: str, payload: VerifyPayload = VerifyPayload(), 
         fields.update({"total_amount": payload.amount, "base_amount": payload.amount,
                        "amount_adjusted": True, "original_total": old_total})
         note += f" — nominal disesuaikan Rp{old_total:,} → Rp{payload.amount:,}".replace(",", ".")
+    if o.get("manual"):
+        # Order manual (termasuk pre-order): verifikasi = tandai SUDAH BERDANA supaya konsisten
+        # dengan Bendahara/Masterlist yang memakai flag `paid`.
+        final_amt = fields.get("total_amount", o.get("total_amount", 0))
+        fields["paid"] = True
+        fields["order_amount"] = final_amt
+        fields["transfer_amount"] = final_amt
+        if not o.get("transfer_date"):
+            fields["transfer_date"] = now_iso()[:10]
     await db.orders.update_one({"id": order_id}, {"$set": fields})
     await log_activity(user, "verify", note, order_id)
     return clean(await db.orders.find_one({"id": order_id}))
@@ -1655,6 +1717,81 @@ async def update_manual(order_id: str, payload: ManualUpdate, user: dict = Depen
     await db.orders.update_one({"id": order_id}, {"$set": updates})
     await log_activity(user, "manual",
                        f"Ubah order manual #{o.get('order_no')} — {name} ({'SUDAH BAYAR' if paid else 'BELUM BAYAR'})",
+                       order_id)
+    return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.post("/admin/preorder")
+async def preorder_create(payload: PreorderCreate, user: dict = Depends(require_walkin)):
+    """Pre-order (H-1) dibuat sebagai ORDER MANUAL (muncul di Masterlist → Order Manual).
+    Belum Berdana → status manual_unpaid; Sudah Berdana → verified + paid. Kursi dikunci permanen."""
+    if not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Isi nama pembeli")
+    if payload.session_id not in [s["id"] for s in SESSIONS]:
+        raise HTTPException(status_code=400, detail="Sesi tidak valid")
+    seats = list(dict.fromkeys(payload.seats))
+    if not seats:
+        raise HTTPException(status_code=400, detail="Pilih minimal 1 kursi")
+    for seat in seats:
+        if seat not in ALL_SEAT_LABELS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} tidak valid")
+        if seat in RESERVED_SEATS:
+            raise HTTPException(status_code=400, detail=f"Kursi {seat} khusus operator, tidak bisa dipilih")
+    validate_couple_pairs(seats)
+
+    paid = bool(payload.paid)
+    method = payload.payment_method if payload.payment_method in ("cash", "qris", "transfer") else "transfer"
+    proof = (payload.proof_image or "").strip() or None
+    amount = int(payload.amount or 0) if paid else 0
+    if paid:
+        if amount <= 0:
+            raise HTTPException(status_code=400, detail="Isi nominal dana terlebih dahulu")
+        if amount > 100_000_000:
+            raise HTTPException(status_code=400, detail="Nominal terlalu besar")
+        if proof:
+            if not proof.startswith("data:image"):
+                raise HTTPException(status_code=400, detail="Format bukti tidak valid")
+            if len(proof) > MAX_PROOF_BYTES:
+                raise HTTPException(status_code=400, detail="Ukuran gambar bukti terlalu besar (maks ~6MB)")
+    else:
+        proof = None
+
+    await taken_seats(payload.session_id)
+    order_id = str(uuid.uuid4())
+    claimed = []
+    for seat in seats:
+        try:
+            await db.seat_locks.insert_one({
+                "_id": f"{payload.session_id}:{seat}", "session_id": payload.session_id,
+                "seat": seat, "order_id": order_id, "expires_at": None,
+            })
+            claimed.append(seat)
+        except DuplicateKeyError:
+            if claimed:
+                await db.seat_locks.delete_many({"_id": {"$in": [f"{payload.session_id}:{s}" for s in claimed]}})
+            raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah terisi. Pilih kursi lain.")
+
+    actor = user.get("name") or user.get("username")
+    order = {
+        "id": order_id, "order_no": await gen_order_no(),
+        "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
+        "session_id": payload.session_id, "seats": claimed, "qty": len(claimed),
+        "order_amount": amount, "base_amount": amount, "unique_code": 0, "total_amount": amount,
+        "payment_method": method,
+        "status": "verified" if paid else "manual_unpaid",
+        "paid": paid,
+        "transfer_date": now_iso()[:10] if paid else None,
+        "transfer_amount": amount if paid else None,
+        "proof_image": proof, "checked_in": False,
+        "verified_by": actor if paid else None,
+        "manual": True, "preorder": True, "sold_by": actor, "created_by": actor,
+        "location": (payload.location or "").strip(),
+        "note": "Pre-order",
+        "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.orders.insert_one(order)
+    await log_activity(user, "manual",
+                       f"Pre-order {len(claimed)} tiket #{order['order_no']} — {order['name']} ({'SUDAH BERDANA' if paid else 'BELUM BERDANA'}), kursi {', '.join(claimed)}",
                        order_id)
     return clean(await db.orders.find_one({"id": order_id}))
 

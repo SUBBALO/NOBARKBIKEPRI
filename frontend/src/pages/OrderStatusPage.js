@@ -50,6 +50,7 @@ const StatusBadge = ({ status }) => {
     pending_payment: { t: "Menunggu Pembayaran", c: "bg-[#B26A1E]/15 text-[#8A3A12]", i: Clock },
     waiting_verification: { t: "Menunggu Verifikasi", c: "bg-[#7A241F]/15 text-[#7A241F]", i: Hourglass },
     verified: { t: "Terverifikasi", c: "bg-[#2F703E]/15 text-[#255E33]", i: CheckCircle2 },
+    manual_unpaid: { t: "Belum Berdana", c: "bg-[#B26A1E]/15 text-[#8A3A12]", i: Clock },
     rejected: { t: "Ditolak", c: "bg-[#EF4444]/15 text-[#EF4444]", i: XCircle },
     expired: { t: "Kadaluarsa", c: "bg-[#7A6A5E]/15 text-[#7A6A5E]", i: AlertTriangle },
   }[status] || { t: status, c: "bg-muted", i: Clock };
@@ -71,6 +72,9 @@ export default function OrderStatusPage() {
   const fileRef = useRef(null);
   const remindedRef = useRef(false);
   const logoRef = useRef(null);
+  const [danaAmount, setDanaAmount] = useState(0);
+  const [danaMethod, setDanaMethod] = useState("transfer");
+  const danaFileRef = useRef(null);
 
   useEffect(() => {
     const img = new Image();
@@ -263,6 +267,24 @@ export default function OrderStatusPage() {
     setUploading(false);
   };
 
+  const submitDana = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!danaAmount || danaAmount <= 0) { toast.error("Isi nominal Dana Paramita dulu"); e.target.value = ""; return; }
+    if (!file.type.startsWith("image/")) { toast.error("File harus berupa gambar"); return; }
+    setUploading(true);
+    try {
+      const dataUrl = await compressImage(file);
+      const { data } = await api.post(`/orders/${id}/preorder-pay`, { amount: danaAmount, payment_method: danaMethod, proof_image: dataUrl });
+      setOrder(data);
+      toast.success("Terima kasih! Dana Paramita Anda menunggu verifikasi panitia.");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Gagal mengunggah bukti");
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
   if (loading) return <div className="flex justify-center py-32"><Loader2 className="h-7 w-7 animate-spin text-[#B26A1E]" /></div>;
   if (!order) return (
     <div className="max-w-md mx-auto text-center py-32 px-4">
@@ -272,6 +294,8 @@ export default function OrderStatusPage() {
   );
 
   const canUpload = order.status === "pending_payment" || order.status === "waiting_verification";
+  const isPreorder = !!(order.preorder && order.manual);
+  const isPreorderDana = isPreorder && !order.paid && !["verified", "rejected"].includes(order.status);
   const inAppBrowser = /(Instagram|FBAN|FBAV|FB_IAB|Line|TikTok|Twitter)/i.test(navigator.userAgent || "");
 
   return (
@@ -322,6 +346,13 @@ export default function OrderStatusPage() {
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">Jumlah tiket</dt><dd className="font-medium">{order.qty} kursi</dd></div>
             <div className="flex justify-between"><dt className="text-[#7A6A5E]">Kontribusi</dt><dd className="font-medium">Dana Sukarela</dd></div>
           </dl>
+          {isPreorderDana ? (
+            <div className="mt-5 rounded-xl bg-[#F3E9DD] border border-[#B26A1E]/40 p-5">
+              <p className="text-xs text-[#7A6A5E]">Dana Paramita</p>
+              <p className="font-serif-display text-2xl text-[#7A241F] mt-1" data-testid="order-total">Sukarela</p>
+              <p className="text-[11px] text-[#5B4636] mt-2 leading-relaxed">Isi nominal seikhlasnya pada bagian pembayaran, lalu unggah bukti. Dana Paramita bersifat sukarela - tidak ada nominal yang ditentukan.</p>
+            </div>
+          ) : (
           <div className="mt-5 rounded-xl bg-[#F3E9DD] border border-[#B26A1E]/40 p-5">
             <p className="text-xs text-[#7A6A5E]">Nominal Dana Sukarela</p>
             <div className="flex items-center justify-between mt-1">
@@ -334,11 +365,84 @@ export default function OrderStatusPage() {
               Kontribusi bersifat sukarela. Mohon transfer sesuai nominal yang tertera di atas untuk memudahkan verifikasi pembayaran. Nominal di atas sudah termasuk kode unik untuk identifikasi pembayaran.
             </p>
           </div>
+          )}
         </motion.div>
 
         {/* Payment / status action */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
           className="rounded-2xl border border-border bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+
+          {isPreorderDana && (
+            <div data-testid="preorder-dana-form">
+              <h2 className="font-serif-display text-2xl text-[#7A241F] mb-1">Salurkan Dana Paramita</h2>
+              <p className="text-sm text-[#7A6A5E] mb-4">Tempat duduk Anda sudah kami amankan (pre-order). Dana Paramita bersifat <b>sukarela</b> - tidak ada nominal yang ditentukan.</p>
+
+              {order.status === "waiting_verification" && (
+                <div className="rounded-xl border border-[#2F703E]/30 bg-[#2F703E]/5 p-3 mb-4" data-testid="preorder-pending-note">
+                  <p className="text-sm text-[#255E33] font-medium">Dana Anda sedang diverifikasi panitia.</p>
+                  <p className="text-xs text-[#7A6A5E] mt-0.5">Anda tetap bisa memperbarui nominal/bukti bila perlu.</p>
+                </div>
+              )}
+
+              <label className="text-xs text-[#7A6A5E]">Nominal Dana Paramita (seikhlasnya)</label>
+              <div className="relative mt-1.5 mb-4">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                <input inputMode="numeric" data-testid="dana-amount"
+                  value={danaAmount ? danaAmount.toLocaleString("id-ID") : ""}
+                  onChange={(e) => setDanaAmount(parseInt(e.target.value.replace(/[^0-9]/g, "") || "0", 10))}
+                  placeholder="0" className="w-full pl-9 h-12 rounded-lg border border-border text-lg font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#B26A1E]/40" />
+              </div>
+
+              <Tabs value={danaMethod} onValueChange={setDanaMethod} className="w-full">
+                <TabsList className="grid grid-cols-2 w-full">
+                  <TabsTrigger value="qris" data-testid="dana-tab-qris"><QrCode className="h-4 w-4 mr-1.5" /> QRIS</TabsTrigger>
+                  <TabsTrigger value="transfer" data-testid="dana-tab-transfer"><Landmark className="h-4 w-4 mr-1.5" /> Transfer</TabsTrigger>
+                </TabsList>
+                <TabsContent value="qris" className="pt-4">
+                  <div className="rounded-xl border border-border p-3 bg-white">
+                    <img src={LOGOS.qris} alt="QRIS" className="w-full max-w-xs mx-auto rounded-lg" data-testid="dana-qris-image" />
+                  </div>
+                  <a href={LOGOS.qris} download="QRIS-MBI.png" target="_blank" rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm text-[#B26A1E] hover:underline">
+                    <Download className="h-4 w-4" /> Simpan gambar QRIS
+                  </a>
+                  <p className="text-xs text-[#7A6A5E] mt-2">Scan QRIS, transfer sesuai nominal yang Anda isi, lalu unggah bukti di bawah.</p>
+                </TabsContent>
+                <TabsContent value="transfer" className="pt-4">
+                  <p className="text-sm font-medium text-[#7A241F] mb-2">Transfer ke Rekening <b>PD MBI Kepri</b></p>
+                  <div className="rounded-xl border border-border p-5 bg-[#FDFBF7] space-y-2">
+                    <div className="flex justify-between text-sm"><span className="text-[#7A6A5E]">Bank</span><span className="font-semibold">{order.transfer?.bank}</span></div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-[#7A6A5E]">No. Rekening</span>
+                      <span className="font-semibold flex items-center gap-2">
+                        {order.transfer?.account_number}
+                        <button onClick={() => { navigator.clipboard.writeText((order.transfer?.account_number || "").replace(/\s/g, "")); toast.success("No. rekening disalin"); }}
+                          className="text-[#B26A1E]"><Copy className="h-3.5 w-3.5" /></button>
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm"><span className="text-[#7A6A5E]">Atas Nama</span><span className="font-semibold text-right max-w-[60%]">{order.transfer?.account_name}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#7A6A5E]">Berita</span><span className="font-semibold">#{order.order_no}</span></div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              {order.proof_image && (
+                <div className="my-4">
+                  <p className="text-xs text-[#7A6A5E] mb-1.5">Bukti terunggah:</p>
+                  <img src={order.proof_image} alt="Bukti" className="rounded-lg border border-border max-h-48 object-contain" data-testid="dana-proof-preview" />
+                </div>
+              )}
+
+              <input ref={danaFileRef} type="file" accept="image/*" className="hidden" onChange={submitDana} data-testid="dana-file-input" />
+              <Button onClick={() => { if (!danaAmount || danaAmount <= 0) { toast.error("Isi nominal Dana Paramita dulu"); return; } danaFileRef.current?.click(); }}
+                disabled={uploading} data-testid="dana-upload-btn"
+                className="w-full mt-4 bg-[#B26A1E] hover:bg-[#8A3A12] rounded-full h-12">
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UploadCloud className="h-4 w-4 mr-1.5" />}
+                {order.proof_image ? "Ganti Bukti Dana" : "Unggah Bukti & Kirim Dana"}
+              </Button>
+              <p className="text-[11px] text-center text-[#7A6A5E] mt-2">Isi nominal dulu, lalu unggah foto bukti transfer/QRIS. Panitia akan memverifikasi.</p>
+            </div>
+          )}
 
           {order.status === "verified" && (
             <div className="text-center py-4">
@@ -365,7 +469,7 @@ export default function OrderStatusPage() {
             </div>
           )}
 
-          {(order.status === "pending_payment" || order.status === "waiting_verification") && (
+          {!isPreorder && (order.status === "pending_payment" || order.status === "waiting_verification") && (
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-serif-display text-2xl text-[#7A241F]">Pembayaran</h2>

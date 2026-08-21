@@ -274,6 +274,7 @@ export default function WalkinPage({ preorder = false }) {
   });
   const [method, setMethod] = useState("cash");
   const [amountText, setAmountText] = useState("");
+  const [preorderPaid, setPreorderPaid] = useState(false); // /preorder: sudah berdana?
   const [proof, setProof] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -428,6 +429,35 @@ export default function WalkinPage({ preorder = false }) {
 
   const clearForm = () => { setName(""); setPhone(""); setSelected([]); setAmountText(""); setProof(null); };
 
+  const onProofPreorder = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) { setProof(null); return; }
+    if (!f.type.startsWith("image/")) { toast.error("File harus berupa gambar"); return; }
+    const r = new FileReader();
+    r.onload = () => setProof(r.result);
+    r.readAsDataURL(f);
+  };
+
+  const submitPreorder = async () => {
+    if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
+    if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    if (preorderPaid && amount <= 0) { toast.error("Isi nominal Dana Paramita"); return; }
+    setBusy(true);
+    try {
+      const { data } = await adminApi.post("/admin/preorder", {
+        name, phone, session_id: sessionId, seats: selected,
+        paid: preorderPaid, amount: preorderPaid ? amount : 0,
+        payment_method: method, proof_image: preorderPaid ? (proof || null) : null,
+        location: location.trim(),
+      });
+      setResult(data); clearForm(); setPreorderPaid(false); loadMap(sessionId, false);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Gagal membuat pre-order");
+      loadMap(sessionId, false);
+    }
+    setBusy(false);
+  };
+
   const startPayment = async () => {
     if (!walkinSessions[sessionId]) { toast.error("Sesi ini belum dibuka untuk panitia (lokasi)"); return; }
     if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
@@ -471,7 +501,7 @@ export default function WalkinPage({ preorder = false }) {
 
   const remaining = mapData ? (mapData.capacity - mapData.booked) : null;
   const sold = mapData && remaining <= 0;
-  const sessionWalkinOpen = walkinSessions[sessionId];
+  const sessionWalkinOpen = isPreorder ? !!sessionId : walkinSessions[sessionId];
 
   return (
     <div className="min-h-screen bg-[#FDFBF7]">
@@ -560,9 +590,11 @@ export default function WalkinPage({ preorder = false }) {
                         : isWalkinOpen ? "bg-white text-[#7A6A5E] border-border hover:border-[#B26A1E]/50"
                           : "bg-muted/50 text-[#9CA3AF] border-border")}>
                     {s.name} · {s.time}
+                    {!isPreorder && (
                     <span className={cn("ml-1.5 text-[10px] font-semibold", isWalkinOpen ? (sessionId === s.id ? "text-white/90" : "text-[#255E33]") : "text-[#B26A1E]")}>
                       {isWalkinOpen ? "• BUKA" : "• TUTUP"}
                     </span>
+                    )}
                   </button>
                 );
               })}
@@ -637,6 +669,77 @@ export default function WalkinPage({ preorder = false }) {
             </div>
           )}
 
+          {isPreorder ? (
+            <>
+              <Label>Status Dana Paramita</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1.5 mb-3">
+                <button type="button" data-testid="preorder-belum" onClick={() => setPreorderPaid(false)}
+                  className={cn("rounded-xl border px-3 py-2.5 text-sm font-semibold leading-tight transition-colors",
+                    !preorderPaid ? "border-[#B26A1E] bg-[#B26A1E]/10 text-[#8A3A12] ring-2 ring-[#B26A1E]/30" : "border-border bg-white text-[#7A6A5E] hover:border-[#B26A1E]/50")}>
+                  Belum Berdana<span className="block text-[10px] font-normal">nyusul via link</span>
+                </button>
+                <button type="button" data-testid="preorder-sudah" onClick={() => setPreorderPaid(true)}
+                  className={cn("rounded-xl border px-3 py-2.5 text-sm font-semibold leading-tight transition-colors",
+                    preorderPaid ? "border-[#2F703E] bg-[#2F703E]/10 text-[#255E33] ring-2 ring-[#2F703E]/30" : "border-border bg-white text-[#7A6A5E] hover:border-[#2F703E]/50")}>
+                  Sudah Berdana<span className="block text-[10px] font-normal">isi nominal & bukti</span>
+                </button>
+              </div>
+
+              <div className="rounded-lg bg-muted/40 p-3 mb-3">
+                <p className="text-xs text-[#7A6A5E] mb-1">Kursi dipilih ({selected.length})</p>
+                <div className="flex flex-wrap gap-1.5 min-h-[28px]" data-testid="walkin-selected-seats">
+                  {selected.length === 0 ? <span className="text-xs text-[#9CA3AF]">Belum ada kursi dipilih</span>
+                    : selected.map((s) => <span key={s} className="px-2.5 py-1 rounded-md bg-[#B26A1E]/10 text-[#8A3A12] text-sm font-bold">{s}</span>)}
+                </div>
+              </div>
+
+              {preorderPaid ? (
+                <>
+                  <Label>Metode Pembayaran</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-1.5 mb-3">
+                    {PAY.map((m) => {
+                      const Icon = m.icon; const active = method === m.k;
+                      return (
+                        <button type="button" key={m.k} data-testid={`preorder-pay-${m.k}`} onClick={() => setMethod(m.k)}
+                          className={cn("rounded-xl border p-2.5 text-center transition-colors",
+                            active ? "border-[#B26A1E] bg-[#B26A1E]/5 ring-2 ring-[#B26A1E]/30" : "border-border hover:border-[#B26A1E]/50")}>
+                          <Icon className={cn("h-5 w-5 mx-auto mb-0.5", active ? "text-[#B26A1E]" : "text-[#7A6A5E]")} />
+                          <span className="text-xs font-medium text-[#2C1E16]">{m.t}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-lg border border-[#B26A1E]/30 bg-[#F3E9DD]/50 p-3 mb-3">
+                    <p className="text-xs font-semibold text-[#7A241F] mb-2">Nominal Dana Paramita</p>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                      <Input data-testid="preorder-amount" inputMode="numeric"
+                        value={amount ? amount.toLocaleString("id-ID") : ""}
+                        onChange={(e) => setAmountText(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="0" className="pl-9 h-11 text-base font-semibold bg-white" />
+                    </div>
+                  </div>
+                  <label data-testid="preorder-proof" className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-[#B26A1E]/50 bg-white px-3 py-3 text-sm text-[#8A3A12] cursor-pointer hover:bg-[#F3E9DD]/40 mb-3">
+                    <UploadCloud className="h-4 w-4" />
+                    {proof ? "Bukti terpilih - ganti" : "Upload Bukti Transfer/QRIS (opsional)"}
+                    <input type="file" accept="image/*" className="hidden" onChange={onProofPreorder} />
+                  </label>
+                  {proof && <img src={proof} alt="bukti" className="rounded-lg border border-border max-h-32 object-contain mb-3" />}
+                </>
+              ) : (
+                <div className="rounded-lg border border-[#B26A1E]/30 bg-[#F3E9DD]/50 p-3 mb-3" data-testid="preorder-belum-note">
+                  <p className="text-sm text-[#7A241F] font-semibold mb-1">Kursi dikunci atas nama pembeli</p>
+                  <p className="text-xs text-[#7A6A5E]">Tiket tetap terbit. Pembeli menyalurkan Dana Paramita nanti lewat <b>link WhatsApp</b> (pilih QRIS/Transfer, isi nominal, unggah bukti). Panitia verifikasi di panel admin.</p>
+                </div>
+              )}
+
+              <Button onClick={submitPreorder} disabled={busy || selected.length === 0 || !sessionId} data-testid="preorder-submit"
+                className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
+                {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} {preorderPaid ? "Buat Pre-Order (Sudah Berdana)" : "Simpan Pre-Order (Belum Berdana)"}
+              </Button>
+            </>
+          ) : (
+          <>
           <Label>Metode Pembayaran</Label>
           <div className="grid grid-cols-3 gap-2 mt-1.5 mb-2">
             {PAY.map((m) => {
@@ -690,6 +793,8 @@ export default function WalkinPage({ preorder = false }) {
             className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
             {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} {method === "cash" ? "Buat Tiket (LUNAS)" : "Lanjut Bayar"}
           </Button>
+          </>
+          )}
         </div>
       </div>
       )}
@@ -793,8 +898,8 @@ export default function WalkinPage({ preorder = false }) {
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-[#2F703E]/15 flex items-center justify-center shrink-0"><CheckCircle2 className="h-6 w-6 text-[#2F703E]" /></div>
               <div>
-                <DialogTitle className="font-serif-display text-3xl text-[#2F703E]">{result?.preorder ? "PRE-ORDER LUNAS ✅" : "LUNAS ✅"}</DialogTitle>
-                {result && <p className="text-sm text-[#7A6A5E] mt-0.5"><b className="text-[#2C1E16]">{result.name}</b> · {rupiah(result.total_amount)} · {result.payment_method?.toUpperCase()}</p>}
+                <DialogTitle className="font-serif-display text-3xl text-[#2F703E]">{result?.preorder ? (result?.paid ? "PRE-ORDER · SUDAH BERDANA" : "PRE-ORDER TERSIMPAN") : "LUNAS ✅"}</DialogTitle>
+                {result && <p className="text-sm text-[#7A6A5E] mt-0.5"><b className="text-[#2C1E16]">{result.name}</b> · {(result.preorder && !result.paid) ? "Belum Berdana" : rupiah(result.total_amount)}</p>}
               </div>
             </div>
           </DialogHeader>
@@ -845,7 +950,14 @@ export default function WalkinPage({ preorder = false }) {
                 const sName = SESSIONS.find((s) => s.id === result.session_id)?.name || `Sesi ${result.session_id}`;
                 const sTime = SESSIONS.find((s) => s.id === result.session_id)?.time || "";
                 const link = `${window.location.origin}/order/${result.id}`;
-                const msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih. Berikut E-TICKET Film Dokumenter ASHIN JINARAKKHITA:\nNo. Order: #${result.order_no}\nSesi: ${sName} · ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\nDana: ${rupiah(result.total_amount)}\n\nLihat & simpan e-ticket:\n${link}\n\n${result.preorder ? "Ini PRE-ORDER. Mohon CHECK-IN & ambil tiket fisik pada Minggu, 13 Sep 2026 di CGV Grand Batam." : "Tunjukkan e-ticket ini saat check-in di lokasi."}\n— Sekretariat MBI Kepri`;
+                let msg;
+                if (!result.preorder) {
+                  msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih. Berikut E-TICKET Film Dokumenter ASHIN JINARAKKHITA:\nNo. Order: #${result.order_no}\nSesi: ${sName} - ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\nDana: ${rupiah(result.total_amount)}\n\nLihat & simpan e-ticket:\n${link}\n\nTunjukkan e-ticket ini saat check-in di lokasi.\n- Sekretariat MBI Kepri`;
+                } else if (result.paid) {
+                  msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih atas Dana Paramita Anda untuk Film Dokumenter ASHIN JINARAKKHITA.\n\nBerikut E-TICKET pre-order Anda:\nNo. Order: #${result.order_no}\nSesi: ${sName} - ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\nDana Paramita: ${rupiah(result.total_amount)}\n\nLihat & simpan e-ticket:\n${link}\n\nMohon hadir untuk CHECK-IN & menukar tiket fisik pada Minggu, 13 September 2026 di CGV Grand Batam Mall.\n\nSadhu, Sadhu, Sadhu.\n- Sekretariat MBI Kepri`;
+                } else {
+                  msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih. Tempat duduk Anda untuk Film Dokumenter ASHIN JINARAKKHITA sudah kami amankan (pre-order):\nNo. Order: #${result.order_no}\nSesi: ${sName} - ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\n\nApabila Anda berkenan menyalurkan Dana Paramita, silakan klik tautan berikut - pilih QRIS/Transfer, isi nominal seikhlasnya, lalu unggah bukti:\n${link}\n\nDana Paramita bersifat sukarela, tidak ada nominal yang ditentukan. Mohon hadir untuk CHECK-IN & menukar tiket fisik pada Minggu, 13 September 2026 di CGV Grand Batam Mall.\n\nSadhu, Sadhu, Sadhu.\n- Sekretariat MBI Kepri`;
+                }
                 window.open(`https://wa.me/${p}?text=${encodeURIComponent(msg)}`, "_blank");
               }} data-testid="walkin-result-wa" className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE5A] text-white">
                 <Send className="h-4 w-4 mr-1.5" /> Kirim E-Ticket ke WhatsApp
