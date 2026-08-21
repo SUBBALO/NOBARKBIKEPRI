@@ -102,6 +102,32 @@ Jika sudah membayar, mohon abaikan pesan ini. Terima kasih.
   window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
 };
 
+const sendManualWA = (o) => {
+  const s = SESSIONS_STATIC.find((x) => x.id === o.session_id);
+  const link = `${window.location.origin}/order/${o.id}`;
+  const paidLine = o.paid ? `Dana: ${rupiah(o.total_amount)}` : "";
+  const msg =
+`Namo Buddhaya, ${o.name}
+Terima kasih 🙏
+
+E-TICKET Film Dokumenter "Ashin Jinarakkhita"
+No. Order: #${o.order_no}
+Hari/Tanggal: Minggu, 13 September 2026
+Tempat: CGV Grand Batam
+${s?.name || "Sesi"} (${s?.time || "-"})
+Kursi: ${(o.seats || []).join(", ")}
+Jumlah: ${o.qty} tiket
+${paidLine}
+
+Lihat & simpan e-ticket di sini:
+${link}
+
+Mohon tunjukkan e-ticket ini kepada petugas di lokasi untuk menukar tiket fisik (hardcopy) asli. Sampai jumpa!
+— Sekretariat MBI Kepri`;
+  window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
+};
+
+
 const orderProgress = (o) => {
   if (o.status === "pending_payment") return { t: "Belum Bayar", c: "bg-[#B26A1E]/15 text-[#8A3A12]" };
   if (o.status === "waiting_verification") return { t: "⚠ Belum cek payment", c: "bg-[#B26A1E]/20 text-[#8A3A12]" };
@@ -1706,6 +1732,7 @@ function ManualPanel() {
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => saveTicket(o)} className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-lg bg-[#B26A1E]/10 text-[#B26A1E] text-sm font-medium"><Ticket className="h-4 w-4" /> E-Ticket</button>
+                {o.phone ? <button onClick={() => sendManualWA(o)} data-testid={`manual-wa-${o.order_no}`} className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-lg bg-[#25D366]/15 text-[#1E8A4C] text-sm font-medium"><MessageCircle className="h-4 w-4" /> Kirim WA</button> : null}
                 <button onClick={() => openEdit(o)} className="flex-1 inline-flex items-center justify-center gap-1 h-9 rounded-lg bg-[#2F703E]/10 text-[#2F703E] text-sm font-medium"><Pencil className="h-4 w-4" /> Edit</button>
                 <button onClick={() => removeOrder(o)} className="inline-flex items-center justify-center h-9 px-4 rounded-lg bg-[#EF4444]/10 text-[#EF4444] text-sm font-medium"><Trash2 className="h-4 w-4" /></button>
               </div>
@@ -1743,6 +1770,7 @@ function ManualPanel() {
                   <td className="px-3 py-2 text-right font-semibold text-[#7A241F]">{rupiah(o.paid ? o.total_amount : (o.order_amount || o.total_amount))}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button onClick={() => saveTicket(o)} data-testid={`manual-ticket-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#B26A1E] hover:bg-[#B26A1E]/10 text-xs font-medium"><Ticket className="h-3.5 w-3.5" /> E-Ticket</button>
+                    {o.phone ? <button onClick={() => sendManualWA(o)} data-testid={`manual-wa-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#1E8A4C] hover:bg-[#25D366]/15 text-xs font-medium"><MessageCircle className="h-3.5 w-3.5" /> WA</button> : null}
                     <button onClick={() => openEdit(o)} data-testid={`manual-edit-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#2F703E] hover:bg-[#2F703E]/10 text-xs font-medium"><Pencil className="h-3.5 w-3.5" /> Edit</button>
                     <button onClick={() => removeOrder(o)} data-testid={`manual-del-${o.order_no}`} className="inline-flex items-center gap-1 h-8 px-2 rounded-lg text-[#EF4444] hover:bg-[#EF4444]/10 text-xs font-medium"><Trash2 className="h-3.5 w-3.5" /></button>
                   </td>
