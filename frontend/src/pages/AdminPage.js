@@ -112,7 +112,7 @@ const sendManualWA = (o) => {
   const paidLine = o.paid ? `Dana: ${rupiah(o.total_amount)}` : "";
   const msg =
 `Namo Buddhaya, ${o.name}
-Terima kasih 🙏
+Terima kasih.
 
 E-TICKET Film Dokumenter "Ashin Jinarakkhita"
 No. Order: #${o.order_no}

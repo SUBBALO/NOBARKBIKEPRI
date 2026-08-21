@@ -845,7 +845,7 @@ export default function WalkinPage({ preorder = false }) {
                 const sName = SESSIONS.find((s) => s.id === result.session_id)?.name || `Sesi ${result.session_id}`;
                 const sTime = SESSIONS.find((s) => s.id === result.session_id)?.time || "";
                 const link = `${window.location.origin}/order/${result.id}`;
-                const msg = `Namo Buddhaya, ${result.name} 🙏\n\nTerima kasih. Berikut E-TICKET Film Dokumenter ASHIN JINARAKKHITA:\nNo. Order: #${result.order_no}\nSesi: ${sName} · ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\nDana: ${rupiah(result.total_amount)}\n\nLihat & simpan e-ticket:\n${link}\n\n${result.preorder ? "Ini PRE-ORDER. Mohon CHECK-IN & ambil tiket fisik pada Minggu, 13 Sep 2026 di CGV Grand Batam." : "Tunjukkan e-ticket ini saat check-in di lokasi."}\n— Sekretariat MBI Kepri`;
+                const msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih. Berikut E-TICKET Film Dokumenter ASHIN JINARAKKHITA:\nNo. Order: #${result.order_no}\nSesi: ${sName} · ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\nDana: ${rupiah(result.total_amount)}\n\nLihat & simpan e-ticket:\n${link}\n\n${result.preorder ? "Ini PRE-ORDER. Mohon CHECK-IN & ambil tiket fisik pada Minggu, 13 Sep 2026 di CGV Grand Batam." : "Tunjukkan e-ticket ini saat check-in di lokasi."}\n— Sekretariat MBI Kepri`;
                 window.open(`https://wa.me/${p}?text=${encodeURIComponent(msg)}`, "_blank");
               }} data-testid="walkin-result-wa" className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE5A] text-white">
                 <Send className="h-4 w-4 mr-1.5" /> Kirim E-Ticket ke WhatsApp
