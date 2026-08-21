@@ -1507,7 +1507,19 @@ function ManualPanel() {
     });
     if (_cur) seatLines.push(_cur);
     if (seatLines.length === 0) seatLines.push("-");
-    const H = 1180 + (seatLines.length - 1) * 38;
+    // Wrap Nama panjang (rombongan) juga
+    const wrapVal = (text, maxW) => {
+      const words = String(text || "-").split(" ");
+      const lines = []; let ln = "";
+      words.forEach((w) => {
+        const t = ln ? ln + " " + w : w;
+        if (_m.measureText(t).width > maxW && ln) { lines.push(ln); ln = w; } else ln = t;
+      });
+      if (ln) lines.push(ln);
+      return lines.length ? lines : ["-"];
+    };
+    const nameLines = wrapVal(o.name, 470);
+    const H = 1180 + (seatLines.length - 1) * 38 + (nameLines.length - 1) * 38;
     const draw = (logoImg) => {
       const c = document.createElement("canvas"); c.width = W; c.height = H;
       const x = c.getContext("2d");
@@ -1547,7 +1559,7 @@ function ManualPanel() {
       x.strokeStyle = "#B26A1E"; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(70, y0); x.lineTo(W - 70, y0); x.stroke(); x.setLineDash([]);
       const rows = [
         ["No. Order", `#${o.order_no}`],
-        ["Nama", o.name],
+        ["Nama", null],
         ["Sesi", `${session?.name || "-"} · ${session?.time || ""}`],
         ["Nomor Kursi", null],
         ["Jumlah", `${o.qty} tiket`],
@@ -1558,10 +1570,11 @@ function ManualPanel() {
       let y = y0 + 54; x.textAlign = "left";
       rows.forEach(([k, v]) => {
         x.fillStyle = "#7A6A5E"; x.font = "20px Arial"; x.fillText(k, 80, y);
-        if (k === "Nomor Kursi") {
+        if (k === "Nomor Kursi" || k === "Nama") {
+          const lines = k === "Nama" ? nameLines : seatLines;
           x.fillStyle = "#2C1E16"; x.font = "bold 25px Arial"; x.textAlign = "right";
-          seatLines.forEach((ln, i) => { x.fillText(ln, W - 80, y + i * 38); });
-          x.textAlign = "left"; y += 60 + (seatLines.length - 1) * 38;
+          lines.forEach((ln, i) => { x.fillText(ln, W - 80, y + i * 38); });
+          x.textAlign = "left"; y += 60 + (lines.length - 1) * 38;
         } else {
           x.fillStyle = k === "Status Pembayaran" ? (paid ? "#255E33" : "#8A3A12") : "#2C1E16";
           x.font = "bold 25px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
