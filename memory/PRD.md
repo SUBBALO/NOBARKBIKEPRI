@@ -293,3 +293,9 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - COPY: "Nominal kontribusi bebas, sesuai Dana Paramita Anda. 🙏" dipakai di halaman web /order (form dana) & /preorder (catatan Belum Berdana). Emoji hanya di web.
 - TESTING iteration_22: backend 9/9 pytest (test_iter22_preorder.py) + UI e2e (preorder belum/sudah, buyer dana form, verifikasi, regresi /walkin) PASS, no issues. Data uji dibersihkan.
 - Perlu REDEPLOY agar naik ke kbikepri.com.
+
+## Update (Jun 2026 — Tombol Download E-Ticket di dialog hasil /preorder)
+- WalkinPage.js: fungsi saveTicketImage(o) = template e-ticket SAMA dgn Order Manual (canvas PNG: logo KBI, E-TICKET FILM DOKUMENTER ASHIN JINARAKKHITA, No.Order, Nama (wrap), Sesi, Nomor Kursi (wrap), Jumlah, Tgl&Jam Pesan, Diinput oleh, Status Pembayaran bila paid). Helper fmtDateTime ditambahkan. Cross-platform: iOS→navigator.share (share sheet Simpan ke Foto), Android→download langsung, Desktop Windows→anchor download PNG (Web Share hanya mobile, hindari dialog Windows Share).
+- Tombol baru 'Download E-Ticket' (data-testid walkin-result-download) di DialogFooter dialog hasil, di antara 'Kirim E-Ticket ke WhatsApp' dan 'Selesai'. Muncul utk semua hasil (walk-in & preorder belum/sudah).
+- TESTING iteration_23 (frontend): tombol muncul posisi benar, klik memicu unduhan PNG asli (e-ticket-<no>.png ~155-162KB) + toast sukses, zero error JS, utk belum & sudah berdana. Data ZZTEST dibersihkan.
+- Perlu REDEPLOY.

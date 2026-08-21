@@ -19,6 +19,13 @@ const fmtTimeWIB = (iso) => {
   } catch { return ""; }
 };
 
+const fmtDateTime = (iso) => {
+  if (!iso) return "-";
+  try {
+    return new Date(iso).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch { return "-"; }
+};
+
 const CHANNELS = {
   umum: { label: "WEBSITE", cls: "bg-[#1E6F8B]/15 text-[#155A73] border-[#1E6F8B]/30" },
   manual: { label: "ORDER MANUAL", cls: "bg-[#B26A1E]/15 text-[#8A3A12] border-[#B26A1E]/30" },
@@ -456,6 +463,139 @@ export default function WalkinPage({ preorder = false }) {
       loadMap(sessionId, false);
     }
     setBusy(false);
+  };
+
+  // E-Ticket (template sama dgn Order Manual di panel admin) — jalan di Windows/Android/iPhone
+  const saveTicketImage = async (o) => {
+    if (!o) return;
+    const session = SESSIONS.find((s) => s.id === o.session_id);
+    const paid = !!o.paid;
+    const by = o.created_by || o.sold_by || "-";
+    const W = 820;
+    const seats = o.seats || [];
+    const _m = document.createElement("canvas").getContext("2d");
+    _m.font = "bold 25px Arial";
+    const seatMaxW = 470;
+    const seatLines = [];
+    let _cur = "";
+    seats.forEach((s) => {
+      const t = _cur ? _cur + ", " + s : s;
+      if (_m.measureText(t).width > seatMaxW && _cur) { seatLines.push(_cur); _cur = s; } else _cur = t;
+    });
+    if (_cur) seatLines.push(_cur);
+    if (seatLines.length === 0) seatLines.push("-");
+    const wrapVal = (text, maxW) => {
+      const words = String(text || "-").split(" ");
+      const lines = []; let ln = "";
+      words.forEach((w) => {
+        const t = ln ? ln + " " + w : w;
+        if (_m.measureText(t).width > maxW && ln) { lines.push(ln); ln = w; } else ln = t;
+      });
+      if (ln) lines.push(ln);
+      return lines.length ? lines : ["-"];
+    };
+    const nameLines = wrapVal(o.name, 470);
+    const H = 1180 + (seatLines.length - 1) * 38 + (nameLines.length - 1) * 38;
+    const draw = (logoImg) => {
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const x = c.getContext("2d");
+      x.fillStyle = "#7A241F"; x.fillRect(0, 0, W, H);
+      x.fillStyle = "#FDFBF7"; x.fillRect(30, 30, W - 60, H - 60);
+      x.fillStyle = "#B26A1E"; x.fillRect(30, 30, W - 60, 12);
+      const cx = W / 2; x.textAlign = "center";
+      let top = 130;
+      if (logoImg) {
+        try {
+          const maxH = 92, maxW = 300;
+          let lw = logoImg.naturalWidth || logoImg.width || 1, lh = logoImg.naturalHeight || logoImg.height || 1;
+          const r = Math.min(maxW / lw, maxH / lh);
+          lw = lw * r; lh = lh * r;
+          x.drawImage(logoImg, cx - lw / 2, 52, lw, lh);
+          top = 52 + lh + 40;
+        } catch (e) { /* skip logo */ }
+      }
+      x.fillStyle = "#B26A1E"; x.font = "bold 26px Georgia"; x.fillText("E-TICKET · FILM DOKUMENTER", cx, top);
+      x.fillStyle = "#7A241F"; x.font = "bold 38px Georgia"; x.fillText("ASHIN JINARAKKHITA", cx, top + 48);
+      const wrap = (text, maxW) => {
+        const words = text.split(" "); const lines = []; let line = "";
+        words.forEach((w) => {
+          const t = line ? line + " " + w : w;
+          if (x.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t;
+        });
+        if (line) lines.push(line);
+        return lines;
+      };
+      x.fillStyle = "#8A6A3E"; x.font = "italic 17px Georgia";
+      let sy = top + 80;
+      wrap("Jejak Langkah Sang Pelopor Membangkitkan Kembali Dharma di Nusantara.", W - 200).forEach((ln) => { x.fillText(ln, cx, sy); sy += 24; });
+      x.fillStyle = "#5B4636"; x.font = "18px Arial";
+      x.fillText("Minggu, 13 September 2026", cx, sy + 10);
+      x.fillText("CGV Grand Batam Mall", cx, sy + 36);
+      let y0 = sy + 68;
+      x.strokeStyle = "#B26A1E"; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(70, y0); x.lineTo(W - 70, y0); x.stroke(); x.setLineDash([]);
+      const rows = [
+        ["No. Order", `#${o.order_no}`],
+        ["Nama", null],
+        ["Sesi", `${session?.name || "-"} · ${session?.time || ""}`],
+        ["Nomor Kursi", null],
+        ["Jumlah", `${o.qty || seats.length} tiket`],
+        ["Tgl & Jam Pesan", fmtDateTime(o.created_at)],
+        ["Diinput oleh", by],
+      ];
+      if (paid) rows.push(["Status Pembayaran", rupiah(o.total_amount)]);
+      let y = y0 + 54; x.textAlign = "left";
+      rows.forEach(([k, v]) => {
+        x.fillStyle = "#7A6A5E"; x.font = "20px Arial"; x.fillText(k, 80, y);
+        if (k === "Nomor Kursi" || k === "Nama") {
+          const lines = k === "Nama" ? nameLines : seatLines;
+          x.fillStyle = "#2C1E16"; x.font = "bold 25px Arial"; x.textAlign = "right";
+          lines.forEach((ln, i) => { x.fillText(ln, W - 80, y + i * 38); });
+          x.textAlign = "left"; y += 60 + (lines.length - 1) * 38;
+        } else {
+          x.fillStyle = k === "Status Pembayaran" ? (paid ? "#255E33" : "#8A3A12") : "#2C1E16";
+          x.font = "bold 25px Arial"; x.textAlign = "right"; x.fillText(String(v).slice(0, 40), W - 80, y);
+          x.textAlign = "left"; y += 60;
+        }
+      });
+      x.textAlign = "center";
+      x.fillStyle = "#7A241F"; x.font = "bold 30px Georgia"; x.fillText(`#${o.order_no}`, cx, y + 28);
+      x.fillStyle = "#8A3A12"; x.font = "bold 21px Arial";
+      x.fillText("Tunjukkan e-ticket ini kepada petugas di lokasi", cx, H - 108);
+      x.fillText("untuk menukar tiket fisik (hardcopy) asli.", cx, H - 80);
+      x.fillStyle = "#B26A1E"; x.font = "16px Arial";
+      x.fillText("Keluarga Buddhayana Indonesia Prov. Kepulauan Riau", cx, H - 48);
+      return c;
+    };
+    try {
+      let logo = null;
+      await new Promise((res) => { const img = new Image(); img.crossOrigin = "anonymous"; img.onload = () => { logo = img; res(); }; img.onerror = () => res(); img.src = LOGOS.kbi; });
+      let canvas;
+      try { canvas = draw(logo); } catch (e) { canvas = draw(null); }
+      const fileName = `e-ticket-${o.order_no}.png`;
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const isMobile = isIOS || /Android/i.test(navigator.userAgent);
+      if (isMobile && blob && navigator.canShare) {
+        try {
+          const file = new File([blob], fileName, { type: "image/png" });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: `E-Ticket #${o.order_no}` });
+            toast.success("E-ticket siap dibagikan/disimpan");
+            return;
+          }
+        } catch (err) { if (err?.name === "AbortError") return; }
+      }
+      const url = blob ? URL.createObjectURL(blob) : canvas.toDataURL("image/png");
+      if (isIOS) {
+        window.open(url, "_blank");
+        toast.info("Tekan lama gambar lalu pilih \u201CSimpan ke Foto\u201D", { duration: 6000 });
+        return;
+      }
+      const a = document.createElement("a"); a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      if (blob) setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success("E-ticket tersimpan sebagai gambar");
+    } catch (e) { console.error("save ticket:", e); toast.error("Gagal membuat e-ticket"); }
   };
 
   const startPayment = async () => {
@@ -963,6 +1103,9 @@ export default function WalkinPage({ preorder = false }) {
                 <Send className="h-4 w-4 mr-1.5" /> Kirim E-Ticket ke WhatsApp
               </Button>
             ) : null}
+            <Button onClick={() => saveTicketImage(result)} data-testid="walkin-result-download" className="w-full h-11 bg-[#B26A1E] hover:bg-[#8A3A12] text-white">
+              <Ticket className="h-4 w-4 mr-1.5" /> Download E-Ticket
+            </Button>
             <Button onClick={() => { setResult(null); setDisplayMode("welcome"); setSessionId(null); }} variant="outline" className="w-full h-11" data-testid="walkin-result-ok">{result?.preorder ? "Selesai" : "Sudah Saya Serahkan"}</Button>
           </DialogFooter>
         </DialogContent>
