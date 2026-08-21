@@ -14,12 +14,13 @@ import DisplayPage from "@/pages/DisplayPage";
 function Shell() {
   const loc = useLocation();
   const isAdmin = loc.pathname.startsWith("/admin");
-  const standalone = loc.pathname.startsWith("/checkin") || loc.pathname.startsWith("/walkin") || loc.pathname.startsWith("/display");
+  const standalone = loc.pathname.startsWith("/checkin") || loc.pathname.startsWith("/walkin") || loc.pathname.startsWith("/preorder") || loc.pathname.startsWith("/display");
   if (standalone) {
     return (
       <Routes>
         <Route path="/checkin" element={<CheckinPage />} />
         <Route path="/walkin" element={<WalkinPage />} />
+        <Route path="/preorder" element={<WalkinPage preorder />} />
         <Route path="/display" element={<DisplayPage />} />
       </Routes>
     );

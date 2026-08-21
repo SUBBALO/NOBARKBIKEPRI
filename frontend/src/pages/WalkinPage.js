@@ -253,14 +253,14 @@ function Login({ onLogin }) {
   );
 }
 
-export default function WalkinPage() {
+export default function WalkinPage({ preorder = false }) {
   const [authed, setAuthed] = useState(!!getAdminUser());
   const [user, setUser] = useState(getAdminUser());
   const [panitiaMode, setPanitiaMode] = useState("menu"); // menu | order | checkin
   const role = user?.role;
   const canSell = ["superadmin", "admin", "seller", "loket"].includes(role);
-  const canCheckin = ["superadmin", "admin", "loket", "checkin", "checkin_web"].includes(role);
-  const isPreorder = role === "seller"; // penjual pre-order: jual tanpa check-in
+  const canCheckin = !preorder && ["superadmin", "admin", "loket", "checkin", "checkin_web"].includes(role);
+  const isPreorder = preorder || role === "seller"; // /preorder ATAU role seller = jual tanpa check-in
   const [checkinView, setCheckinView] = useState(null); // data peserta yg baru di-check-in (utk layar monitor)
   const [sessionId, setSessionId] = useState(null);
   const [mapData, setMapData] = useState(null);
@@ -488,7 +488,7 @@ export default function WalkinPage() {
             <img src={LOGOS.kbi} alt="KBI" className="h-8 bg-white/95 rounded p-1" />
             <div>
               <p className="text-sm font-semibold leading-tight flex items-center gap-1.5">
-                {panitiaMode === "checkin" ? <><ScanLine className="h-4 w-4" /> Check-in Peserta</> : <><Store className="h-4 w-4" /> Jual Tiket di Tempat</>}
+                {panitiaMode === "checkin" ? <><ScanLine className="h-4 w-4" /> Check-in Peserta</> : preorder ? <><Store className="h-4 w-4" /> Pre-Order Tiket</> : <><Store className="h-4 w-4" /> Jual Tiket di Tempat</>}
               </p>
               <p className="text-[11px] text-white/70 leading-tight">Petugas: {user?.name}</p>
             </div>
@@ -512,7 +512,7 @@ export default function WalkinPage() {
             <h1 className="font-serif-display text-2xl sm:text-3xl leading-tight">Film Dokumenter <span className="text-[#E4C57E]">Ashin Jinarakkhita</span></h1>
             <p className="text-xs text-white/80 mt-1">Minggu, 13 September 2026 · CGV Grand Batam</p>
           </div>
-          <p className="text-center text-sm text-[#7A6A5E] mt-4 mb-3">Pilih tugas Anda:</p>
+          <p className="text-center text-sm text-[#7A6A5E] mt-4 mb-3">{preorder ? "Mode PRE-ORDER — jual tiket, peserta check-in di hari-H:" : "Pilih tugas Anda:"}</p>
           <div className={cn("grid gap-3 sm:gap-4", canSell && canCheckin ? "grid-cols-2" : "grid-cols-1 max-w-md mx-auto w-full")}>
             {canSell && (
             <button onClick={() => { setPanitiaMode("order"); setDisplayMode("welcome"); }} data-testid="walkin-menu-order"
@@ -520,8 +520,8 @@ export default function WalkinPage() {
               <span className="h-14 w-14 mx-auto rounded-2xl bg-[#B26A1E]/10 group-hover:bg-[#B26A1E]/20 flex items-center justify-center mb-3 transition-colors">
                 <Store className="h-7 w-7 text-[#B26A1E]" />
               </span>
-              <p className="font-serif-display text-xl sm:text-2xl text-[#7A241F]">Pesan Tiket</p>
-              <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">Jual tiket di tempat: pilih sesi, kursi, bayar.</p>
+              <p className="font-serif-display text-xl sm:text-2xl text-[#7A241F]">{preorder ? "Pesan Tiket (Pre-Order)" : "Pesan Tiket"}</p>
+              <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">{preorder ? "Jual tiket pre-order — TANPA check-in. Kirim e-ticket via WhatsApp." : "Jual tiket di tempat: pilih sesi, kursi, bayar."}</p>
             </button>
             )}
             {canCheckin && (
