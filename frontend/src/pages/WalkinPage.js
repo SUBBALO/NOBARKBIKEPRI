@@ -546,9 +546,9 @@ export default function WalkinPage() {
       )}
 
       {panitiaMode === "order" && (
-      <div className="max-w-6xl mx-auto px-4 py-5 grid lg:grid-cols-3 gap-6">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-5 grid lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Seat map — the big monitor area */}
-        <div className="lg:col-span-2 rounded-2xl border border-border bg-white p-5">
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-white p-3 sm:p-5 min-w-0 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex flex-wrap gap-2">
               {SESSIONS.map((s) => {
@@ -597,7 +597,9 @@ export default function WalkinPage() {
           ) : loadingMap ? (
             <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[#B26A1E]" /></div>
           ) : mapData ? (
-            <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} couples={mapData.couples || {}} allowDisability />
+            <div className="overflow-x-auto -mx-1 px-1">
+              <SeatMap rows={mapData.rows} selected={selected} onToggle={toggle} couples={mapData.couples || {}} allowDisability />
+            </div>
           ) : (
             <p className="text-center text-sm text-[#7A6A5E] py-16">Gagal memuat peta kursi.</p>
           )}
