@@ -61,6 +61,7 @@ const waPhone = (phone) => {
 };
 
 const sendWA = (o) => {
+  const link = `${window.location.origin}/order/${o.id}`;
   const msg =
 `Namo Buddhaya, ${o.name}
 Terima kasih, pembayaran Anda sudah kami *VERIFIKASI*.
@@ -76,7 +77,10 @@ Tempat: CGV Grand Batam
 ${o.session?.name || "Sesi"} (${o.session?.time || "-"})
 Kursi: ${o.seats.join(", ")}
 
-Mohon tunjukkan pesan ini saat check-in di lokasi. Sampai jumpa!
+Lihat & simpan e-ticket:
+${link}
+
+Mohon tunjukkan e-ticket ini saat check-in di lokasi. Sampai jumpa!
 — Sekretariat MBI Kepri`;
   window.open(`https://wa.me/${waPhone(o.phone)}?text=${encodeURIComponent(msg)}`, "_blank");
 };

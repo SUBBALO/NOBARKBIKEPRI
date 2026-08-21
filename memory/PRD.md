@@ -272,3 +272,10 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Role "seller" di Admin>Users di-relabel "Penjual Pre-Order (jual saja, tanpa check-in)". Role backend "manual" ditambah (belum dipakai UI; cadangan).
 - Fix mobile: dialog Edit Order Manual & Edit VIP dikunci lebar layar (w-[calc(100vw-1rem)] + overflow-x-hidden, SeatMap dibungkus overflow-x-auto). E-ticket manual: kolom Nama panjang (rombongan) kini wrap multi-baris (sama seperti Nomor Kursi), tinggi kanvas dinamis.
 - Semua compile bersih; backend RBAC & preorder teruji curl. Perlu REDEPLOY.
+
+## Update (Jun 2026 — Link /preorder terpisah + WA salam Namo Buddhaya + link e-ticket)
+- ROUTE BARU /preorder (App.js) = WalkinPage dgn prop preorder. Memaksa mode pre-order utk SIAPA PUN (termasuk admin/Chelyn): isPreorder=true, menu hanya "Pesan Tiket" (Check In disembunyikan), header/tombol berlabel "Pre-Order". /walkin tetap hari-H (auto check-in + menu Check In). Menghindari admin tak sengaja auto check-in.
+- WHATSAPP: ketiga pesan kini buka "Namo Buddhaya, {nama}" + sertakan link e-ticket {origin}/order/{id}. (1) sendWA website verified (AdminPage) +link. (2) sendManualWA order manual (tombol "Kirim WA" di baris manual desktop+mobile, pakai MessageCircle icon). (3) WalkinPage result "Kirim E-Ticket ke WhatsApp". Pakai window.location.origin → produksi jadi kbikepri.com.
+- Order Manual (panel admin): tombol "Kirim WA" ditambah di samping E-Ticket (muncul bila ada no HP).
+- Mobile /walkin: SeatMap dibungkus overflow-x-auto, padding dirapikan. Kamera bukti struk (getUserMedia facingMode environment + input capture) sudah jalan di iPhone/Android (butuh HTTPS + izin kamera, bukan browser dalam-app).
+- Semua compile bersih. Perlu REDEPLOY.
