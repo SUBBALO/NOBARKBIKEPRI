@@ -8,7 +8,7 @@ import { SeatMap } from "@/components/SeatMap";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin, Monitor, Video, Search, UserCheck, ScanLine, X, ArrowLeft, Users } from "lucide-react";
+import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin, Monitor, Video, Search, UserCheck, ScanLine, X, ArrowLeft, Users, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DISPLAY_CHANNEL } from "./DisplayPage";
 
@@ -259,6 +259,8 @@ export default function WalkinPage() {
   const [panitiaMode, setPanitiaMode] = useState("menu"); // menu | order | checkin
   const role = user?.role;
   const canSell = ["superadmin", "admin", "seller", "loket"].includes(role);
+  const canCheckin = ["superadmin", "admin", "loket", "checkin", "checkin_web"].includes(role);
+  const isPreorder = role === "seller"; // penjual pre-order: jual tanpa check-in
   const [checkinView, setCheckinView] = useState(null); // data peserta yg baru di-check-in (utk layar monitor)
   const [sessionId, setSessionId] = useState(null);
   const [mapData, setMapData] = useState(null);
@@ -414,7 +416,7 @@ export default function WalkinPage() {
   const doCreate = async (proofImg) => {
     const { data } = await adminApi.post("/admin/walkin", {
       name, phone, session_id: sessionId, seats: selected, payment_method: method, amount,
-      proof_image: proofImg || null, location: location.trim(),
+      proof_image: proofImg || null, location: location.trim(), preorder: isPreorder,
     });
     localStorage.setItem("walkin_location", location.trim());
     const loc = location.trim();
@@ -511,7 +513,7 @@ export default function WalkinPage() {
             <p className="text-xs text-white/80 mt-1">Minggu, 13 September 2026 · CGV Grand Batam</p>
           </div>
           <p className="text-center text-sm text-[#7A6A5E] mt-4 mb-3">Pilih tugas Anda:</p>
-          <div className={cn("grid gap-3 sm:gap-4", canSell ? "grid-cols-2" : "grid-cols-1 max-w-md mx-auto w-full")}>
+          <div className={cn("grid gap-3 sm:gap-4", canSell && canCheckin ? "grid-cols-2" : "grid-cols-1 max-w-md mx-auto w-full")}>
             {canSell && (
             <button onClick={() => { setPanitiaMode("order"); setDisplayMode("welcome"); }} data-testid="walkin-menu-order"
               className="group rounded-2xl border-2 border-[#B26A1E]/40 bg-white px-4 py-6 text-center hover:border-[#B26A1E] hover:bg-[#B26A1E]/5 transition-colors shadow-sm">
@@ -522,6 +524,7 @@ export default function WalkinPage() {
               <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">Jual tiket di tempat: pilih sesi, kursi, bayar.</p>
             </button>
             )}
+            {canCheckin && (
             <button onClick={() => setPanitiaMode("checkin")} data-testid="walkin-menu-checkin"
               className="group rounded-2xl border-2 border-[#2F703E]/40 bg-white px-4 py-6 text-center hover:border-[#2F703E] hover:bg-[#2F703E]/5 transition-colors shadow-sm">
               <span className="h-14 w-14 mx-auto rounded-2xl bg-[#2F703E]/10 group-hover:bg-[#2F703E]/20 flex items-center justify-center mb-3 transition-colors">
@@ -530,6 +533,7 @@ export default function WalkinPage() {
               <p className="font-serif-display text-xl sm:text-2xl text-[#7A241F]">Check In</p>
               <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">Catat kehadiran peserta & serahkan tiket.</p>
             </button>
+            )}
           </div>
         </div>
       )}
@@ -787,7 +791,7 @@ export default function WalkinPage() {
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-[#2F703E]/15 flex items-center justify-center shrink-0"><CheckCircle2 className="h-6 w-6 text-[#2F703E]" /></div>
               <div>
-                <DialogTitle className="font-serif-display text-3xl text-[#2F703E]">LUNAS ✅</DialogTitle>
+                <DialogTitle className="font-serif-display text-3xl text-[#2F703E]">{result?.preorder ? "PRE-ORDER LUNAS ✅" : "LUNAS ✅"}</DialogTitle>
                 {result && <p className="text-sm text-[#7A6A5E] mt-0.5"><b className="text-[#2C1E16]">{result.name}</b> · {rupiah(result.total_amount)} · {result.payment_method?.toUpperCase()}</p>}
               </div>
             </div>
@@ -804,6 +808,18 @@ export default function WalkinPage() {
                   <p className="font-serif-display text-3xl text-[#B26A1E]" data-testid="walkin-result-qty">{result.seats.length} tiket</p>
                 </div>
               </div>
+              {result.preorder ? (
+                <div className="rounded-lg bg-[#B26A1E]/[0.08] border border-[#B26A1E]/30 p-4">
+                  <p className="text-[#8A3A12] font-bold mb-1">📌 PRE-ORDER — tiket belum diserahkan</p>
+                  <p className="text-xs text-[#7A6A5E] mb-3">Peserta <b>WAJIB check-in & ambil tiket fisik pada Minggu, 13 Sep 2026</b> di CGV Grand Batam. Kirim e-ticket sebagai bukti pre-order.</p>
+                  <p className="font-serif-display text-xl text-[#7A241F]" data-testid="walkin-result-session">
+                    {(SESSIONS.find((s) => s.id === result.session_id)?.name || `Sesi ${result.session_id}`).toUpperCase()} · {SESSIONS.find((s) => s.id === result.session_id)?.time}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-2" data-testid="walkin-result-seats">
+                    {result.seats.map((s) => (<span key={s} className="px-3 py-1.5 rounded-md bg-white text-[#8A3A12] font-bold text-lg border border-[#B26A1E]/30">{s}</span>))}
+                  </div>
+                </div>
+              ) : (
               <div className="rounded-lg bg-[#7A241F]/[0.04] border border-[#7A241F]/10 p-4">
                 <p className="text-[#8A3A12] font-medium mb-2">🎟️ Serahkan tiket:</p>
                 <p className="font-serif-display text-2xl text-[#7A241F] mb-2" data-testid="walkin-result-session">
@@ -816,10 +832,24 @@ export default function WalkinPage() {
                   ))}
                 </div>
               </div>
+              )}
             </div>
           )}
-          <DialogFooter>
-            <Button onClick={() => { setResult(null); setDisplayMode("welcome"); setSessionId(null); }} className="w-full h-11 bg-[#7A241F] hover:bg-[#5E1B17]" data-testid="walkin-result-ok">Sudah Saya Serahkan</Button>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            {result?.phone ? (
+              <Button onClick={() => {
+                let p = (result.phone || "").replace(/[^0-9]/g, "");
+                if (p.startsWith("0")) p = "62" + p.slice(1); else if (!p.startsWith("62")) p = "62" + p;
+                const sName = SESSIONS.find((s) => s.id === result.session_id)?.name || `Sesi ${result.session_id}`;
+                const sTime = SESSIONS.find((s) => s.id === result.session_id)?.time || "";
+                const link = `${window.location.origin}/order/${result.id}`;
+                const msg = `Halo ${result.name}, terima kasih 🙏\n\nE-TICKET Film Dokumenter ASHIN JINARAKKHITA\nNo. Order: #${result.order_no}\nSesi: ${sName} · ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\nDana: ${rupiah(result.total_amount)}\n\nLihat & simpan e-ticket: ${link}\n\n${result.preorder ? "Ini PRE-ORDER. Mohon CHECK-IN & ambil tiket fisik pada Minggu, 13 Sep 2026 di CGV Grand Batam." : "Tunjukkan e-ticket ini saat check-in di lokasi."}`;
+                window.open(`https://wa.me/${p}?text=${encodeURIComponent(msg)}`, "_blank");
+              }} data-testid="walkin-result-wa" className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE5A] text-white">
+                <Send className="h-4 w-4 mr-1.5" /> Kirim E-Ticket ke WhatsApp
+              </Button>
+            ) : null}
+            <Button onClick={() => { setResult(null); setDisplayMode("welcome"); setSessionId(null); }} variant="outline" className="w-full h-11" data-testid="walkin-result-ok">{result?.preorder ? "Selesai" : "Sudah Saya Serahkan"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

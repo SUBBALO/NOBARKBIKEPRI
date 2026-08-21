@@ -263,3 +263,12 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - CHECK-IN monitor: saat panitia tandai hadir, data tiket peserta tampil di layar monitor kedua (DisplayPage mode "checkin": nama, badge kanal, sesi, kursi). Setelah klik "Selesai & Kembali ke Menu" → balik ke menu utama + monitor balik ke banner.
 - CARI-DULU (perf): /checkin (mobile) & panel check-in /walkin tidak menampilkan seluruh daftar; hasil muncul saat ketik ≥2 karакter (maks 12-15 hasil). AdminPage check-in sudah cari-dulu sebelumnya.
 - Chelyn = role "admin" (izin terbatas di atas, can_delete=false). Susanto (dibuat nanti) = superadmin. Perlu REDEPLOY.
+
+## Update (Jun 2026 — Pre-order (jual tanpa check-in) + Kirim E-Ticket WhatsApp)
+- Kebutuhan: panitia lain jual tiket H-1 (pre-order) TANPA memberi tiket/ check-in; peserta tetap wajib check-in & ambil tiket fisik tgl 13 Sep. Solusi (Opsi A): pakai /walkin "Pesan Tiket" dgn role "seller" = PENJUAL PRE-ORDER.
+- Backend WalkinCreate + preorder flag: bila preorder=true → order status "verified" TAPI checked_in=False (tidak auto check-in seperti walk-in biasa). Field order.preorder disimpan. DIUJI curl: seller buat cash preorder → checked_in False, muncul di participants channel panitia belum hadir; bisa di-check-in nanti.
+- Role menu /walkin: canSell=[superadmin,admin,seller,loket] (lihat "Pesan Tiket"); canCheckin=[superadmin,admin,loket,checkin,checkin_web] (lihat "Check In"). "seller" HANYA lihat Pesan Tiket (pre-order, tanpa check-in). Frontend kirim preorder=true saat role seller.
+- Result dialog /walkin: bila preorder → judul "PRE-ORDER LUNAS", box "tiket belum diserahkan, WAJIB check-in tgl 13 Sep". Tombol BARU "Kirim E-Ticket ke WhatsApp" (hijau): buka wa.me/{phone 62..} berisi detail order + link {origin}/order/{id} + instruksi (pre-order/normal). Ada di semua hasil walk-in bila ada nomor HP.
+- Role "seller" di Admin>Users di-relabel "Penjual Pre-Order (jual saja, tanpa check-in)". Role backend "manual" ditambah (belum dipakai UI; cadangan).
+- Fix mobile: dialog Edit Order Manual & Edit VIP dikunci lebar layar (w-[calc(100vw-1rem)] + overflow-x-hidden, SeatMap dibungkus overflow-x-auto). E-ticket manual: kolom Nama panjang (rombongan) kini wrap multi-baris (sama seperti Nomor Kursi), tinggi kanvas dinamis.
+- Semua compile bersih; backend RBAC & preorder teruji curl. Perlu REDEPLOY.

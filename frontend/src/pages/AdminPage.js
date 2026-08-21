@@ -181,7 +181,7 @@ const ROLE_BADGE = {
   superadmin: { t: "Super Admin", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
   admin: { t: "Admin", c: "bg-[#7A241F]/15 text-[#7A241F]" },
   checkin: { t: "Petugas Check-in", c: "bg-[#2F703E]/15 text-[#255E33]" },
-  seller: { t: "Petugas Penjual Tiket", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
+  seller: { t: "Penjual Pre-Order", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
   loket: { t: "Loket (Jual + Check-in)", c: "bg-[#B26A1E]/15 text-[#8A3A12]" },
   checkin_web: { t: "Check-in Website", c: "bg-[#1E6F8B]/15 text-[#155A73]" },
 };
@@ -597,7 +597,7 @@ function UsersPanel({ currentUser }) {
               <option value="loket">Loket (jual tiket + check-in SEMUA termasuk manual)</option>
               {isSuper && <>
                 <option value="checkin">Petugas Check-in (hanya check-in semua)</option>
-                <option value="seller">Petugas Penjual Tiket (jual di tempat + check-in)</option>
+                <option value="seller">Penjual Pre-Order (jual tiket saja, TANPA check-in)</option>
                 <option value="admin">Admin (verifikasi + hapus + check-in)</option>
                 <option value="superadmin">Super Admin (semua + kelola user)</option>
               </>}
@@ -739,7 +739,7 @@ function UsersPanel({ currentUser }) {
                     { v: "checkin_web", t: "Check-in Website", d: "Check-in tiket Website; order manual hanya diarahkan (tidak bisa tandai hadir)" },
                     { v: "loket", t: "Loket", d: "Jual tiket di tempat + check-in SEMUA (termasuk Order Manual)" },
                     { v: "checkin", t: "Petugas Check-in", d: "Check-in semua peserta" },
-                    { v: "seller", t: "Petugas Penjual Tiket", d: "Jual tiket di tempat + check-in" },
+                    { v: "seller", t: "Penjual Pre-Order", d: "Jual tiket pre-order saja (tanpa check-in; peserta check-in di hari-H)" },
                     { v: "admin", t: "Admin", d: "Verifikasi + hapus + check-in + jual" },
                     { v: "superadmin", t: "Super Admin", d: "Semua akses + kelola user" },
                   ].map((opt) => {

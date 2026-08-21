@@ -126,6 +126,7 @@ class WalkinCreate(BaseModel):
     amount: int = 0  # dana sukarela (total, Rp)
     proof_image: Optional[str] = None  # wajib untuk qris/transfer (base64 data URL)
     location: Optional[str] = ""  # lokasi penjualan (wajib untuk walk-in)
+    preorder: Optional[bool] = False  # True = jual pre-order (TIDAK auto check-in; check-in di hari-H)
 
 
 class AdminLogin(BaseModel):
@@ -1357,16 +1358,18 @@ async def walkin_order(payload: WalkinCreate, user: dict = Depends(require_walki
     else:
         code, total = await gen_unique_total(base)
     actor = user.get("name") or user.get("username")
+    checked = not bool(payload.preorder)
     order = {
         "id": order_id, "order_no": order_no,
         "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
         "session_id": payload.session_id, "seats": claimed, "qty": qty,
         "base_amount": base, "unique_code": code, "total_amount": total,
         "payment_method": payload.payment_method, "status": "verified",
-        "proof_image": proof, "checked_in": True, "checked_in_at": now_iso(),
-        "checked_in_by": actor, "checked_in_by_username": user.get("username"),
+        "proof_image": proof, "checked_in": checked,
+        "checked_in_at": now_iso() if checked else None,
+        "checked_in_by": actor if checked else None, "checked_in_by_username": user.get("username") if checked else None,
         "verified_by": actor,
-        "walkin": True, "sold_by": actor,
+        "walkin": True, "sold_by": actor, "preorder": bool(payload.preorder),
         "location": location,
         "created_at": now_iso(), "updated_at": now_iso(),
     }
