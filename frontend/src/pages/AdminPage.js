@@ -1321,7 +1321,7 @@ function VIPPanel() {
       </div>
 
       <Dialog open={!!edit} onOpenChange={() => { if (!busy) { setEdit(null); setEditMap(null); } }}>
-        <DialogContent data-testid="vip-edit-dialog" className="max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent data-testid="vip-edit-dialog" className="w-[calc(100vw-1rem)] max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Edit Tiket VIP</DialogTitle>
           </DialogHeader>
@@ -1344,7 +1344,9 @@ function VIPPanel() {
               {editLoading ? (
                 <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-[#B26A1E]" /></div>
               ) : editMap ? (
-                <SeatMap rows={editMap.rows} selected={editSeats} onToggle={toggleEdit} couples={editCouples} allowDisability />
+                <div className="w-full overflow-x-auto -mx-1 px-1">
+                  <SeatMap rows={editMap.rows} selected={editSeats} onToggle={toggleEdit} couples={editCouples} allowDisability />
+                </div>
               ) : (
                 <p className="text-center text-sm text-[#7A6A5E] py-10">Gagal memuat peta kursi.</p>
               )}
@@ -1739,12 +1741,12 @@ function ManualPanel() {
       </div>
 
       <Dialog open={!!edit} onOpenChange={() => { if (!busy) { setEdit(null); setEditProof(null); setEditMap(null); } }}>
-        <DialogContent data-testid="manual-edit-dialog" className="max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent data-testid="manual-edit-dialog" className="w-[calc(100vw-1rem)] max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle className="font-serif-display text-2xl text-[#7A241F]">Edit Order Manual</DialogTitle>
+            <DialogTitle className="font-serif-display text-xl sm:text-2xl text-[#7A241F]">Edit Order Manual</DialogTitle>
           </DialogHeader>
           {edit && (
-            <div className="space-y-3">
+            <div className="space-y-3 min-w-0">
               <div>
                 <Label>Nama Pembeli</Label>
                 <Input data-testid="manual-edit-name" value={edit.name || ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })} className="mt-1.5" />
@@ -1801,7 +1803,9 @@ function ManualPanel() {
               {editLoading ? (
                 <div className="flex justify-center py-16"><Loader2 className="h-7 w-7 animate-spin text-[#B26A1E]" /></div>
               ) : editMap ? (
-                <SeatMap rows={editMap.rows} selected={editSeats} onToggle={toggleEdit} couples={editCouples} allowDisability />
+                <div className="w-full overflow-x-auto -mx-1 px-1">
+                  <SeatMap rows={editMap.rows} selected={editSeats} onToggle={toggleEdit} couples={editCouples} allowDisability />
+                </div>
               ) : (
                 <p className="text-center text-sm text-[#7A6A5E] py-10">Gagal memuat peta kursi.</p>
               )}
