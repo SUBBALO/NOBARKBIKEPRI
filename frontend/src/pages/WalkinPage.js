@@ -729,7 +729,7 @@ export default function WalkinPage({ preorder = false }) {
               ) : (
                 <div className="rounded-lg border border-[#B26A1E]/30 bg-[#F3E9DD]/50 p-3 mb-3" data-testid="preorder-belum-note">
                   <p className="text-sm text-[#7A241F] font-semibold mb-1">Kursi dikunci atas nama pembeli</p>
-                  <p className="text-xs text-[#7A6A5E]">Tiket tetap terbit. Pembeli menyalurkan Dana Paramita nanti lewat <b>link WhatsApp</b> (pilih QRIS/Transfer, isi nominal, unggah bukti). Panitia verifikasi di panel admin.</p>
+                  <p className="text-xs text-[#7A6A5E]">Tiket tetap terbit. Nominal kontribusi bebas, sesuai Dana Paramita Anda 🙏. Pembeli menyalurkan Dana Paramita nanti lewat <b>link WhatsApp</b> (pilih QRIS/Transfer, isi nominal, unggah bukti). Panitia verifikasi di panel admin.</p>
                 </div>
               )}
 
@@ -956,7 +956,7 @@ export default function WalkinPage({ preorder = false }) {
                 } else if (result.paid) {
                   msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih atas Dana Paramita Anda untuk Film Dokumenter ASHIN JINARAKKHITA.\n\nBerikut E-TICKET pre-order Anda:\nNo. Order: #${result.order_no}\nSesi: ${sName} - ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\nDana Paramita: ${rupiah(result.total_amount)}\n\nLihat & simpan e-ticket:\n${link}\n\nMohon hadir untuk CHECK-IN & menukar tiket fisik pada Minggu, 13 September 2026 di CGV Grand Batam Mall.\n\nSadhu, Sadhu, Sadhu.\n- Sekretariat MBI Kepri`;
                 } else {
-                  msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih. Tempat duduk Anda untuk Film Dokumenter ASHIN JINARAKKHITA sudah kami amankan (pre-order):\nNo. Order: #${result.order_no}\nSesi: ${sName} - ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\n\nApabila Anda berkenan menyalurkan Dana Paramita, silakan klik tautan berikut - pilih QRIS/Transfer, isi nominal seikhlasnya, lalu unggah bukti:\n${link}\n\nDana Paramita bersifat sukarela, tidak ada nominal yang ditentukan. Mohon hadir untuk CHECK-IN & menukar tiket fisik pada Minggu, 13 September 2026 di CGV Grand Batam Mall.\n\nSadhu, Sadhu, Sadhu.\n- Sekretariat MBI Kepri`;
+                  msg = `Namo Buddhaya, ${result.name}\n\nTerima kasih. Tempat duduk Anda untuk Film Dokumenter ASHIN JINARAKKHITA sudah kami amankan (pre-order):\nNo. Order: #${result.order_no}\nSesi: ${sName} - ${sTime}\nKursi: ${result.seats.join(", ")}\nJumlah: ${result.seats.length} tiket\n\nApabila Anda berkenan menyalurkan Dana Paramita, silakan klik tautan berikut:\n${link}\n\nNominal kontribusi bebas, sesuai Dana Paramita Anda. Di halaman tersebut Anda bisa pilih QRIS/Transfer, isi nominal, lalu unggah bukti - sekaligus melihat & menyimpan e-ticket.\n\nMohon hadir untuk CHECK-IN & menukar tiket fisik pada Minggu, 13 September 2026 di CGV Grand Batam Mall.\n\nSadhu, Sadhu, Sadhu.\n- Sekretariat MBI Kepri`;
                 }
                 window.open(`https://wa.me/${p}?text=${encodeURIComponent(msg)}`, "_blank");
               }} data-testid="walkin-result-wa" className="w-full h-11 bg-[#25D366] hover:bg-[#1EBE5A] text-white">

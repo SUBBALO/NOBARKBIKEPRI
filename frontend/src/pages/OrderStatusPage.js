@@ -350,7 +350,7 @@ export default function OrderStatusPage() {
             <div className="mt-5 rounded-xl bg-[#F3E9DD] border border-[#B26A1E]/40 p-5">
               <p className="text-xs text-[#7A6A5E]">Dana Paramita</p>
               <p className="font-serif-display text-2xl text-[#7A241F] mt-1" data-testid="order-total">Sukarela</p>
-              <p className="text-[11px] text-[#5B4636] mt-2 leading-relaxed">Isi nominal seikhlasnya pada bagian pembayaran, lalu unggah bukti. Dana Paramita bersifat sukarela - tidak ada nominal yang ditentukan.</p>
+              <p className="text-[11px] text-[#5B4636] mt-2 leading-relaxed">Isi nominal seikhlasnya pada bagian pembayaran, lalu unggah bukti. Nominal kontribusi bebas, sesuai Dana Paramita Anda. 🙏</p>
             </div>
           ) : (
           <div className="mt-5 rounded-xl bg-[#F3E9DD] border border-[#B26A1E]/40 p-5">
@@ -375,7 +375,7 @@ export default function OrderStatusPage() {
           {isPreorderDana && (
             <div data-testid="preorder-dana-form">
               <h2 className="font-serif-display text-2xl text-[#7A241F] mb-1">Salurkan Dana Paramita</h2>
-              <p className="text-sm text-[#7A6A5E] mb-4">Tempat duduk Anda sudah kami amankan (pre-order). Dana Paramita bersifat <b>sukarela</b> - tidak ada nominal yang ditentukan.</p>
+              <p className="text-sm text-[#7A6A5E] mb-4">Tempat duduk Anda sudah kami amankan (pre-order). Nominal kontribusi bebas, sesuai Dana Paramita Anda. 🙏</p>
 
               {order.status === "waiting_verification" && (
                 <div className="rounded-xl border border-[#2F703E]/30 bg-[#2F703E]/5 p-3 mb-4" data-testid="preorder-pending-note">
