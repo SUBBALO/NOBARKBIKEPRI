@@ -14,7 +14,7 @@ import {
   Loader2, ShieldCheck, LogOut, CheckCircle2, XCircle, Printer,
   Eye, RefreshCw, Ticket, Clock, Wallet, Users, Search, UserCheck, Download, ScanLine, MessageCircle, UploadCloud,
   Trash2, AlertTriangle, UserPlus, History,
-  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown, Pencil, ClipboardList, Lock,
+  Store, Banknote, RotateCcw, ShieldAlert, MapPin, ChevronDown, KeyRound, Crown, Pencil, ClipboardList, Lock, Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -1407,6 +1407,9 @@ function ManualPanel() {
   const [tfAmount, setTfAmount] = useState("");
   const [proof, setProof] = useState(null);
   const [note, setNote] = useState("");
+  const [method, setMethod] = useState("cash");
+  const [ucode, setUcode] = useState(0);
+  const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [list, setList] = useState([]);
   const [edit, setEdit] = useState(null);
@@ -1456,14 +1459,19 @@ function ManualPanel() {
   const submit = async () => {
     if (!name.trim()) { toast.error("Isi nama pembeli"); return; }
     if (selected.length === 0) { toast.error("Pilih minimal 1 kursi"); return; }
+    if (paid && (!amount || parseInt(amount) <= 0)) { toast.error("Isi nominal dana"); return; }
+    if (paid && method !== "cash" && !proof) { toast.error("Foto / upload bukti struk dulu"); return; }
     setBusy(true);
     try {
-      await adminApi.post("/admin/manual", {
+      const { data } = await adminApi.post("/admin/manual", {
         name, phone, session_id: sessionId, seats: selected,
-        amount: 0, paid: false, note,
+        amount: paid ? parseInt(amount) : 0, paid,
+        payment_method: method, unique_code: (paid && method !== "cash") ? ucode : 0,
+        proof_image: (paid && method !== "cash") ? (proof || null) : null,
+        note,
       });
-      toast.success("Order manual dibuat (nominal diisi nanti saat upload bukti)");
-      setName(""); setPhone(""); setAmount(""); setPaid(false); setTgl(""); setTfAmount(""); setProof(null); setNote(""); setSelected([]);
+      setResult(data);
+      setName(""); setPhone(""); setAmount(""); setPaid(false); setMethod("cash"); setUcode(0); setTgl(""); setTfAmount(""); setProof(null); setNote(""); setSelected([]);
       loadMap(sessionId, false); loadList();
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal membuat order manual"); loadMap(sessionId, false); }
     setBusy(false);
@@ -1742,12 +1750,74 @@ function ManualPanel() {
             <p className="text-xs text-[#7A6A5E]">Kursi dipilih ({selected.length}):</p>
             <p className="text-sm font-semibold text-[#7A241F] break-words" data-testid="manual-selected">{selected.length ? selected.join(", ") : "— belum ada —"}</p>
           </div>
-          <p className="text-xs text-[#7A6A5E] rounded-lg bg-[#B26A1E]/[0.07] border border-[#B26A1E]/20 p-2.5">
-            Order dibuat dengan status <b>Belum Berdana</b>. Nominal & bukti transfer diisi nanti lewat tombol <b>Edit</b> saat pembeli sudah berdana.
-          </p>
-          <Button onClick={submit} disabled={busy || selected.length === 0 || !name.trim()} data-testid="manual-submit"
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" data-testid="manual-belum" onClick={() => setPaid(false)}
+              className={cn("rounded-xl border px-3 py-2.5 text-sm font-semibold", !paid ? "border-[#B26A1E] bg-[#B26A1E]/10 text-[#8A3A12] ring-2 ring-[#B26A1E]/30" : "border-border bg-white text-[#7A6A5E]")}>Belum Bayar</button>
+            <button type="button" data-testid="manual-sudah" onClick={() => setPaid(true)}
+              className={cn("rounded-xl border px-3 py-2.5 text-sm font-semibold", paid ? "border-[#2F703E] bg-[#2F703E]/10 text-[#255E33] ring-2 ring-[#2F703E]/30" : "border-border bg-white text-[#7A6A5E]")}>Sudah Bayar</button>
+          </div>
+
+          {paid ? (
+            <>
+              <div>
+                <Label>Nominal Dana</Label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#7A6A5E]">Rp</span>
+                  <Input data-testid="manual-amount" inputMode="numeric" value={amount ? parseInt(amount).toLocaleString("id-ID") : ""} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="pl-9" />
+                </div>
+              </div>
+              <div>
+                <Label>Metode Pembayaran</Label>
+                <div className="grid grid-cols-3 gap-2 mt-1.5">
+                  {["cash", "qris", "transfer"].map((k) => (
+                    <button key={k} type="button" data-testid={`manual-pay-${k}`} onClick={() => { setMethod(k); setUcode(k === "cash" ? 0 : Math.floor(100 + Math.random() * 900)); }}
+                      className={cn("rounded-xl border p-2 text-center text-xs font-medium capitalize", method === k ? "border-[#B26A1E] bg-[#B26A1E]/5 ring-2 ring-[#B26A1E]/30 text-[#8A3A12]" : "border-border text-[#7A6A5E]")}>{k}</button>
+                  ))}
+                </div>
+              </div>
+              {method !== "cash" && (
+                <div className="rounded-lg border border-[#B26A1E]/30 bg-white p-3">
+                  {amount > 0 && (
+                    <div className="mb-3 rounded-lg bg-[#7A241F]/10 border border-[#7A241F]/30 p-2.5" data-testid="manual-total-unik">
+                      <p className="text-[11px] text-[#7A6A5E]">Total transfer (termasuk kode unik <b>{ucode}</b>):</p>
+                      <p className="text-lg font-bold text-[#7A241F]">{rupiah(parseInt(amount) + ucode)}</p>
+                      <p className="text-[10px] text-[#7A6A5E]">Minta pembeli transfer PAS sejumlah ini.</p>
+                    </div>
+                  )}
+                  {method === "qris" ? (
+                    <div className="text-center">
+                      <p className="text-xs font-semibold text-[#7A241F] mb-2">Scan QRIS</p>
+                      <img src={LOGOS.qris} alt="QRIS" className="mx-auto w-full max-w-[180px] rounded-lg border border-border" />
+                    </div>
+                  ) : (
+                    <div className="rounded-lg bg-[#F3E9DD]/50 p-3 text-center">
+                      <p className="text-xs text-[#7A6A5E]">BCA</p>
+                      <p className="text-lg font-bold text-[#7A241F]">061 518 3381</p>
+                      <p className="text-xs text-[#7A6A5E]">a.n. PD MBI Kepri</p>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <label data-testid="manual-photo" className="flex items-center justify-center gap-1.5 rounded-lg border border-[#B26A1E]/50 bg-white px-2 py-2 text-xs font-medium text-[#8A3A12] cursor-pointer hover:bg-[#F3E9DD]/40">
+                      <Camera className="h-4 w-4" /> Ambil Foto
+                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onProof} />
+                    </label>
+                    <label data-testid="manual-upload" className="flex items-center justify-center gap-1.5 rounded-lg border border-[#B26A1E]/50 bg-white px-2 py-2 text-xs font-medium text-[#8A3A12] cursor-pointer hover:bg-[#F3E9DD]/40">
+                      <UploadCloud className="h-4 w-4" /> Upload Struk
+                      <input type="file" accept="image/*" className="hidden" onChange={onProof} />
+                    </label>
+                  </div>
+                  {proof && <img src={proof} alt="bukti" className="rounded-lg border border-border max-h-28 object-contain mt-2 mx-auto" data-testid="manual-proof-preview" />}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-[#7A6A5E] rounded-lg bg-[#B26A1E]/[0.07] border border-[#B26A1E]/20 p-2.5">
+              Order dibuat status <b>Belum Bayar</b>. Nominal & bukti transfer bisa diisi nanti lewat tombol <b>Edit</b> saat pembeli sudah berdana.
+            </p>
+          )}
+          <Button onClick={submit} disabled={busy || selected.length === 0 || !name.trim() || (paid && (!amount || parseInt(amount) <= 0)) || (paid && method !== "cash" && !proof)} data-testid="manual-submit"
             className="w-full h-12 bg-[#B26A1E] hover:bg-[#8A3A12] text-base">
-            {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <ClipboardList className="h-5 w-5 mr-1.5" />} Buat Order Manual
+            {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <ClipboardList className="h-5 w-5 mr-1.5" />} {paid ? (method !== "cash" && !proof ? "Foto / Upload Bukti Dulu" : "Buat Tiket & Tampilkan E-Ticket") : "Buat Order Manual (Belum Bayar)"}
           </Button>
         </div>
       </div>
@@ -1825,6 +1895,23 @@ function ManualPanel() {
           </table>
         </div>
       </div>
+
+      <Dialog open={!!result} onOpenChange={(o) => !o && setResult(null)}>
+        <DialogContent className="max-w-sm rounded-2xl" data-testid="manual-result-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-serif-display text-2xl text-[#2F703E]">{result?.paid ? "SUDAH BAYAR ✅" : "ORDER TERSIMPAN"}</DialogTitle>
+          </DialogHeader>
+          {result && (
+            <div className="space-y-2.5">
+              <p className="text-sm"><b className="text-[#2C1E16]">{result.name}</b> · #{result.order_no}</p>
+              <p className="text-xs text-[#7A6A5E]">{(result.seats || []).join(", ")} · {result.paid ? rupiah(result.total_amount) : "Belum Bayar"}</p>
+              <Button onClick={() => saveTicket(result)} className="w-full bg-[#B26A1E] hover:bg-[#8A3A12]" data-testid="manual-result-download"><Download className="h-4 w-4 mr-1.5" /> Download E-Ticket</Button>
+              {result.phone ? <Button onClick={() => sendManualWA(result)} className="w-full bg-[#25D366] hover:bg-[#1EA952] text-white" data-testid="manual-result-wa"><MessageCircle className="h-4 w-4 mr-1.5" /> Kirim WhatsApp</Button> : null}
+              <Button variant="outline" onClick={() => setResult(null)} className="w-full" data-testid="manual-result-ok">Selesai</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!edit} onOpenChange={() => { if (!busy) { setEdit(null); setEditProof(null); setEditMap(null); } }}>
         <DialogContent data-testid="manual-edit-dialog" className="w-[calc(100vw-1rem)] max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">

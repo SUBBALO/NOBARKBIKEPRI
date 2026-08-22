@@ -282,6 +282,7 @@ export default function WalkinPage({ preorder = false }) {
   const [method, setMethod] = useState("cash");
   const [amountText, setAmountText] = useState("");
   const [preorderPaid, setPreorderPaid] = useState(false); // /preorder: sudah berdana?
+  const [ucode, setUcode] = useState(0); // kode unik QRIS/Transfer
   const [proof, setProof] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -454,7 +455,8 @@ export default function WalkinPage({ preorder = false }) {
       const { data } = await adminApi.post("/admin/preorder", {
         name, phone, session_id: sessionId, seats: selected,
         paid: preorderPaid, amount: preorderPaid ? amount : 0,
-        payment_method: method, proof_image: preorderPaid ? (proof || null) : null,
+        payment_method: method, unique_code: (preorderPaid && method !== "cash") ? ucode : 0,
+        proof_image: preorderPaid ? (proof || null) : null,
         location: location.trim(),
       });
       setResult(data); clearForm(); setPreorderPaid(false); loadMap(sessionId, false);
@@ -683,7 +685,7 @@ export default function WalkinPage({ preorder = false }) {
             <p className="text-xs text-white/80 mt-1">Minggu, 13 September 2026 · CGV Grand Batam</p>
           </div>
           <p className="text-center text-sm text-[#7A6A5E] mt-4 mb-3">{preorder ? "Mode PRE-ORDER — jual tiket, peserta check-in di hari-H:" : "Pilih tugas Anda:"}</p>
-          <div className={cn("grid gap-3 sm:gap-4", canSell && canCheckin ? "grid-cols-2" : "grid-cols-1 max-w-md mx-auto w-full")}>
+          <div className={cn("grid gap-3 sm:gap-4", canSell && canCheckin && !preorder ? "grid-cols-2" : "grid-cols-1 max-w-md mx-auto w-full")}>
             {canSell && (
             <button onClick={() => { setPanitiaMode("order"); setDisplayMode("welcome"); }} data-testid="walkin-menu-order"
               className="group rounded-2xl border-2 border-[#B26A1E]/40 bg-white px-4 py-6 text-center hover:border-[#B26A1E] hover:bg-[#B26A1E]/5 transition-colors shadow-sm">
@@ -694,7 +696,7 @@ export default function WalkinPage({ preorder = false }) {
               <p className="text-xs sm:text-sm text-[#7A6A5E] mt-1">{preorder ? "Jual tiket pre-order — TANPA check-in. Kirim e-ticket via WhatsApp." : "Jual tiket di tempat: pilih sesi, kursi, bayar."}</p>
             </button>
             )}
-            {canCheckin && (
+            {canCheckin && !preorder && (
             <button onClick={() => setPanitiaMode("checkin")} data-testid="walkin-menu-checkin"
               className="group rounded-2xl border-2 border-[#2F703E]/40 bg-white px-4 py-6 text-center hover:border-[#2F703E] hover:bg-[#2F703E]/5 transition-colors shadow-sm">
               <span className="h-14 w-14 mx-auto rounded-2xl bg-[#2F703E]/10 group-hover:bg-[#2F703E]/20 flex items-center justify-center mb-3 transition-colors">
@@ -707,6 +709,8 @@ export default function WalkinPage({ preorder = false }) {
           </div>
         </div>
       )}
+
+      {panitiaMode === "checkin" && !preorder && (
         <CheckinPanel
           onCheckinDisplay={(v) => setCheckinView(v)}
           onFinish={() => { setCheckinView(null); setPanitiaMode("menu"); }}
@@ -833,20 +837,6 @@ export default function WalkinPage({ preorder = false }) {
 
               {preorderPaid ? (
                 <>
-                  <Label>Metode Pembayaran</Label>
-                  <div className="grid grid-cols-3 gap-2 mt-1.5 mb-3">
-                    {PAY.map((m) => {
-                      const Icon = m.icon; const active = method === m.k;
-                      return (
-                        <button type="button" key={m.k} data-testid={`preorder-pay-${m.k}`} onClick={() => setMethod(m.k)}
-                          className={cn("rounded-xl border p-2.5 text-center transition-colors",
-                            active ? "border-[#B26A1E] bg-[#B26A1E]/5 ring-2 ring-[#B26A1E]/30" : "border-border hover:border-[#B26A1E]/50")}>
-                          <Icon className={cn("h-5 w-5 mx-auto mb-0.5", active ? "text-[#B26A1E]" : "text-[#7A6A5E]")} />
-                          <span className="text-xs font-medium text-[#2C1E16]">{m.t}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
                   <div className="rounded-lg border border-[#B26A1E]/30 bg-[#F3E9DD]/50 p-3 mb-3">
                     <p className="text-xs font-semibold text-[#7A241F] mb-2">Nominal Dana Paramita</p>
                     <div className="relative">
@@ -857,8 +847,29 @@ export default function WalkinPage({ preorder = false }) {
                         placeholder="0" className="pl-9 h-11 text-base font-semibold bg-white" />
                     </div>
                   </div>
+                  <Label>Metode Pembayaran</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-1.5 mb-3">
+                    {PAY.map((m) => {
+                      const Icon = m.icon; const active = method === m.k;
+                      return (
+                        <button type="button" key={m.k} data-testid={`preorder-pay-${m.k}`} onClick={() => { setMethod(m.k); setUcode(m.k === "cash" ? 0 : Math.floor(100 + Math.random() * 900)); }}
+                          className={cn("rounded-xl border p-2.5 text-center transition-colors",
+                            active ? "border-[#B26A1E] bg-[#B26A1E]/5 ring-2 ring-[#B26A1E]/30" : "border-border hover:border-[#B26A1E]/50")}>
+                          <Icon className={cn("h-5 w-5 mx-auto mb-0.5", active ? "text-[#B26A1E]" : "text-[#7A6A5E]")} />
+                          <span className="text-xs font-medium text-[#2C1E16]">{m.t}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                   {method !== "cash" && (
                     <div className="rounded-lg border border-[#B26A1E]/30 bg-white p-3 mb-3">
+                      {amount > 0 && (
+                        <div className="mb-3 rounded-lg bg-[#7A241F]/10 border border-[#7A241F]/30 p-2.5" data-testid="preorder-total-unik">
+                          <p className="text-[11px] text-[#7A6A5E]">Total transfer (termasuk kode unik <b>{ucode}</b>):</p>
+                          <p className="text-xl font-bold text-[#7A241F]">{rupiah(amount + ucode)}</p>
+                          <p className="text-[10px] text-[#7A6A5E]">Minta pembeli transfer PAS sejumlah ini agar mudah dicocokkan.</p>
+                        </div>
+                      )}
                       {method === "qris" ? (
                         <div className="text-center">
                           <p className="text-xs font-semibold text-[#7A241F] mb-2">Scan QRIS untuk berdana</p>

@@ -327,3 +327,11 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Toolbar (no-print): tombol Cetak SESI 1/2/3/4 (state solo + CSS .solo-N sembunyikan sesi lain saat print) + Cetak Semua. window.print() → Save as PDF (A4 landscape, tiap sesi 1 halaman, print-color-adjust exact).
 - Tombol pembuka 'Cetak Denah Kursi (PDF) — pilih per sesi' (data-testid admin-denah-btn) di panel Admin > Order Manual → buka /denah tab baru.
 - Karena fitur in-app, di produksi mengikuti data asli. Verifikasi screenshot preview OK. Perlu REDEPLOY.
+
+## Update (Jun 2026 — Kode unik QRIS/Transfer + urutan input + fix check-in /preorder)
+- Alur PREORDER & ORDER MANUAL disamakan, URUTAN: pilih kursi → Nama → No HP → NOMINAL → pilih Metode. Cash → langsung (tanpa kode unik/bukti). QRIS/Transfer → muncul TOTAL + KODE UNIK 3 digit (mis 100.000→100.137) + QRIS/no rekening → Foto/Upload bukti → result (Download E-Ticket + Kirim WhatsApp).
+- Backend: ManualCreate & PreorderCreate tambah payment_method + unique_code. manual_order & preorder_create: total_amount = base + unique_code bila paid & method qris/transfer (cash code=0). Order Manual tetap ada opsi Belum Bayar.
+- Frontend: WalkinPage preorder & AdminPage ManualPanel — states method/ucode/result, kode unik digenerate saat pilih QRIS/Transfer (Math random 100-999), tampil preorder-total-unik / manual-total-unik, foto (capture) + upload, dialog hasil dgn Download E-Ticket (saveTicket) + Kirim WhatsApp (sendManualWA). Urutan Nominal sebelum Metode.
+- BUG FIX: /preorder tidak lagi menampilkan kolom check-in (CheckinPanel di-guard panitiaMode==='checkin' && !preorder; menu Check In disembunyikan saat preorder; hilangkan teks nyasar ')}' ).
+- TESTING iteration_26 PASS: backend 19 pytest baru + 9 lama green; frontend semua flow (manual belum/cash/transfer/qris, preorder belum/transfer/qris, kode unik, proof gating, result dialog, Bendahara, fix check-in) verified. Data uji dibersihkan.
+- Perlu REDEPLOY ke kbikepri.com.

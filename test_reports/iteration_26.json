@@ -1,0 +1,51 @@
+{
+  "summary": "Tested the revised PREORDER (/preorder) and ORDER MANUAL (admin panel) payment flows end-to-end plus the /preorder check-in bug fix. Backend: 15 new pytest cases for POST /api/admin/manual & /api/admin/preorder (cash/qris/transfer, unique 3-digit code, totals, persistence, validation, auth guards) + 4 auth-hardening cases (bcrypt $2b$ hash, httpOnly+Secure cookie, cookie-only auth, brute-force 429 lockout) — all 19 pass, plus previous iter22 preorder suite (9) still green. Frontend (Playwright, public preview URL): /preorder bug fix verified (no check-in search/column, no 'Check In' menu, no stray ')}'), Manual Belum Bayar / Cash / Transfer / QRIS flows verified, Preorder Belum Berdana / Transfer / QRIS verified incl. unique-code total, proof gating, result dialogs and Bendahara recording. All ZZTEST/TEST_ data purged; coming_soon flag restored to open after legacy suite mutated it.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/manual", "issue": "No server-side enforcement/validation of proof for paid qris/transfer (frontend-only gate). API accepts paid+transfer with no proof_image and no data:image/size validation, unlike /api/admin/preorder which validates format and MAX_PROOF_BYTES. Recommend parity."},
+      {"endpoint": "GET /api/admin/bendahara (rows builder, server.py:917-922)", "issue": "Pre-order rows (manual=True) hit the 'manual' branch, so location is hardcoded to 'Manual' and the location typed on /preorder ('Lokasi Penjualan') is dropped from the Bendahara/Excel report."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Bendahara table (AdminPage.js:1000, also 2065/2103)", "issue": "Kanal badge renders 'Website' for every non-panitia row, so manual orders and pre-orders (channel==='manual') are mislabeled as 'Website'. Should render 'Manual'/'Pre-Order'.", "selector": "[data-testid=\"admin-tab-bendahara\"] table", "priority": "MEDIUM"},
+      {"component": "WalkinPage login card on /preorder", "issue": "Login card title says 'Jual Tiket di Tempat' / 'Masuk dengan akun panitia (Admin)' even in pre-order mode; should read Pre-Order.", "selector": "[data-testid=\"walkin-login-btn\"]", "priority": "LOW"},
+      {"component": "Pre-order result dialog (walkin-result-dialog)", "issue": "Copy says 'Peserta WAJIB check-in & ambil tiket fisik...' which conflicts with the new rule that pre-order is not for check-in (menu subtitle says 'TANPA check-in'). Reword for consistency.", "selector": "[data-testid=\"walkin-result-dialog\"]", "priority": "LOW"},
+      {"component": "Pre-order form", "issue": "'Lokasi Penjualan' is marked required (*) but submit is not gated on it (walk-in mode does gate). Inconsistent required marker; also the value is not surfaced in Bendahara for pre-orders.", "selector": "[data-testid=\"walkin-location\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Manual result dialog", "issues": ["Buttons Download E-Ticket / Kirim WhatsApp / Selesai render correctly; no contrast or overlay problems found in the tested dialogs and forms."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter26_manual_preorder_unique.py",
+    "/app/backend/tests/test_iter26_auth_hardening.py",
+    "/app/test_reports/pytest/pytest_results_iter26.xml"
+  ],
+  "action_items": [
+    "Bendahara Kanal badge: map channel 'manual' to 'Manual'/'Pre-Order' instead of falling through to 'Website' (AdminPage.js:1000, 2065, 2103).",
+    "Keep the location entered on /preorder in the Bendahara/Excel row (server.py manual branch overrides location with 'Manual' for preorder=True docs).",
+    "Add server-side proof requirement + format/size validation for paid qris/transfer in POST /api/admin/manual (parity with /api/admin/preorder).",
+    "Reword pre-order result dialog copy about 'WAJIB check-in' and fix /preorder login card title.",
+    "Legacy test hygiene: tests/backend_test.py, test_iter7/9/10/11/12, test_seatmap_couples currently fail (40 failed / 18 errors) — they read REACT_APP_BACKEND_URL only from os.environ (KeyError) and depend on coming_soon=False + open sessions; running the full suite flipped coming_soon to True and closed sessions (I restored coming_soon=False and purged the TEST_ orders they left behind). Quarantine or repair them before the next full-suite run.",
+    "Split AdminPage.js (3083 lines) and WalkinPage.js (1149 lines) into feature modules (>700-line guideline); ManualPanel and the pre-order payment block are near-duplicates and should share one component."
+  ],
+  "critical_code_review_comments": [
+    "Unique code is generated on the client (Math.random in AdminPage.js:1764 and WalkinPage.js:845) and trusted by the backend; there is no uniqueness check against existing total_amount for manual/pre-order (the public order path at server.py:362 does check). Two manual/pre-order transfers of the same base amount can end up with the same total, defeating reconciliation.",
+    "POST /api/admin/manual trusts unique_code and skips proof validation; both should be validated/derived server-side.",
+    "Bendahara channel/location mapping treats pre-orders identically to admin manual orders, losing seller-location analytics."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter26_manual_preorder_unique.py",
+    "/app/backend/tests/test_iter26_auth_hardening.py"
+  ],
+  "success_rate": {"backend": "100% (28/28 iteration-26 + iter22 preorder tests; legacy pre-existing suites excluded)", "frontend": "100% of the 7 requested flows verified"},
+  "seed_data_creation": "Created and then fully deleted ZZTEST manual/pre-order records (ZZTEST MB, ZZTEST CASH UI, ZZTEST TF UI, ZZTEST QR UI, ZZTEST PO UI, ZZTEST PO BELUM UI) plus pytest ZZTEST_* records; trash entries hard-purged. Also removed 2 TEST_ orders left by the legacy suite and released their seat locks. config.coming_soon restored to false.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin1 / admin123 (superadmin) from /app/memory/test_credentials.md",
+  "context_for_next_testing_agent": "All 7 requested flows pass. Do NOT run `pytest /app/backend/tests/` wholesale: legacy files (backend_test.py, test_iter7/9/10/11/12, test_seatmap_couples) mutate global config (coming_soon, open/walkin sessions) and leave TEST_ orders; run only the iteration-specific files. Seat picking helper: /api/sessions/{1..4}/seats returns rows[].blocks[][] with status/couple flags; avoid couple seats for single-seat orders. UI seat buttons use data-testid=seat-<LABEL>. config.open_sessions and walkin_sessions are currently empty arrays (public/walk-in sessions closed) — /preorder and admin manual panel do not require them.",
+  "rca_of_the_issue": "Bug 'check-in column on /preorder': WalkinPage now gates CheckinPanel and the check-in menu tile behind `canCheckin && !preorder`, so with the preorder prop no check-in search/column renders — verified in the browser (0 occurrences of any check-in element/text on the pre-order order screen). Unique-code logic: frontend generates a 3-digit code on method select (non-cash) and posts amount+unique_code; backend recomputes total = base + code only when paid && method in (qris,transfer), zeroing the code for cash — verified for manual (100000+892=100892, cash 50000) and pre-order (150000+608=150608, qris 200000+245 in API test)."
+}

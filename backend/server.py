@@ -184,6 +184,8 @@ class ManualCreate(BaseModel):
     seats: List[str]
     amount: int = 0
     paid: bool = False
+    payment_method: Optional[str] = "transfer"  # cash/qris/transfer
+    unique_code: Optional[int] = 0
     transfer_date: Optional[str] = None
     transfer_amount: Optional[int] = None
     proof_image: Optional[str] = None
@@ -209,6 +211,7 @@ class PreorderCreate(BaseModel):
     paid: bool = False
     amount: int = 0
     payment_method: Optional[str] = "transfer"  # cash/qris/transfer (bila sudah berdana)
+    unique_code: Optional[int] = 0
     proof_image: Optional[str] = None
     location: Optional[str] = ""
 
@@ -1657,18 +1660,21 @@ async def manual_order(payload: ManualCreate, user: dict = Depends(require_manua
 
     actor = user.get("name") or user.get("username")
     paid = bool(payload.paid)
-    counted = _manual_counted(paid, payload.amount, payload.transfer_amount)
+    method = payload.payment_method if payload.payment_method in ("cash", "qris", "transfer") else "transfer"
+    base = int(payload.amount or 0)
+    code = int(payload.unique_code or 0) if (paid and method in ("qris", "transfer")) else 0
+    total = (base + code) if paid else 0
     order = {
         "id": order_id, "order_no": await gen_order_no(),
         "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
         "session_id": payload.session_id, "seats": claimed, "qty": len(claimed),
-        "order_amount": payload.amount or 0,
-        "base_amount": counted, "unique_code": 0, "total_amount": counted,
-        "payment_method": "transfer",
+        "order_amount": base,
+        "base_amount": base, "unique_code": code, "total_amount": total,
+        "payment_method": method,
         "status": "verified" if paid else "manual_unpaid",
         "paid": paid,
-        "transfer_date": payload.transfer_date or None,
-        "transfer_amount": payload.transfer_amount or None,
+        "transfer_date": (payload.transfer_date or now_iso()[:10]) if paid else None,
+        "transfer_amount": total if paid else None,
         "proof_image": payload.proof_image or None, "checked_in": False,
         "verified_by": actor if paid else None,
         "manual": True, "sold_by": actor, "created_by": actor,
@@ -1772,16 +1778,18 @@ async def preorder_create(payload: PreorderCreate, user: dict = Depends(require_
             raise HTTPException(status_code=409, detail=f"Kursi {seat} sudah terisi. Pilih kursi lain.")
 
     actor = user.get("name") or user.get("username")
+    code = int(payload.unique_code or 0) if (paid and method in ("qris", "transfer")) else 0
+    total = (amount + code) if paid else 0
     order = {
         "id": order_id, "order_no": await gen_order_no(),
         "name": payload.name.strip(), "phone": (payload.phone or "").strip(),
         "session_id": payload.session_id, "seats": claimed, "qty": len(claimed),
-        "order_amount": amount, "base_amount": amount, "unique_code": 0, "total_amount": amount,
+        "order_amount": amount, "base_amount": amount, "unique_code": code, "total_amount": total,
         "payment_method": method,
         "status": "verified" if paid else "manual_unpaid",
         "paid": paid,
         "transfer_date": now_iso()[:10] if paid else None,
-        "transfer_amount": amount if paid else None,
+        "transfer_amount": total if paid else None,
         "proof_image": proof, "checked_in": False,
         "verified_by": actor if paid else None,
         "manual": True, "preorder": True, "sold_by": actor, "created_by": actor,
