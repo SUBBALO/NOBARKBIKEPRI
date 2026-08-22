@@ -335,3 +335,8 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - BUG FIX: /preorder tidak lagi menampilkan kolom check-in (CheckinPanel di-guard panitiaMode==='checkin' && !preorder; menu Check In disembunyikan saat preorder; hilangkan teks nyasar ')}' ).
 - TESTING iteration_26 PASS: backend 19 pytest baru + 9 lama green; frontend semua flow (manual belum/cash/transfer/qris, preorder belum/transfer/qris, kode unik, proof gating, result dialog, Bendahara, fix check-in) verified. Data uji dibersihkan.
 - Perlu REDEPLOY ke kbikepri.com.
+
+## Update (Jun 2026 — Fix denah print putih)
+- Masalah: print denah jadi putih karena warna pakai background-color (Chrome/Edge default mematikan "Background graphics").
+- Fix DenahPage.js: status kursi ditandai GARIS TEPI berwarna tebal (bw 1-3px) + teks dark + tint latar terang (border & teks selalu tercetak walau bg off). Legenda mengikuti (border tebal). Tambah catatan aktifkan Background graphics utk warna penuh. Diverifikasi via emulasi media print — status kursi jelas tanpa bg.
+- Perlu REDEPLOY.

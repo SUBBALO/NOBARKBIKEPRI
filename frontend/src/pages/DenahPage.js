@@ -14,19 +14,19 @@ const GAP = 3;
 
 // Prioritas warna: operator > disabilitas > terisi > couple > kosong
 const seatStyle = (seat) => {
-  if (seat.status === "reserved") return { bg: "#1F2937", fg: "#FFFFFF", bd: "#111827" };
-  if (seat.disability) return { bg: "#10B981", fg: "#FFFFFF", bd: "#059669" };
-  if (seat.status === "booked") return { bg: "#9CA3AF", fg: "#FFFFFF", bd: "#6B7280" };
-  if (seat.couple) return { bg: "#F9A8D4", fg: "#831843", bd: "#DB2777" };
-  return { bg: "#FFFFFF", fg: "#374151", bd: "#B0B7C3" };
+  if (seat.status === "reserved") return { bg: "#E5E7EB", fg: "#111827", bd: "#111827", bw: 3 };
+  if (seat.disability) return { bg: "#D1FAE5", fg: "#065F46", bd: "#059669", bw: 2.5 };
+  if (seat.status === "booked") return { bg: "#E5E7EB", fg: "#4B5563", bd: "#6B7280", bw: 2.5 };
+  if (seat.couple) return { bg: "#FCE7F3", fg: "#9D174D", bd: "#DB2777", bw: 2 };
+  return { bg: "#FFFFFF", fg: "#374151", bd: "#9CA3AF", bw: 1 };
 };
 
 const LEGEND = [
-  { label: "KOSONG (siap jual)", bg: "#FFFFFF", bd: "#B0B7C3" },
-  { label: "TERISI / SUDAH TERJUAL", bg: "#9CA3AF", bd: "#6B7280" },
-  { label: "SWEETBOX / COUPLE", bg: "#F9A8D4", bd: "#DB2777" },
-  { label: "DISABILITAS", bg: "#10B981", bd: "#059669" },
-  { label: "OPERATOR", bg: "#1F2937", bd: "#111827" },
+  { label: "KOSONG (siap jual)", bg: "#FFFFFF", bd: "#9CA3AF", bw: 1 },
+  { label: "TERISI / SUDAH TERJUAL", bg: "#E5E7EB", bd: "#6B7280", bw: 2.5 },
+  { label: "SWEETBOX / COUPLE", bg: "#FCE7F3", bd: "#DB2777", bw: 2 },
+  { label: "DISABILITAS", bg: "#D1FAE5", bd: "#059669", bw: 2.5 },
+  { label: "OPERATOR", bg: "#E5E7EB", bd: "#111827", bw: 3 },
 ];
 
 const SessionDenah = ({ session, data, printedAt }) => {
@@ -92,7 +92,7 @@ const SessionDenah = ({ session, data, printedAt }) => {
                       style={{
                         width: CELL, height: CELL, fontSize: 9, fontWeight: 700,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        borderRadius: 5, backgroundColor: st.bg, color: st.fg, border: `1px solid ${st.bd}`,
+                        borderRadius: 5, backgroundColor: st.bg, color: st.fg, border: `${st.bw}px solid ${st.bd}`,
                         WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
                       }}>
                       {seat.label.replace(row.row, "")}
@@ -112,7 +112,7 @@ const SessionDenah = ({ session, data, printedAt }) => {
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           {LEGEND.map((l) => (
             <div key={l.label} className="flex items-center gap-2 text-xs font-bold text-[#3B2A20]">
-              <span style={{ width: 20, height: 20, borderRadius: 4, backgroundColor: l.bg, border: `1.5px solid ${l.bd}`, WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }} />
+              <span style={{ width: 20, height: 20, borderRadius: 4, backgroundColor: l.bg, border: `${l.bw}px solid ${l.bd}`, WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }} />
               {l.label}
             </div>
           ))}
@@ -190,7 +190,7 @@ export default function DenahPage() {
       </div>
 
       <div className="no-print text-center text-xs text-[#7A6A5E] py-2 px-4">
-        Pilih tombol <b>Cetak Sesi</b> → di dialog print, tujuan <b>Save as PDF</b>, kertas <b>A4 Landscape</b>. Data kursi mengikuti kondisi terkini sistem.
+        Pilih tombol <b>Cetak Sesi</b> → tujuan <b>Save as PDF</b>, kertas <b>A4 Landscape</b>. Status kursi ditandai <b>garis tepi berwarna + teks</b> (tetap kebaca walau tanpa warna latar). Agar warna latar ikut penuh, aktifkan <b>"Background graphics / Grafik latar"</b> di dialog print.
       </div>
 
       <div className="max-w-[1100px] mx-auto px-2 pb-10" data-testid="denah-container">
