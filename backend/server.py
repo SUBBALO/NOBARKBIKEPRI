@@ -1850,9 +1850,17 @@ async def cash_settlement(user: dict = Depends(require_roles("superadmin")),
     """Rekap setoran kas per petugas (hanya order CASH lunas). QRIS/Transfer tidak dihitung."""
     sellers = await _collect_cash_settlement(date_from, date_to)
     settlements = [clean(s) async for s in db.cash_settlements.find({}).sort("created_at", -1)]
+    # grand total SELURUH ACARA (abaikan filter tanggal)
+    all_sellers = await _collect_cash_settlement() if (date_from or date_to) else sellers
+    grand_total = {
+        "collected": sum(p["collected"] for p in all_sellers),
+        "deposited": sum(p["deposited"] for p in all_sellers),
+        "outstanding": sum(p["outstanding"] for p in all_sellers),
+    }
     return {
         "sellers": sellers,
         "settlements": settlements,
+        "grand_total": grand_total,
         "total_collected": sum(p["collected"] for p in sellers),
         "total_deposited": sum(p["deposited"] for p in sellers),
         "total_outstanding": sum(p["outstanding"] for p in sellers),
@@ -1952,6 +1960,23 @@ async def cash_receive(payload: CashReceive, user: dict = Depends(require_roles(
     await db.cash_settlements.insert_one(rec)
     await log_activity(user, "setoran", f"Terima setoran kas dari {seller}: Rp{amount:,} ({len(ids)} order)".replace(",", "."), None)
     return clean(rec)
+
+
+@api_router.delete("/admin/cash-settlement/{settlement_id}")
+async def cancel_cash_settlement(settlement_id: str, user: dict = Depends(require_roles("superadmin"))):
+    """Batalkan/koreksi 1 catatan setoran → order kembali BELUM disetor (recalc otomatis)."""
+    rec = await db.cash_settlements.find_one({"id": settlement_id})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Catatan setoran tidak ditemukan")
+    ids = rec.get("order_ids") or []
+    if ids:
+        await db.orders.update_many({"id": {"$in": ids}},
+                                    {"$set": {"cash_deposited": False},
+                                     "$unset": {"deposited_at": "", "deposited_to": ""}})
+    await db.cash_settlements.delete_one({"id": settlement_id})
+    await log_activity(user, "setoran",
+                       f"Batalkan setoran kas dari {rec.get('seller')}: Rp{int(rec.get('amount') or 0):,} ({len(ids)} order)".replace(",", "."), None)
+    return {"ok": True, "restored": len(ids)}
 
 
 

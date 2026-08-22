@@ -1420,6 +1420,15 @@ function SetoranPanel() {
     } catch (e) { toast.error(e?.response?.data?.detail || "Gagal mencatat setoran"); }
     setBusy("");
   };
+  const cancelSettlement = async (st) => {
+    if (!window.confirm(`Batalkan setoran ${st.seller} sebesar ${rupiah(st.amount)}? ${st.count} order akan kembali berstatus BELUM disetor.`)) return;
+    setBusy("cancel-" + st.id);
+    try {
+      await adminApi.delete(`/admin/cash-settlement/${st.id}`);
+      toast.success(`Setoran ${st.seller} dibatalkan`); await load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal membatalkan setoran"); }
+    setBusy("");
+  };
   const exportExcel = async () => {
     setExporting(true);
     try {
@@ -1448,6 +1457,16 @@ function SetoranPanel() {
           </Button>
         </div>
       </div>
+      {data.grand_total && (
+        <div className="rounded-2xl border-2 border-[#2F703E]/40 bg-white p-4 mb-4" data-testid="setoran-grand-total">
+          <p className="text-[11px] uppercase font-bold text-[#255E33] tracking-wide mb-2">Ringkasan Kas Seluruh Acara</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div><p className="text-[11px] text-[#7A6A5E]">Total Kas Cash</p><p className="text-xl font-bold text-[#2C1E16]" data-testid="grand-collected">{rupiah(data.grand_total.collected)}</p></div>
+            <div><p className="text-[11px] text-[#255E33]">Sudah Disetor</p><p className="text-xl font-bold text-[#2F703E]" data-testid="grand-deposited">{rupiah(data.grand_total.deposited)}</p></div>
+            <div><p className="text-[11px] text-[#7A241F]">Belum Disetor</p><p className="text-xl font-bold text-[#7A241F]" data-testid="grand-outstanding">{rupiah(data.grand_total.outstanding)}</p></div>
+          </div>
+        </div>
+      )}
       <div className="rounded-xl border border-border bg-white p-3 mb-4 flex flex-wrap items-end gap-3" data-testid="setoran-daterange">
         <div>
           <label className="block text-[11px] text-[#7A6A5E] mb-1">Dari tanggal</label>
@@ -1510,9 +1529,15 @@ function SetoranPanel() {
           <h3 className="font-serif-display text-lg text-[#7A241F] mb-2">Riwayat Setoran (Closing)</h3>
           <div className="space-y-1.5">
             {data.settlements.map((st) => (
-              <div key={st.id} className="flex justify-between items-center text-sm border border-border rounded-lg px-3 py-2 bg-white" data-testid="setoran-history-row">
+              <div key={st.id} className="flex justify-between items-center gap-2 text-sm border border-border rounded-lg px-3 py-2 bg-white" data-testid="setoran-history-row">
                 <span><b>{st.seller}</b> · {(st.created_at || "").slice(0, 16).replace("T", " ")} WIB</span>
-                <span className="text-[#2F703E] font-semibold">{rupiah(st.amount)} <span className="text-[#7A6A5E] font-normal">({st.count} order · diterima {st.received_by})</span></span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#2F703E] font-semibold">{rupiah(st.amount)} <span className="text-[#7A6A5E] font-normal">({st.count} order · diterima {st.received_by})</span></span>
+                  <Button size="sm" variant="ghost" disabled={busy === "cancel-" + st.id} onClick={() => cancelSettlement(st)}
+                    data-testid="setoran-cancel-btn" className="text-[#7A241F] hover:bg-[#7A241F]/10 h-7 px-2">
+                    {busy === "cancel-" + st.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><XCircle className="h-3.5 w-3.5 mr-1" />Batalkan</>}
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
