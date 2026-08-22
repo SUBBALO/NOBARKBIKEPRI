@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only E2E test of /preorder (WalkinPage) 'Sudah Berdana' flow changes via Playwright on the public preview URL. Logged in as admin1/admin123, verified location placeholder, CASH flow (no proof needed), QRIS flow (QRIS image + photo/upload buttons, submit gated by proof), TRANSFER flow (bank account info + proof gating), and BELUM BERDANA regression. All 5 scenarios PASSED. No console errors, no error elements on page. Test data (ZZTEST*) cleaned via DELETE /api/admin/manual/{id}.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/preorder login card", "issues": ["Login card heading still reads 'Jual Tiket di Tempat' / 'Masuk dengan akun panitia (Admin)' on the pre-order route; after login the header correctly shows 'Pre-Order Tiket'. Cosmetic copy mismatch only."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/cleanup_zztest.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "preorder-submit is not gated by location (walkin-location) although the label marks it required with *, unlike the walk-in flow (walkin-submit checks !location.trim()). Consider disabling pre-order submit when location is empty for consistency.",
+    "WalkinPage.js is >1100 lines; consider splitting the pre-order form, seat area and result dialog into separate components."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (per request)", "frontend": "100% (5/5 scenarios, 22/22 assertions)"},
+  "seed_data_creation": "Created 4 temporary pre-orders (ZZTEST Cash #6385, ZZTEST Qris #5160, ZZTEST Transfer #5056, ZZTEST Belum #8478) — all deleted afterwards; seats released.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin1 / admin123 (superadmin) from /app/memory/test_credentials.md",
+  "context_for_next_testing_agent": "Preorder flow verified end-to-end: placeholder 'mis. Vihara Buddhayana' OK; cash submit enabled without proof; qris/transfer submit disabled with label 'Foto / Upload Bukti Dulu' until proof uploaded (use set_input_files on '[data-testid=preorder-upload] input[type=file]' or preorder-photo input); result dialog title 'PRE-ORDER · SUDAH BERDANA' with walkin-result-orderno/download/wa; belum berdana gives 'PRE-ORDER TERSIMPAN'. Session 1 seat map loads; free seats in rows L/M around L18-L21. Cleanup script: /app/test_reports/cleanup_zztest.py.",
+  "rca_of_the_issue": "N/A - no defects found"
+}

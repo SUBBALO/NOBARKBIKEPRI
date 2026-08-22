@@ -299,3 +299,12 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Tombol baru 'Download E-Ticket' (data-testid walkin-result-download) di DialogFooter dialog hasil, di antara 'Kirim E-Ticket ke WhatsApp' dan 'Selesai'. Muncul utk semua hasil (walk-in & preorder belum/sudah).
 - TESTING iteration_23 (frontend): tombol muncul posisi benar, klik memicu unduhan PNG asli (e-ticket-<no>.png ~155-162KB) + toast sukses, zero error JS, utk belum & sudah berdana. Data ZZTEST dibersihkan.
 - Perlu REDEPLOY.
+
+## Update (Jun 2026 — Alur input /preorder Sudah Berdana diperbaiki + placeholder lokasi)
+- Placeholder Lokasi Penjualan (walkin-location) diganti jadi "mis. Vihara Buddhayana".
+- Alur Sudah Berdana (WalkinPage isPreorder):
+  - CASH: isi nominal saja → tombol 'Buat Tiket & Tampilkan E-Ticket' langsung aktif → dialog hasil (nomor tiket + Download E-Ticket + Kirim WhatsApp).
+  - QRIS/TRANSFER: tampil gambar QRIS (LOGOS.qris) / info rekening (transfer dari /event) + 2 tombol 'Ambil Foto' (preorder-photo, input capture=environment) & 'Upload Struk' (preorder-upload, input file) → mendukung kamera & file di Android/iPhone/Windows. Tombol submit di-DISABLE ('Foto / Upload Bukti Dulu') sampai bukti diunggah (preorder-proof-preview), lalu aktif → dialog hasil.
+  - Belum Berdana tetap sama.
+- TESTING iteration_24 (frontend): 5 skenario (placeholder, cash, qris, transfer, belum berdana) PASS, no error, data ZZTEST dibersihkan.
+- Perlu REDEPLOY.

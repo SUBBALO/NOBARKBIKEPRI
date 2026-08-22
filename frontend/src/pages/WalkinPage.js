@@ -790,7 +790,7 @@ export default function WalkinPage({ preorder = false }) {
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#B26A1E]" />
             <Input id="wl" data-testid="walkin-location" value={location} onChange={(e) => setLocation(e.target.value)}
               list="walkin-loc-list" autoComplete="off"
-              placeholder="mis. Vihara Duta Maitreya" className="pl-9" />
+              placeholder="mis. Vihara Buddhayana" className="pl-9" />
             <datalist id="walkin-loc-list">
               {locHistory.map((l) => <option key={l} value={l} />)}
             </datalist>
@@ -859,12 +859,37 @@ export default function WalkinPage({ preorder = false }) {
                         placeholder="0" className="pl-9 h-11 text-base font-semibold bg-white" />
                     </div>
                   </div>
-                  <label data-testid="preorder-proof" className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-[#B26A1E]/50 bg-white px-3 py-3 text-sm text-[#8A3A12] cursor-pointer hover:bg-[#F3E9DD]/40 mb-3">
-                    <UploadCloud className="h-4 w-4" />
-                    {proof ? "Bukti terpilih - ganti" : "Upload Bukti Transfer/QRIS (opsional)"}
-                    <input type="file" accept="image/*" className="hidden" onChange={onProofPreorder} />
-                  </label>
-                  {proof && <img src={proof} alt="bukti" className="rounded-lg border border-border max-h-32 object-contain mb-3" />}
+                  {method !== "cash" && (
+                    <div className="rounded-lg border border-[#B26A1E]/30 bg-white p-3 mb-3">
+                      {method === "qris" ? (
+                        <div className="text-center">
+                          <p className="text-xs font-semibold text-[#7A241F] mb-2">Scan QRIS untuk berdana</p>
+                          <img src={LOGOS.qris} alt="QRIS" className="mx-auto w-full max-w-[220px] rounded-lg border border-border bg-white" />
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-xs font-semibold text-[#7A241F] mb-2">Transfer ke rekening</p>
+                          <div className="rounded-lg bg-[#F3E9DD]/50 p-3 text-center">
+                            <p className="text-xs text-[#7A6A5E]">{transfer?.bank || "BCA"}</p>
+                            <p className="font-mono text-xl font-bold text-[#7A241F] tracking-wide">{transfer?.account_number}</p>
+                            <p className="text-xs text-[#7A6A5E]">a.n. {transfer?.account_name}</p>
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-[11px] text-[#7A6A5E] mt-3 mb-2">Setelah pembeli berdana, foto atau unggah bukti struk:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label data-testid="preorder-photo" className="flex items-center justify-center gap-2 rounded-lg border border-[#B26A1E]/50 bg-white px-3 py-2.5 text-sm font-medium text-[#8A3A12] cursor-pointer hover:bg-[#F3E9DD]/40">
+                          <Camera className="h-4 w-4" /> Ambil Foto
+                          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onProofPreorder} />
+                        </label>
+                        <label data-testid="preorder-upload" className="flex items-center justify-center gap-2 rounded-lg border border-[#B26A1E]/50 bg-white px-3 py-2.5 text-sm font-medium text-[#8A3A12] cursor-pointer hover:bg-[#F3E9DD]/40">
+                          <UploadCloud className="h-4 w-4" /> Upload Struk
+                          <input type="file" accept="image/*" className="hidden" onChange={onProofPreorder} />
+                        </label>
+                      </div>
+                      {proof && <img src={proof} alt="bukti" className="rounded-lg border border-border max-h-32 object-contain mt-3 mx-auto" data-testid="preorder-proof-preview" />}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="rounded-lg border border-[#B26A1E]/30 bg-[#F3E9DD]/50 p-3 mb-3" data-testid="preorder-belum-note">
@@ -873,9 +898,9 @@ export default function WalkinPage({ preorder = false }) {
                 </div>
               )}
 
-              <Button onClick={submitPreorder} disabled={busy || selected.length === 0 || !sessionId} data-testid="preorder-submit"
+              <Button onClick={submitPreorder} disabled={busy || selected.length === 0 || !sessionId || (preorderPaid && amount <= 0) || (preorderPaid && method !== "cash" && !proof)} data-testid="preorder-submit"
                 className="w-full h-12 bg-[#7A241F] hover:bg-[#5E1B17] text-base">
-                {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} {preorderPaid ? "Buat Pre-Order (Sudah Berdana)" : "Simpan Pre-Order (Belum Berdana)"}
+                {busy ? <Loader2 className="h-5 w-5 animate-spin mr-1.5" /> : <Ticket className="h-5 w-5 mr-1.5" />} {!preorderPaid ? "Simpan Pre-Order (Belum Berdana)" : (method !== "cash" && !proof ? "Foto / Upload Bukti Dulu" : "Buat Tiket & Tampilkan E-Ticket")}
               </Button>
             </>
           ) : (
