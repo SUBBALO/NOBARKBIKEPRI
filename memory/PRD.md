@@ -308,3 +308,8 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
   - Belum Berdana tetap sama.
 - TESTING iteration_24 (frontend): 5 skenario (placeholder, cash, qris, transfer, belum berdana) PASS, no error, data ZZTEST dibersihkan.
 - Perlu REDEPLOY.
+
+## Update (Jun 2026 — Rekap Pre-Order di panel admin)
+- AdminPage ManualPanel: kartu 'Rekap Pre-Order' (data-testid preorder-rekap) di atas daftar Order Manual, dihitung client-side dari /admin/manual (hanya o.preorder===true). Kartu: Sudah Berdana (paid||verified), Menunggu Verifikasi (status waiting_verification), Belum Berdana (sisanya), Total Dana Terkumpul (sum total_amount yg sudah berdana), header total order & tiket. Sembunyi bila tidak ada pre-order. Tidak menghitung order manual rombongan biasa.
+- TESTING iteration_25 (frontend) PASS: angka benar (Sudah=2, Menunggu=1, Belum=1, Dana=Rp250.000, 4 order·4 tiket), hanya preorder=true, sembunyi saat kosong. Data ZZTEST dibersihkan total.
+- Perlu REDEPLOY.

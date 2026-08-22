@@ -1,0 +1,19 @@
+{
+  "summary": "Frontend-only test of new 'Rekap Pre-Order' card in Admin > Order Manual tab. Logged in as admin1/admin123 (httpOnly cookie set on /api/admin/login, verified in response headers). Rekap card rendered above the order list with correct values from 4 ZZTEST pre-orders: Sudah Berdana=2, Menunggu Verifikasi=1, Belum Berdana=1, Total Dana Terkumpul=Rp 250.000, header '4 order · 4 tiket'. Verified it counts ONLY preorder=true orders (manual list had 7 orders total, 3 non-preorder excluded). After cleanup, card correctly hides (0 elements) when no pre-orders exist. All ZZTEST test data removed (4 active via DELETE /api/admin/manual/{id} + 31 soft-deleted ZZTEST records purged from Kotak Sampah); 0 ZZTEST remaining in DB, non-ZZTEST data untouched (3 manual orders remain: testT, TEST, ...).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ManualPanel poBelum uses status !== 'verified' && !== 'waiting_verification' — fine today, but a future status (e.g. 'rejected'/'cancelled') would be silently counted as 'Belum Berdana'. Consider explicit status mapping.",
+    "AdminPage.js is very large (>2000 lines); consider splitting panels (ManualPanel, VIPPanel, etc.) into separate modules."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None created; used existing 4 ZZTEST PO records and deleted them afterwards (also purged 31 legacy soft-deleted ZZTEST orders from trash).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin1 / admin123 (superadmin) — worked",
+  "context_for_next_testing_agent": "Rekap Pre-Order card (data-testid preorder-rekap + -sudah/-menunggu/-belum/-dana) verified working and correctly hidden when no preorder=true orders exist. DB is clean of ZZTEST data (both active and trash). Manual orders remaining are non-test data (testT, TEST, etc.) — do not delete.",
+  "rca_of_the_issue": "No defects found."
+}

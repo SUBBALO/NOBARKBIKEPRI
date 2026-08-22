@@ -1656,12 +1656,50 @@ function ManualPanel() {
   };
 
 
+  const preorders = list.filter((o) => o.preorder);
+  const poSudah = preorders.filter((o) => o.paid || o.status === "verified");
+  const poMenunggu = preorders.filter((o) => !o.paid && o.status === "waiting_verification");
+  const poBelum = preorders.filter((o) => !o.paid && o.status !== "waiting_verification" && o.status !== "verified");
+  const poDanaTotal = poSudah.reduce((a, o) => a + (o.total_amount || 0), 0);
+  const poTiket = preorders.reduce((a, o) => a + (o.qty || (o.seats || []).length || 0), 0);
+
   return (
     <div className="no-print" data-testid="manual-panel">
       <div className="rounded-2xl border border-[#B26A1E]/25 bg-gradient-to-br from-[#B26A1E]/[0.07] to-transparent p-4 mb-4">
         <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2"><ClipboardList className="h-5 w-5 text-[#B26A1E]" /> Order Manual (Rombongan)</h2>
         <p className="text-sm text-[#7A6A5E]">Buat pesanan manual: pilih kursi (bebas), input nominal & status bayar. Kalau sudah bayar, isi tanggal & nominal transfer — otomatis masuk laporan Bendahara.</p>
       </div>
+
+      {preorders.length > 0 && (
+        <div className="rounded-2xl border border-[#2F703E]/25 bg-gradient-to-br from-[#2F703E]/[0.06] to-transparent p-4 mb-4" data-testid="preorder-rekap">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-serif-display text-xl text-[#255E33] flex items-center gap-2"><Ticket className="h-4 w-4 text-[#2F703E]" /> Rekap Pre-Order</h3>
+            <span className="text-xs text-[#7A6A5E]">{preorders.length} order · {poTiket} tiket</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-[#2F703E]/30 bg-white p-3" data-testid="preorder-rekap-sudah">
+              <p className="text-[11px] font-semibold text-[#255E33] uppercase tracking-wide">Sudah Berdana</p>
+              <p className="text-2xl font-bold text-[#2F703E] mt-0.5">{poSudah.length}</p>
+              <p className="text-xs text-[#7A6A5E]">order</p>
+            </div>
+            <div className="rounded-xl border border-[#B26A1E]/30 bg-white p-3" data-testid="preorder-rekap-menunggu">
+              <p className="text-[11px] font-semibold text-[#8A3A12] uppercase tracking-wide">Menunggu Verifikasi</p>
+              <p className="text-2xl font-bold text-[#B26A1E] mt-0.5">{poMenunggu.length}</p>
+              <p className="text-xs text-[#7A6A5E]">order</p>
+            </div>
+            <div className="rounded-xl border border-[#7A241F]/25 bg-white p-3" data-testid="preorder-rekap-belum">
+              <p className="text-[11px] font-semibold text-[#7A241F] uppercase tracking-wide">Belum Berdana</p>
+              <p className="text-2xl font-bold text-[#7A241F] mt-0.5">{poBelum.length}</p>
+              <p className="text-xs text-[#7A6A5E]">order</p>
+            </div>
+            <div className="rounded-xl border border-[#2F703E]/30 bg-[#2F703E]/5 p-3" data-testid="preorder-rekap-dana">
+              <p className="text-[11px] font-semibold text-[#255E33] uppercase tracking-wide">Total Dana Terkumpul</p>
+              <p className="text-lg font-bold text-[#2F703E] mt-0.5 leading-tight">{rupiah(poDanaTotal)}</p>
+              <p className="text-xs text-[#7A6A5E]">dari pre-order sudah berdana</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-[1fr_340px] gap-4">
         <div className="rounded-2xl border border-border bg-white p-4">
