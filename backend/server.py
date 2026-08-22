@@ -222,6 +222,10 @@ class PreorderPay(BaseModel):
     proof_image: str
 
 
+class CashReceive(BaseModel):
+    seller: str
+
+
 class SetActiveSession(BaseModel):
     session_id: int
 
@@ -1802,6 +1806,63 @@ async def preorder_create(payload: PreorderCreate, user: dict = Depends(require_
                        f"Pre-order {len(claimed)} tiket #{order['order_no']} — {order['name']} ({'SUDAH BERDANA' if paid else 'BELUM BERDANA'}), kursi {', '.join(claimed)}",
                        order_id)
     return clean(await db.orders.find_one({"id": order_id}))
+
+
+@api_router.get("/admin/cash-settlement")
+async def cash_settlement(user: dict = Depends(require_roles("superadmin"))):
+    """Rekap setoran kas per petugas (hanya order CASH lunas). QRIS/Transfer tidak dihitung."""
+    per = {}
+    async for o in db.orders.find({"payment_method": "cash", "paid": True, "deleted": {"$ne": True}}):
+        seller = o.get("sold_by") or o.get("created_by") or "—"
+        p = per.setdefault(seller, {"seller": seller, "collected": 0, "deposited": 0, "outstanding": 0, "count": 0, "count_outstanding": 0, "tickets": 0, "days": {}})
+        amt = int(o.get("total_amount") or 0)
+        qty = int(o.get("qty") or len(o.get("seats") or []) or 1)
+        day = (o.get("created_at") or "")[:10]
+        p["collected"] += amt
+        p["count"] += 1
+        p["tickets"] += qty
+        if o.get("cash_deposited"):
+            p["deposited"] += amt
+        else:
+            p["outstanding"] += amt
+            p["count_outstanding"] += 1
+        d = p["days"].setdefault(day, {"date": day, "tickets": 0, "cash": 0, "orders": 0})
+        d["tickets"] += qty
+        d["cash"] += amt
+        d["orders"] += 1
+    for p in per.values():
+        p["days"] = sorted(p["days"].values(), key=lambda x: x["date"], reverse=True)
+    settlements = [clean(s) async for s in db.cash_settlements.find({}).sort("created_at", -1)]
+    sellers = sorted(per.values(), key=lambda x: (-x["outstanding"], x["seller"]))
+    return {
+        "sellers": sellers,
+        "settlements": settlements,
+        "total_collected": sum(p["collected"] for p in per.values()),
+        "total_deposited": sum(p["deposited"] for p in per.values()),
+        "total_outstanding": sum(p["outstanding"] for p in per.values()),
+    }
+
+
+@api_router.post("/admin/cash-settlement/receive")
+async def cash_receive(payload: CashReceive, user: dict = Depends(require_roles("superadmin"))):
+    seller = (payload.seller or "").strip()
+    if not seller:
+        raise HTTPException(status_code=400, detail="Petugas tidak valid")
+    q = {"payment_method": "cash", "paid": True, "deleted": {"$ne": True}, "cash_deposited": {"$ne": True},
+         "$or": [{"sold_by": seller}, {"sold_by": {"$in": [None, ""]}, "created_by": seller}]}
+    orders = [o async for o in db.orders.find(q)]
+    if not orders:
+        raise HTTPException(status_code=400, detail="Tidak ada cash yang perlu disetor untuk petugas ini")
+    amount = sum(int(o.get("total_amount") or 0) for o in orders)
+    ids = [o["id"] for o in orders]
+    now = now_iso()
+    receiver = user.get("name") or user.get("username")
+    await db.orders.update_many({"id": {"$in": ids}}, {"$set": {"cash_deposited": True, "deposited_at": now, "deposited_to": receiver}})
+    rec = {"id": str(uuid.uuid4()), "seller": seller, "amount": amount, "count": len(ids),
+           "received_by": receiver, "order_ids": ids, "created_at": now}
+    await db.cash_settlements.insert_one(rec)
+    await log_activity(user, "setoran", f"Terima setoran kas dari {seller}: Rp{amount:,} ({len(ids)} order)".replace(",", "."), None)
+    return clean(rec)
 
 
 

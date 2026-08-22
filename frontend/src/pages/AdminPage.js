@@ -1394,6 +1394,74 @@ function VIPPanel() {
   );
 }
 
+function SetoranPanel() {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState("");
+  const load = async () => { try { const r = await adminApi.get("/admin/cash-settlement"); setData(r.data); } catch { toast.error("Gagal memuat data setoran"); } };
+  useEffect(() => { load(); }, []);
+  const receive = async (seller) => {
+    if (!window.confirm(`Catat: sudah TERIMA semua setoran cash dari ${seller}? Aksi ini menandai kas petugas sudah disetor ke Bendahara.`)) return;
+    setBusy(seller);
+    try { const r = await adminApi.post("/admin/cash-settlement/receive", { seller }); toast.success(`Setoran ${seller} ${rupiah(r.data.amount)} tercatat`); await load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Gagal mencatat setoran"); }
+    setBusy("");
+  };
+  if (!data) return <div className="py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-[#B26A1E]" /></div>;
+  return (
+    <div className="no-print" data-testid="setoran-panel">
+      <div className="rounded-2xl border border-[#2F703E]/25 bg-gradient-to-br from-[#2F703E]/[0.06] to-transparent p-4 mb-4">
+        <h2 className="font-serif-display text-2xl text-[#255E33] flex items-center gap-2"><Wallet className="h-5 w-5 text-[#2F703E]" /> Setoran Kas ke Bendahara</h2>
+        <p className="text-sm text-[#7A6A5E]">Hanya CASH (Pre-Order + Walk-in + Order Manual). QRIS/Transfer langsung ke rekening. Klik "Terima Setoran" saat petugas sudah menyerahkan uang cash ke Chelyn.</p>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="rounded-xl border border-border bg-white p-3"><p className="text-[11px] text-[#7A6A5E] uppercase font-semibold">Total Cash</p><p className="text-lg font-bold text-[#2C1E16]">{rupiah(data.total_collected)}</p></div>
+        <div className="rounded-xl border border-[#2F703E]/30 bg-white p-3"><p className="text-[11px] text-[#255E33] uppercase font-semibold">Sudah Disetor</p><p className="text-lg font-bold text-[#2F703E]">{rupiah(data.total_deposited)}</p></div>
+        <div className="rounded-xl border border-[#7A241F]/30 bg-white p-3"><p className="text-[11px] text-[#7A241F] uppercase font-semibold">Belum Disetor</p><p className="text-lg font-bold text-[#7A241F]">{rupiah(data.total_outstanding)}</p></div>
+      </div>
+      {data.sellers.length === 0 && <p className="text-sm text-[#7A6A5E]">Belum ada penjualan cash.</p>}
+      {data.sellers.map((s) => (
+        <div key={s.seller} className="rounded-xl border border-border bg-white p-4 mb-3" data-testid="setoran-seller">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="font-semibold text-[#2C1E16]">{s.seller}</p>
+              <p className="text-xs text-[#7A6A5E]">{s.tickets} tiket · {s.count} order cash · sudah disetor {rupiah(s.deposited)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-[#7A6A5E]">Belum disetor</p>
+              <p className="text-lg font-bold text-[#7A241F]">{rupiah(s.outstanding)}</p>
+            </div>
+            <Button size="sm" disabled={s.outstanding <= 0 || busy === s.seller} onClick={() => receive(s.seller)}
+              data-testid="setoran-receive-btn" className="bg-[#2F703E] hover:bg-[#255E33]">
+              {busy === s.seller ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />} {s.outstanding > 0 ? "Terima Setoran" : "Lunas Disetor"}
+            </Button>
+          </div>
+          <div className="mt-2 border-t border-border pt-2">
+            <p className="text-[11px] text-[#7A6A5E] mb-1">Rincian per tanggal:</p>
+            <div className="flex flex-wrap gap-2">
+              {s.days.map((d) => (
+                <span key={d.date} className="text-xs rounded-md bg-[#F3E9DD]/60 px-2 py-1 text-[#5B4636]">{d.date}: <b>{d.tickets} tiket</b> · {rupiah(d.cash)}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+      {data.settlements.length > 0 && (
+        <div className="mt-6">
+          <h3 className="font-serif-display text-lg text-[#7A241F] mb-2">Riwayat Setoran (Closing)</h3>
+          <div className="space-y-1.5">
+            {data.settlements.map((st) => (
+              <div key={st.id} className="flex justify-between items-center text-sm border border-border rounded-lg px-3 py-2 bg-white" data-testid="setoran-history-row">
+                <span><b>{st.seller}</b> · {(st.created_at || "").slice(0, 16).replace("T", " ")} WIB</span>
+                <span className="text-[#2F703E] font-semibold">{rupiah(st.amount)} <span className="text-[#7A6A5E] font-normal">({st.count} order · diterima {st.received_by})</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ManualPanel() {
   const [sessionId, setSessionId] = useState(1);
   const [mapData, setMapData] = useState(null);
@@ -2502,6 +2570,13 @@ export default function AdminPage() {
           </button>
         )}
         {isSuper && (
+          <button data-testid="admin-tab-setoran" onClick={() => setTab("setoran")}
+            className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
+              tab === "setoran" ? "bg-[#2F703E] text-white border-[#2F703E]" : "bg-white text-[#7A6A5E] border-border hover:border-[#2F703E]/50")}>
+            <Wallet className="h-4 w-4" /> Setoran Kas
+          </button>
+        )}
+        {isSuper && (
           <button data-testid="admin-tab-trash" onClick={() => setTab("trash")}
             className={cn("px-4 py-2 rounded-full text-sm font-medium border transition-colors inline-flex items-center gap-1.5",
               tab === "trash" ? "bg-[#EF4444] text-white border-[#EF4444]" : "bg-white text-[#7A6A5E] border-border hover:border-[#EF4444]/50")}>
@@ -2854,6 +2929,7 @@ export default function AdminPage() {
         </div>
       )}
 
+      {tab === "setoran" && isSuper && <SetoranPanel />}
       {tab === "masterlist" && <MasterlistPanel />}
 
       {tab === "users" && isStaff && <UsersPanel currentUser={currentUser} />}

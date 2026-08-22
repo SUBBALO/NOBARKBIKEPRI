@@ -345,3 +345,11 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Akar masalah: index.css punya global `@media print { body * { visibility: hidden } #print-area visible }` (untuk cetak tiket). Halaman /denah tidak di dalam #print-area → semua tersembunyi saat print → PDF kosong.
 - Fix DenahPage.js <style> @media print: tambah `body * { visibility: visible !important }` + `html,body,#root { height:auto; overflow:visible }` (aman krn /denah standalone). Diverifikasi emulasi media print — isi denah tampil penuh.
 - Perlu REDEPLOY.
+
+## Update (Jun 2026 — Setoran Kas ke Bendahara / closing cash)
+- FITUR: rekonsiliasi kas CASH ke Bendahara (Chelyn). Tab "Setoran Kas" (data-testid `admin-tab-setoran`) — KHUSUS SUPER ADMIN (`tab === "setoran" && isSuper`). Panel `SetoranPanel` (AdminPage.js:1397).
+- BACKEND: `GET /api/admin/cash-settlement` (require_roles superadmin) → rekap per petugas HANYA order `payment_method=="cash"` & `paid==True` & not deleted; QRIS/Transfer DIKECUALIKAN (langsung ke rekening). Tiap petugas (key = sold_by || created_by): collected, deposited, outstanding, count, tickets, days[] (per tanggal WIB: tickets/cash/orders). Return juga `settlements[]` (riwayat closing dari koleksi `cash_settlements`) + total_collected/deposited/outstanding.
+- `POST /api/admin/cash-settlement/receive {seller}` (superadmin) = "Terima Semua" 1 klik → tandai semua order cash `paid` yg belum `cash_deposited` milik seller → set `cash_deposited/deposited_at/deposited_to`, buat record `cash_settlements` (seller, amount, count, received_by, order_ids), log action `setoran`. Anti dobel: order yg sudah cash_deposited tidak ikut; panggil ulang tanpa sisa → 400.
+- Model `CashReceive{seller}`. Order cash yg dipakai: manual/preorder/walk-in cash lunas.
+- DIUJI e2e (curl + screenshot, Jun 2026): 3 order manual (admin1 cash 50rb/2 tiket, admin2 cash 75rb/3 tiket, admin1 QRIS 100.137 → DIKECUALIKAN). Rekap = total cash 125rb, tiket per petugas benar, per-tanggal benar. Terima Admin 1 → 50rb tercatat, outstanding→0, deposited=50rb; panggil ulang → 400 (no double). Riwayat closing muncul. Role guard: admin2 → 403; tab tersembunyi utk non-super. UI panel render sempurna. Data uji ZZTEST + settlement dibersihkan total.
+- Perlu REDEPLOY agar naik ke kbikepri.com.
