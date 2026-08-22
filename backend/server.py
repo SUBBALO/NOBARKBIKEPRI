@@ -224,6 +224,11 @@ class PreorderPay(BaseModel):
 
 class CashReceive(BaseModel):
     seller: str
+    date_from: Optional[str] = Field(None, alias="from")
+    date_to: Optional[str] = Field(None, alias="to")
+
+    class Config:
+        populate_by_name = True
 
 
 class SetActiveSession(BaseModel):
@@ -1808,16 +1813,19 @@ async def preorder_create(payload: PreorderCreate, user: dict = Depends(require_
     return clean(await db.orders.find_one({"id": order_id}))
 
 
-@api_router.get("/admin/cash-settlement")
-async def cash_settlement(user: dict = Depends(require_roles("superadmin"))):
-    """Rekap setoran kas per petugas (hanya order CASH lunas). QRIS/Transfer tidak dihitung."""
+async def _collect_cash_settlement(date_from=None, date_to=None):
+    """Rekap kas CASH lunas per petugas, opsional filter tanggal (created_at WIB YYYY-MM-DD)."""
     per = {}
     async for o in db.orders.find({"payment_method": "cash", "paid": True, "deleted": {"$ne": True}}):
+        day = (o.get("created_at") or "")[:10]
+        if date_from and day and day < date_from:
+            continue
+        if date_to and day and day > date_to:
+            continue
         seller = o.get("sold_by") or o.get("created_by") or "—"
         p = per.setdefault(seller, {"seller": seller, "collected": 0, "deposited": 0, "outstanding": 0, "count": 0, "count_outstanding": 0, "tickets": 0, "days": {}})
         amt = int(o.get("total_amount") or 0)
         qty = int(o.get("qty") or len(o.get("seats") or []) or 1)
-        day = (o.get("created_at") or "")[:10]
         p["collected"] += amt
         p["count"] += 1
         p["tickets"] += qty
@@ -1832,15 +1840,84 @@ async def cash_settlement(user: dict = Depends(require_roles("superadmin"))):
         d["orders"] += 1
     for p in per.values():
         p["days"] = sorted(p["days"].values(), key=lambda x: x["date"], reverse=True)
+    return sorted(per.values(), key=lambda x: (-x["outstanding"], x["seller"]))
+
+
+@api_router.get("/admin/cash-settlement")
+async def cash_settlement(user: dict = Depends(require_roles("superadmin")),
+                          date_from: str = Query(None, alias="from"),
+                          date_to: str = Query(None, alias="to")):
+    """Rekap setoran kas per petugas (hanya order CASH lunas). QRIS/Transfer tidak dihitung."""
+    sellers = await _collect_cash_settlement(date_from, date_to)
     settlements = [clean(s) async for s in db.cash_settlements.find({}).sort("created_at", -1)]
-    sellers = sorted(per.values(), key=lambda x: (-x["outstanding"], x["seller"]))
     return {
         "sellers": sellers,
         "settlements": settlements,
-        "total_collected": sum(p["collected"] for p in per.values()),
-        "total_deposited": sum(p["deposited"] for p in per.values()),
-        "total_outstanding": sum(p["outstanding"] for p in per.values()),
+        "total_collected": sum(p["collected"] for p in sellers),
+        "total_deposited": sum(p["deposited"] for p in sellers),
+        "total_outstanding": sum(p["outstanding"] for p in sellers),
     }
+
+
+@api_router.get("/admin/cash-settlement/export")
+async def export_cash_settlement(user: dict = Depends(require_roles("superadmin")),
+                                 date_from: str = Query(None, alias="from"),
+                                 date_to: str = Query(None, alias="to")):
+    sellers = await _collect_cash_settlement(date_from, date_to)
+    wb = Workbook()
+    header_fill = PatternFill("solid", fgColor="255E33")
+
+    def style_header(ws):
+        for cell in ws[1]:
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+
+    # Sheet 1: Rekap per Petugas
+    ws = wb.active
+    ws.title = "Setoran per Petugas"
+    ws.append(["Petugas", "Jml Order Cash", "Jml Tiket", "Total Cash (Rp)",
+               "Sudah Disetor (Rp)", "Belum Disetor (Rp)"])
+    style_header(ws)
+    for s in sellers:
+        ws.append([s["seller"], s["count"], s["tickets"], s["collected"], s["deposited"], s["outstanding"]])
+    ws.append(["TOTAL",
+               sum(s["count"] for s in sellers), sum(s["tickets"] for s in sellers),
+               sum(s["collected"] for s in sellers), sum(s["deposited"] for s in sellers),
+               sum(s["outstanding"] for s in sellers)])
+    for cell in ws[ws.max_row]:
+        cell.font = Font(bold=True)
+    for idx, w in enumerate([20, 14, 10, 16, 16, 16], 1):
+        ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
+
+    # Sheet 2: Rincian per Tanggal
+    ws2 = wb.create_sheet("Rincian per Tanggal")
+    ws2.append(["Petugas", "Tanggal", "Jml Order", "Jml Tiket", "Cash (Rp)"])
+    style_header(ws2)
+    for s in sellers:
+        for d in s["days"]:
+            ws2.append([s["seller"], d["date"], d["orders"], d["tickets"], d["cash"]])
+    for idx, w in enumerate([20, 14, 12, 12, 16], 1):
+        ws2.column_dimensions[ws2.cell(row=1, column=idx).column_letter].width = w
+
+    # Sheet 3: Riwayat Setoran (Closing)
+    ws3 = wb.create_sheet("Riwayat Setoran")
+    ws3.append(["Waktu (WIB)", "Petugas", "Jml Order", "Jumlah (Rp)", "Diterima Oleh"])
+    style_header(ws3)
+    async for st in db.cash_settlements.find({}).sort("created_at", -1):
+        ws3.append([(st.get("created_at") or "")[:16].replace("T", " "), st.get("seller"),
+                    st.get("count"), st.get("amount"), st.get("received_by")])
+    for idx, w in enumerate([18, 20, 12, 16, 18], 1):
+        ws3.column_dimensions[ws3.cell(row=1, column=idx).column_letter].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"setoran-kas-{datetime.now().strftime('%Y%m%d-%H%M')}.xlsx"
+    return StreamingResponse(
+        buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
 
 
 @api_router.post("/admin/cash-settlement/receive")
@@ -1851,6 +1928,18 @@ async def cash_receive(payload: CashReceive, user: dict = Depends(require_roles(
     q = {"payment_method": "cash", "paid": True, "deleted": {"$ne": True}, "cash_deposited": {"$ne": True},
          "$or": [{"sold_by": seller}, {"sold_by": {"$in": [None, ""]}, "created_by": seller}]}
     orders = [o async for o in db.orders.find(q)]
+    # opsional batasi ke rentang tanggal yg sedang ditampilkan
+    df = (payload.date_from or "").strip()
+    dt = (payload.date_to or "").strip()
+    if df or dt:
+        def _in(o):
+            day = (o.get("created_at") or "")[:10]
+            if df and day and day < df:
+                return False
+            if dt and day and day > dt:
+                return False
+            return True
+        orders = [o for o in orders if _in(o)]
     if not orders:
         raise HTTPException(status_code=400, detail="Tidak ada cash yang perlu disetor untuk petugas ini")
     amount = sum(int(o.get("total_amount") or 0) for o in orders)

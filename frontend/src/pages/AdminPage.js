@@ -1397,21 +1397,81 @@ function VIPPanel() {
 function SetoranPanel() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState("");
-  const load = async () => { try { const r = await adminApi.get("/admin/cash-settlement"); setData(r.data); } catch { toast.error("Gagal memuat data setoran"); } };
-  useEffect(() => { load(); }, []);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const load = async () => {
+    try {
+      const params = {};
+      if (dateFrom) params.from = dateFrom;
+      if (dateTo) params.to = dateTo;
+      const r = await adminApi.get("/admin/cash-settlement", { params });
+      setData(r.data);
+    } catch { toast.error("Gagal memuat data setoran"); }
+  };
+  useEffect(() => { load(); }, [dateFrom, dateTo]);
   const receive = async (seller) => {
     if (!window.confirm(`Catat: sudah TERIMA semua setoran cash dari ${seller}? Aksi ini menandai kas petugas sudah disetor ke Bendahara.`)) return;
     setBusy(seller);
-    try { const r = await adminApi.post("/admin/cash-settlement/receive", { seller }); toast.success(`Setoran ${seller} ${rupiah(r.data.amount)} tercatat`); await load(); }
-    catch (e) { toast.error(e?.response?.data?.detail || "Gagal mencatat setoran"); }
+    try {
+      const body = { seller, ...(dateFrom && { from: dateFrom }), ...(dateTo && { to: dateTo }) };
+      const r = await adminApi.post("/admin/cash-settlement/receive", body);
+      toast.success(`Setoran ${seller} ${rupiah(r.data.amount)} tercatat`); await load();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Gagal mencatat setoran"); }
     setBusy("");
+  };
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const params = { responseType: "blob" };
+      if (dateFrom || dateTo) params.params = { ...(dateFrom && { from: dateFrom }), ...(dateTo && { to: dateTo }) };
+      const res = await adminApi.get("/admin/cash-settlement/export", params);
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = "setoran_kas.xlsx"; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error("Gagal export Excel"); }
+    setExporting(false);
   };
   if (!data) return <div className="py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-[#B26A1E]" /></div>;
   return (
     <div className="no-print" data-testid="setoran-panel">
       <div className="rounded-2xl border border-[#2F703E]/25 bg-gradient-to-br from-[#2F703E]/[0.06] to-transparent p-4 mb-4">
-        <h2 className="font-serif-display text-2xl text-[#255E33] flex items-center gap-2"><Wallet className="h-5 w-5 text-[#2F703E]" /> Setoran Kas ke Bendahara</h2>
-        <p className="text-sm text-[#7A6A5E]">Hanya CASH (Pre-Order + Walk-in + Order Manual). QRIS/Transfer langsung ke rekening. Klik "Terima Setoran" saat petugas sudah menyerahkan uang cash ke Chelyn.</p>
+        <div className="flex items-start justify-between flex-wrap gap-2">
+          <div>
+            <h2 className="font-serif-display text-2xl text-[#255E33] flex items-center gap-2"><Wallet className="h-5 w-5 text-[#2F703E]" /> Setoran Kas ke Bendahara</h2>
+            <p className="text-sm text-[#7A6A5E]">Hanya CASH (Pre-Order + Walk-in + Order Manual). QRIS/Transfer langsung ke rekening. Klik "Terima Setoran" saat petugas sudah menyerahkan uang cash ke Chelyn.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={exportExcel} disabled={exporting}
+            data-testid="setoran-export-btn" className="border-[#2F703E]/40 text-[#255E33] hover:bg-[#2F703E]/10">
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4 mr-1" />} Export Excel
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-xl border border-border bg-white p-3 mb-4 flex flex-wrap items-end gap-3" data-testid="setoran-daterange">
+        <div>
+          <label className="block text-[11px] text-[#7A6A5E] mb-1">Dari tanggal</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+            data-testid="setoran-date-from" className="text-sm rounded-lg border border-border px-2 py-1.5" />
+        </div>
+        <div>
+          <label className="block text-[11px] text-[#7A6A5E] mb-1">Sampai tanggal</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+            data-testid="setoran-date-to" className="text-sm rounded-lg border border-border px-2 py-1.5" />
+        </div>
+        <button onClick={() => { const t = new Date().toISOString().slice(0, 10); setDateFrom(t); setDateTo(t); }}
+          data-testid="setoran-preset-today" className="text-xs rounded-full px-3 py-1.5 border border-border bg-white text-[#7A6A5E] hover:border-[#2F703E]/50">Hari ini</button>
+        <button onClick={() => { setDateFrom("2026-09-13"); setDateTo("2026-09-13"); }}
+          data-testid="setoran-preset-event" className="text-xs rounded-full px-3 py-1.5 border border-border bg-white text-[#7A6A5E] hover:border-[#2F703E]/50">Hari Acara (13 Sep)</button>
+        {(dateFrom || dateTo) && (
+          <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+            data-testid="setoran-preset-all" className="text-xs rounded-full px-3 py-1.5 border border-[#B26A1E]/40 bg-white text-[#7A241F] hover:border-[#B26A1E]">Semua tanggal ✕</button>
+        )}
+        {(dateFrom || dateTo) && (
+          <span className="text-[11px] text-[#255E33] font-medium ml-auto" data-testid="setoran-daterange-info">
+            Menampilkan {dateFrom || "awal"} s/d {dateTo || "akhir"}
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="rounded-xl border border-border bg-white p-3"><p className="text-[11px] text-[#7A6A5E] uppercase font-semibold">Total Cash</p><p className="text-lg font-bold text-[#2C1E16]">{rupiah(data.total_collected)}</p></div>
