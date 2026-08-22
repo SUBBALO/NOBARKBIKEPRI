@@ -810,7 +810,7 @@ function UsersPanel({ currentUser }) {
   );
 }
 
-function BendaharaPanel() {
+function BendaharaPanel({ isSuper, onGoSetoran }) {
   const [resp, setResp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState({});
@@ -893,6 +893,15 @@ function BendaharaPanel() {
           </Button>
         </div>
       </div>
+
+      {isSuper && (
+        <div className="rounded-lg border border-[#2F703E]/30 bg-[#2F703E]/[0.06] px-3 py-2 mb-4 flex items-center gap-2 text-sm text-[#255E33]" data-testid="bendahara-to-setoran-note">
+          <Wallet className="h-4 w-4 flex-shrink-0" />
+          <span>Untuk mencatat <b>setoran uang tunai</b> dari petugas ke Bendahara (closing cash), buka tab</span>
+          <button onClick={onGoSetoran} data-testid="bendahara-to-setoran-btn"
+            className="underline font-semibold hover:text-[#2F703E]">Setoran Kas →</button>
+        </div>
+      )}
 
       {/* Date range filter */}
       <div className="rounded-xl border border-border bg-white p-3 mb-4 flex flex-wrap items-end gap-3" data-testid="bendahara-daterange">
@@ -1515,6 +1524,18 @@ function SetoranPanel() {
             </Button>
           </div>
           <div className="mt-2 border-t border-border pt-2">
+            <p className="text-[11px] text-[#7A6A5E] mb-1">Sumber kas:</p>
+            <div className="flex flex-wrap gap-2 mb-2" data-testid="setoran-sources">
+              {(s.sources || []).map((src) => (
+                <span key={src.source} className={cn("text-xs rounded-md px-2 py-1 border",
+                  src.source === "Pre-Order" ? "bg-[#2F703E]/10 border-[#2F703E]/30 text-[#255E33]" :
+                  src.source === "Walk-in" ? "bg-[#B26A1E]/10 border-[#B26A1E]/30 text-[#7A241F]" :
+                  src.source === "Order Manual" ? "bg-[#7A241F]/10 border-[#7A241F]/30 text-[#7A241F]" :
+                  "bg-[#F3E9DD]/60 border-border text-[#5B4636]")}>
+                  {src.source}: <b>{rupiah(src.cash)}</b> · {src.tickets} tiket
+                </span>
+              ))}
+            </div>
             <p className="text-[11px] text-[#7A6A5E] mb-1">Rincian per tanggal:</p>
             <div className="flex flex-wrap gap-2">
               {s.days.map((d) => (
@@ -2974,7 +2995,7 @@ export default function AdminPage() {
 
       {tab === "logs" && <LogsPanel />}
 
-      {tab === "bendahara" && <BendaharaPanel />}
+      {tab === "bendahara" && <BendaharaPanel isSuper={isSuper} onGoSetoran={() => setTab("setoran")} />}
 
       {tab === "vip" && <VIPPanel />}
       {tab === "manual" && <ManualPanel />}

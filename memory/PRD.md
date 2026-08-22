@@ -362,5 +362,10 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 ## Update (Jun 2026 — Setoran Kas: Grand Total acara + Batal/koreksi setoran)
 - KARTU RINGKASAN GRAND TOTAL (data-testid `setoran-grand-total`): kartu menonjol di atas menampilkan Total Kas Cash / Sudah Disetor / Belum Disetor SELURUH ACARA (abaikan filter tanggal). Backend `cash_settlement` return `grand_total{collected,deposited,outstanding}` (hitung tanpa filter bila filter aktif). Kartu 3-kolom lama tetap = angka sesuai filter tanggal.
 - BATAL SETORAN: tombol `setoran-cancel-btn` (XCircle "Batalkan") di tiap baris Riwayat Setoran (Closing). `DELETE /api/admin/cash-settlement/{id}` (superadmin) → order di settlement itu kembali `cash_deposited=false` (+unset deposited_at/deposited_to), record dihapus, rekap recalc OTOMATIS, log action `setoran` (Batalkan). Konfirmasi window.confirm dulu.
-- DIUJI e2e (curl + screenshot): grand_total sebelum terima (50rb/0/50rb) → terima (0 outstanding, deposited 50rb) → batal → restored 1, deposited balik 0, outstanding 50rb, settlements 0. UI grand-total card render di atas. Data uji dibersihkan total. FE compile sukses.
+- Perlu REDEPLOY agar naik ke kbikepri.com.
+
+## Update (Jun 2026 — Setoran Kas: Rekap per Sumber + keputusan menu tetap pisah)
+- REKAP PER SUMBER per petugas (badge di kartu petugas, data-testid `setoran-sources`): pisah kas CASH per kanal — Pre-Order / Walk-in / Order Manual (klasifikasi: `preorder`→Pre-Order, `walkin`→Walk-in, `manual`→Order Manual). `_collect_cash_settlement` return `sources[]` per petugas {source,cash,tickets,orders}. Export Excel sheet "Setoran per Petugas" kini ada kolom Cash Order Manual / Cash Walk-in / Cash Pre-Order.
+- KEPUTUSAN MENU (user setuju rekomendasi sistem): Bendahara & Setoran Kas TETAP 2 menu terpisah (beda akses: Bendahara=semua admin, Setoran Kas=super only; beda fungsi: laporan pemasukan vs closing cash fisik). Ditambah catatan tautan-silang di tab Bendahara (khusus super admin, data-testid `bendahara-to-setoran-note`/`-btn`) yang klik → pindah ke tab Setoran Kas.
+- DIUJI e2e (curl + screenshot): sources benar (Order Manual 50rb/2, Pre-Order 30rb/1); export kolom sumber benar; tautan-silang Bendahara→Setoran Kas berpindah tab. Data uji dibersihkan. FE compile sukses.
 - Perlu REDEPLOY agar naik ke kbikepri.com.

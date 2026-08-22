@@ -1823,9 +1823,10 @@ async def _collect_cash_settlement(date_from=None, date_to=None):
         if date_to and day and day > date_to:
             continue
         seller = o.get("sold_by") or o.get("created_by") or "—"
-        p = per.setdefault(seller, {"seller": seller, "collected": 0, "deposited": 0, "outstanding": 0, "count": 0, "count_outstanding": 0, "tickets": 0, "days": {}})
+        p = per.setdefault(seller, {"seller": seller, "collected": 0, "deposited": 0, "outstanding": 0, "count": 0, "count_outstanding": 0, "tickets": 0, "days": {}, "sources": {}})
         amt = int(o.get("total_amount") or 0)
         qty = int(o.get("qty") or len(o.get("seats") or []) or 1)
+        source = "Pre-Order" if o.get("preorder") else ("Walk-in" if o.get("walkin") else ("Order Manual" if o.get("manual") else "Lainnya"))
         p["collected"] += amt
         p["count"] += 1
         p["tickets"] += qty
@@ -1838,8 +1839,13 @@ async def _collect_cash_settlement(date_from=None, date_to=None):
         d["tickets"] += qty
         d["cash"] += amt
         d["orders"] += 1
+        src = p["sources"].setdefault(source, {"source": source, "cash": 0, "tickets": 0, "orders": 0})
+        src["cash"] += amt
+        src["tickets"] += qty
+        src["orders"] += 1
     for p in per.values():
         p["days"] = sorted(p["days"].values(), key=lambda x: x["date"], reverse=True)
+        p["sources"] = sorted(p["sources"].values(), key=lambda x: -x["cash"])
     return sorted(per.values(), key=lambda x: (-x["outstanding"], x["seller"]))
 
 
@@ -1884,18 +1890,27 @@ async def export_cash_settlement(user: dict = Depends(require_roles("superadmin"
     # Sheet 1: Rekap per Petugas
     ws = wb.active
     ws.title = "Setoran per Petugas"
-    ws.append(["Petugas", "Jml Order Cash", "Jml Tiket", "Total Cash (Rp)",
+    ws.append(["Petugas", "Jml Order Cash", "Jml Tiket", "Cash Order Manual (Rp)",
+               "Cash Walk-in (Rp)", "Cash Pre-Order (Rp)", "Total Cash (Rp)",
                "Sudah Disetor (Rp)", "Belum Disetor (Rp)"])
     style_header(ws)
+
+    def _src(s, name):
+        return sum(x["cash"] for x in s.get("sources", []) if x["source"] == name)
+
     for s in sellers:
-        ws.append([s["seller"], s["count"], s["tickets"], s["collected"], s["deposited"], s["outstanding"]])
+        ws.append([s["seller"], s["count"], s["tickets"],
+                   _src(s, "Order Manual"), _src(s, "Walk-in"), _src(s, "Pre-Order"),
+                   s["collected"], s["deposited"], s["outstanding"]])
     ws.append(["TOTAL",
                sum(s["count"] for s in sellers), sum(s["tickets"] for s in sellers),
+               sum(_src(s, "Order Manual") for s in sellers), sum(_src(s, "Walk-in") for s in sellers),
+               sum(_src(s, "Pre-Order") for s in sellers),
                sum(s["collected"] for s in sellers), sum(s["deposited"] for s in sellers),
                sum(s["outstanding"] for s in sellers)])
     for cell in ws[ws.max_row]:
         cell.font = Font(bold=True)
-    for idx, w in enumerate([20, 14, 10, 16, 16, 16], 1):
+    for idx, w in enumerate([20, 14, 10, 18, 16, 16, 16, 16, 16], 1):
         ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = w
 
     # Sheet 2: Rincian per Tanggal
