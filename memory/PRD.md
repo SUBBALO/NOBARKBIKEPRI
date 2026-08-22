@@ -340,3 +340,8 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Masalah: print denah jadi putih karena warna pakai background-color (Chrome/Edge default mematikan "Background graphics").
 - Fix DenahPage.js: status kursi ditandai GARIS TEPI berwarna tebal (bw 1-3px) + teks dark + tint latar terang (border & teks selalu tercetak walau bg off). Legenda mengikuti (border tebal). Tambah catatan aktifkan Background graphics utk warna penuh. Diverifikasi via emulasi media print — status kursi jelas tanpa bg.
 - Perlu REDEPLOY.
+
+## Update (Jun 2026 — Fix denah Save-as-PDF kosong/putih)
+- Akar masalah: index.css punya global `@media print { body * { visibility: hidden } #print-area visible }` (untuk cetak tiket). Halaman /denah tidak di dalam #print-area → semua tersembunyi saat print → PDF kosong.
+- Fix DenahPage.js <style> @media print: tambah `body * { visibility: visible !important }` + `html,body,#root { height:auto; overflow:visible }` (aman krn /denah standalone). Diverifikasi emulasi media print — isi denah tampil penuh.
+- Perlu REDEPLOY.

@@ -159,6 +159,8 @@ export default function DenahPage() {
     <div className={`min-h-screen bg-[#FDFBF7] ${solo ? `solo-${solo}` : ""}`}>
       <style>{`
         @media print {
+          body * { visibility: visible !important; }
+          html, body, #root { height: auto !important; overflow: visible !important; }
           .no-print { display: none !important; }
           body { background: #fff !important; }
           .dp { break-after: page; padding: 6mm 6mm 10mm !important; }
