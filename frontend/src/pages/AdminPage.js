@@ -1668,6 +1668,9 @@ function ManualPanel() {
       <div className="rounded-2xl border border-[#B26A1E]/25 bg-gradient-to-br from-[#B26A1E]/[0.07] to-transparent p-4 mb-4">
         <h2 className="font-serif-display text-2xl text-[#7A241F] flex items-center gap-2"><ClipboardList className="h-5 w-5 text-[#B26A1E]" /> Order Manual (Rombongan)</h2>
         <p className="text-sm text-[#7A6A5E]">Buat pesanan manual: pilih kursi (bebas), input nominal & status bayar. Kalau sudah bayar, isi tanggal & nominal transfer — otomatis masuk laporan Bendahara.</p>
+        <button onClick={() => window.open("/denah", "_blank")} data-testid="admin-denah-btn" className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#B26A1E]/40 bg-white px-4 py-2 text-sm font-medium text-[#8A3A12] hover:bg-[#B26A1E]/5 transition-colors">
+          <Printer className="h-4 w-4" /> Cetak Denah Kursi (PDF) — pilih per sesi
+        </button>
       </div>
 
       {preorders.length > 0 && (

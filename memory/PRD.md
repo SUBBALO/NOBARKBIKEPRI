@@ -320,3 +320,10 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - Tombol pembuka 'Cetak Denah Kursi (PDF) — semua sesi': di menu /preorder & /walkin (walkin-menu-denah) dan di panel Admin > Order Manual (admin-denah-btn). Klik → buka /denah tab baru → tombol 'Cetak / Simpan PDF' (window.print).
 - Verifikasi screenshot langsung (publik): 4 sesi render, kondisi terkini benar (Sesi 1: 207/20/187), warna sesuai. Perlu REDEPLOY.
 - CATATAN PENDING: permintaan kode unik otomatis (QRIS/Transfer) belum dikerjakan — menunggu jawaban user penempatannya (panitia /preorder vs pembeli /order vs keduanya).
+
+## Update (Jun 2026 — Cetak Denah Kursi per sesi via panel Admin)
+- File /app/frontend/src/pages/DenahPage.js, route publik /denah (standalone). Ambil kursi 4 sesi via api.get(`/sessions/{id}/seats`).
+- Tiap sesi: JUDUL BESAR (SESI X + jam), info acara/tanggal/venue, Kapasitas/Terisi/Kosong, "Update per: {tanggal jam} WIB", denah (LAYAR, baris M→A, LORONG JALAN sebelum K), panel KETERANGAN WARNA. Warna: Kosong=putih, Terisi=abu #9CA3AF, Sweetbox/couple=pink, Disabilitas (K8/K10)=hijau, Operator (A11/A12)=hitam.
+- Toolbar (no-print): tombol Cetak SESI 1/2/3/4 (state solo + CSS .solo-N sembunyikan sesi lain saat print) + Cetak Semua. window.print() → Save as PDF (A4 landscape, tiap sesi 1 halaman, print-color-adjust exact).
+- Tombol pembuka 'Cetak Denah Kursi (PDF) — pilih per sesi' (data-testid admin-denah-btn) di panel Admin > Order Manual → buka /denah tab baru.
+- Karena fitur in-app, di produksi mengikuti data asli. Verifikasi screenshot preview OK. Perlu REDEPLOY.
