@@ -313,3 +313,10 @@ Produksi terpisah dari preview (data preview volatil). Deploy 50 credits/bulan/a
 - AdminPage ManualPanel: kartu 'Rekap Pre-Order' (data-testid preorder-rekap) di atas daftar Order Manual, dihitung client-side dari /admin/manual (hanya o.preorder===true). Kartu: Sudah Berdana (paid||verified), Menunggu Verifikasi (status waiting_verification), Belum Berdana (sisanya), Total Dana Terkumpul (sum total_amount yg sudah berdana), header total order & tiket. Sembunyi bila tidak ada pre-order. Tidak menghitung order manual rombongan biasa.
 - TESTING iteration_25 (frontend) PASS: angka benar (Sudah=2, Menunggu=1, Belum=1, Dana=Rp250.000, 4 order·4 tiket), hanya preorder=true, sembunyi saat kosong. Data ZZTEST dibersihkan total.
 - Perlu REDEPLOY.
+
+## Update (Jun 2026 — PDF Denah Kursi cetak per sesi)
+- Halaman baru /app/frontend/src/pages/DenahPage.js, route publik /denah (standalone, tanpa header/footer). Ambil kursi 4 sesi via api.get(`/sessions/{id}/seats`) (baseURL sudah termasuk /api). Render denah statis siap cetak: LAYAR di atas, baris M→A, LORONG JALAN sebelum baris K, tiap sesi 1 halaman (CSS break-after + @page A4 landscape + print-color-adjust exact).
+- Warna kursi: Tersedia=putih, Terjual=abu (#9CA3AF), Sweetbox/couple=pink, Disabilitas (K8/K10)=hijau (#10B981), Operator (A11/A12)=hitam (#1F2937). Header kapasitas/terjual/sisa + legenda.
+- Tombol pembuka 'Cetak Denah Kursi (PDF) — semua sesi': di menu /preorder & /walkin (walkin-menu-denah) dan di panel Admin > Order Manual (admin-denah-btn). Klik → buka /denah tab baru → tombol 'Cetak / Simpan PDF' (window.print).
+- Verifikasi screenshot langsung (publik): 4 sesi render, kondisi terkini benar (Sesi 1: 207/20/187), warna sesuai. Perlu REDEPLOY.
+- CATATAN PENDING: permintaan kode unik otomatis (QRIS/Transfer) belum dikerjakan — menunggu jawaban user penempatannya (panitia /preorder vs pembeli /order vs keduanya).

@@ -10,11 +10,12 @@ import AdminPage from "@/pages/AdminPage";
 import CheckinPage from "@/pages/CheckinPage";
 import WalkinPage from "@/pages/WalkinPage";
 import DisplayPage from "@/pages/DisplayPage";
+import DenahPage from "@/pages/DenahPage";
 
 function Shell() {
   const loc = useLocation();
   const isAdmin = loc.pathname.startsWith("/admin");
-  const standalone = loc.pathname.startsWith("/checkin") || loc.pathname.startsWith("/walkin") || loc.pathname.startsWith("/preorder") || loc.pathname.startsWith("/display");
+  const standalone = loc.pathname.startsWith("/checkin") || loc.pathname.startsWith("/walkin") || loc.pathname.startsWith("/preorder") || loc.pathname.startsWith("/display") || loc.pathname.startsWith("/denah");
   if (standalone) {
     return (
       <Routes>
@@ -22,6 +23,7 @@ function Shell() {
         <Route path="/walkin" element={<WalkinPage />} />
         <Route path="/preorder" element={<WalkinPage preorder />} />
         <Route path="/display" element={<DisplayPage />} />
+        <Route path="/denah" element={<DenahPage />} />
       </Routes>
     );
   }

@@ -8,7 +8,7 @@ import { SeatMap } from "@/components/SeatMap";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin, Monitor, Video, Search, UserCheck, ScanLine, X, ArrowLeft, Users, Send } from "lucide-react";
+import { Loader2, Store, Banknote, QrCode, Landmark, Ticket, CheckCircle2, RefreshCw, Lock, UploadCloud, Camera, MapPin, Monitor, Video, Search, UserCheck, ScanLine, X, ArrowLeft, Users, Send, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DISPLAY_CHANNEL } from "./DisplayPage";
 
@@ -705,10 +705,14 @@ export default function WalkinPage({ preorder = false }) {
             </button>
             )}
           </div>
+          <div className="text-center mt-4">
+            <button onClick={() => window.open("/denah", "_blank")} data-testid="walkin-menu-denah"
+              className="inline-flex items-center gap-2 rounded-full border border-[#B26A1E]/40 bg-white px-4 py-2 text-sm font-medium text-[#8A3A12] hover:bg-[#B26A1E]/5 transition-colors shadow-sm">
+              <Printer className="h-4 w-4" /> Cetak Denah Kursi (PDF) — semua sesi
+            </button>
+          </div>
         </div>
       )}
-
-      {panitiaMode === "checkin" && (
         <CheckinPanel
           onCheckinDisplay={(v) => setCheckinView(v)}
           onFinish={() => { setCheckinView(null); setPanitiaMode("menu"); }}
